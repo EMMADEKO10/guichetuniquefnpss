@@ -1,0 +1,49 @@
+name: User story
+description: Besoin fonctionnel exprimé du point de vue d'un acteur
+title: "[STORY] "
+labels: ["type: story", "needs-triage"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      description: "En tant que <acteur>, je veux <action> afin de <bénéfice>."
+    validations:
+      required: true
+  - type: dropdown
+    id: actor
+    attributes:
+      label: Acteur principal
+      options:
+        - Requérant (ONG / partenaire)
+        - Agent instructeur FNPSS
+        - Direction Générale FNPSS
+        - Ministère
+        - Agent douanier (DGDA)
+        - Administrateur système
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critères d'acceptation
+      description: Liste vérifiable, un critère par ligne.
+      placeholder: "- [ ] Étant donné ... quand ... alors ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorité (MoSCoW)
+      options: ["Must", "Should", "Could"]
+    validations:
+      required: true
+  - type: input
+    id: epic
+    attributes:
+      label: Epic parente
+      placeholder: "#12"
+  - type: textarea
+    id: deps
+    attributes:
+      label: Dépendances et notes

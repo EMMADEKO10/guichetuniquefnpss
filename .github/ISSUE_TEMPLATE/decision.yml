@@ -1,0 +1,32 @@
+name: Décision (ADR)
+description: Consigner une décision d'architecture ou de périmètre
+title: "[ADR] "
+labels: ["type: decision", "needs-triage"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte
+      description: Problème posé et contraintes.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options envisagées
+      placeholder: "Option A : ...\nOption B : ..."
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Décision et justification
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Conséquences (budget, planning, risques)
+  - type: input
+    id: decider
+    attributes:
+      label: Décideur
+      placeholder: "COPIL du JJ/MM/AAAA"

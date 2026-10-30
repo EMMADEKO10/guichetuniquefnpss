@@ -1,0 +1,45 @@
+name: Risque
+description: Enregistrer un risque dans le registre du projet
+title: "[RISK] "
+labels: ["type: risk", "needs-triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description du risque
+      description: "Si <cause>, alors <événement>, ce qui entraînerait <conséquence>."
+    validations:
+      required: true
+  - type: dropdown
+    id: probability
+    attributes:
+      label: Probabilité
+      options: ["1 - Faible", "2 - Moyenne", "3 - Élevée"]
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options: ["1 - Faible", "2 - Moyen", "3 - Élevé"]
+    validations:
+      required: true
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Mesure de mitigation
+    validations:
+      required: true
+  - type: textarea
+    id: contingency
+    attributes:
+      label: Plan de contingence (si le risque se réalise)
+  - type: input
+    id: owner
+    attributes:
+      label: Propriétaire du risque
+  - type: input
+    id: review
+    attributes:
+      label: Prochaine revue
+      placeholder: "JJ/MM/AAAA"

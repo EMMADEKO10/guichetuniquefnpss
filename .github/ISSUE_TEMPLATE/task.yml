@@ -1,0 +1,36 @@
+name: Tâche technique
+description: Travail technique ou organisationnel sans valeur utilisateur directe
+title: "[TASK] "
+labels: ["type: task", "needs-triage"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Objectif
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Critères de fin
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Domaine
+      options: ["Pilotage", "UX-UI", "Frontend", "Backend", "Blockchain", "Infra-DevOps", "Qualité-Sécurité", "Formation-Déploiement"]
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorité (MoSCoW)
+      options: ["Must", "Should", "Could"]
+    validations:
+      required: true
+  - type: textarea
+    id: deps
+    attributes:
+      label: Dépendances

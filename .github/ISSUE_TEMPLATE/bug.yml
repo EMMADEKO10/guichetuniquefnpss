@@ -1,0 +1,52 @@
+name: Anomalie
+description: Signaler un comportement incorrect
+title: "[BUG] "
+labels: ["type: bug", "needs-triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Comportement constaté
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Gravité
+      options:
+        - Bloquante (service inutilisable ou risque de sécurité)
+        - Majeure (fonction principale dégradée)
+        - Mineure (contournement possible)
+        - Cosmétique
+    validations:
+      required: true
+  - type: dropdown
+    id: env
+    attributes:
+      label: Environnement
+      options: ["Local", "Staging", "Testnet", "Production"]
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Appareil et navigateur
+      placeholder: "Android 12 / Chrome 120, connexion 3G"
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Captures, journaux, identifiant de transaction
+      description: Ne jamais coller de mot de passe, de clé privée ni de donnée personnelle.
