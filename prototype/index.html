@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guichet Unique Dématérialisé du FNPSS — Prototype Interactif (Jalon G1)</title>
+  <style>
+    :root {
+      --fnpss-navy: #0a2540;
+      --fnpss-blue: #065a82;
+      --fnpss-accent: #1a73e8;
+      --fnpss-gold: #f59e0b;
+      --fnpss-red: #d93025;
+      --fnpss-green: #137333;
+      --bg-page: #f4f6f9;
+      --bg-card: #ffffff;
+      --text-main: #1f2937;
+      --text-muted: #5f6368;
+      --border: #dadce0;
+      --purple-web3: #5e35b1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.45;
+    }
+    /* Top DRC Flag Ribbon */
+    .drc-ribbon {
+      height: 5px;
+      background: linear-gradient(90deg, #007fff 0%, #007fff 70%, #f7d618 70%, #f7d618 82%, #ce1021 82%, #ce1021 100%);
+    }
+    header {
+      background: var(--fnpss-navy);
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-crest {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #007fff, #065a82);
+      border: 2px solid #f7d618;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+    .brand-title h1 {
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .brand-title p {
+      font-size: 11.5px;
+      color: #b0c4de;
+    }
+    .role-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .role-tab {
+      background: rgba(255,255,255,0.1);
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 7px 13px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .role-tab:hover { background: rgba(255,255,255,0.2); }
+    .role-tab.active {
+      background: #ffffff;
+      color: var(--fnpss-navy);
+      border-color: #ffffff;
+    }
+    .status-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .net-pill {
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      font-size: 11.5px;
+    }
+    .net-online { background: #e6f4ea; color: #137333; }
+    .net-offline { background: #fef7e0; color: #b06000; }
+    .wallet-pill {
+      background: rgba(94,53,177,0.35);
+      border: 1px solid #9575cd;
+      color: #ede7f6;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: Consolas, monospace;
+      font-size: 11.5px;
+    }
+
+    main {
+      max-width: 1360px;
+      margin: 20px auto;
+      padding: 0 20px 40px;
+    }
+    .view-section { display: none; }
+    .view-section.active { display: block; }
+
+    /* Cards & Grids */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eef0f3;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .card-header h2 {
+      font-size: 16px;
+      color: var(--fnpss-navy);
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .kpi-box {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--fnpss-blue);
+      border-radius: 8px;
+      padding: 13px 16px;
+    }
+    .kpi-box .lbl { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    .kpi-box .val { font-size: 24px; font-weight: 800; color: var(--fnpss-navy); margin-top: 3px; }
+    .kpi-box .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 14px;
+    }
+    .service-card {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 16px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .service-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(6,90,130,0.1);
+      border-color: var(--fnpss-blue);
+    }
+    .service-badge {
+      display: inline-block;
+      background: #e1f5fe;
+      color: var(--fnpss-blue);
+      font-weight: 700;
+      font-size: 11.5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .service-card h3 { font-size: 15px; color: var(--fnpss-navy); margin-bottom: 6px; }
+    .service-card p { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; }
+    .service-meta {
+      font-size: 11.5px;
+      background: #f8fafc;
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      border: 1px solid #eef2f6;
+    }
+
+    /* Buttons & Badges */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.92; }
+    .btn-primary { background: var(--fnpss-blue); color: #fff; }
+    .btn-accent { background: var(--fnpss-accent); color: #fff; }
+    .btn-success { background: var(--fnpss-green); color: #fff; }
+    .btn-purple { background: var(--purple-web3); color: #fff; }
+    .btn-danger { background: var(--fnpss-red); color: #fff; }
+    .btn-outline { background: #fff; border-color: var(--border); color: var(--text-main); }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+    .badge-soumis { background: #e8f0fe; color: #1a73e8; }
+    .badge-instruction { background: #fff8e1; color: #e65100; }
+    .badge-complement { background: #fce8e6; color: #d93025; }
+    .badge-valide { background: #e6f4ea; color: #137333; }
+    .badge-revoque { background: #202124; color: #ffffff; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid #eef0f3;
+    }
+    th {
+      background: #f8fafc;
+      color: var(--fnpss-navy);
+      font-weight: 700;
+      font-size: 12px;
+    }
+    tr:hover td { background: #fafbfc; }
+
+    /* Forms */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: var(--fnpss-navy);
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 8px 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .doc-check-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      margin-bottom: 7px;
+      background: #fafbfc;
+      font-size: 12.5px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .mono {
+      font-family: Consolas, Monaco, monospace;
+      font-size: 11.5px;
+    }
+
+    /* Two-column Admin Split */
+    .admin-split {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 960px) {
+      .admin-split { grid-template-columns: 1fr; }
+    }
+    .pdf-preview {
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      padding: 20px;
+      position: relative;
+    }
+    .pdf-seal-banner {
+      text-align: center;
+      border-bottom: 2px double var(--fnpss-navy);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .pdf-seal-banner h4 { font-size: 13px; letter-spacing: 0.4px; color: var(--fnpss-navy); }
+    .pdf-seal-banner p { font-size: 11px; color: var(--text-muted); }
+
+    /* DGDA Customs Verifier Mobile Frame */
+    .dgda-layout {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+    @media (max-width: 920px) {
+      .dgda-layout { grid-template-columns: 1fr; }
+    }
+    .phone-frame {
+      background: #111827;
+      border-radius: 26px;
+      padding: 14px;
+      color: #fff;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+    }
+    .phone-screen {
+      background: #ffffff;
+      color: #111827;
+      border-radius: 16px;
+      padding: 16px;
+      min-height: 540px;
+    }
+    .verdict-banner {
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      margin: 12px 0;
+      border: 3px solid transparent;
+    }
+    .verdict-green {
+      background: #e6f4ea;
+      border-color: #137333;
+      color: #0d652d;
+    }
+    .verdict-red {
+      background: #fce8e6;
+      border-color: #d93025;
+      color: #b31412;
+    }
+    .verdict-gray {
+      background: #f1f3f4;
+      border-color: #5f6368;
+      color: #3c4043;
+    }
+    .verdict-banner .v-icon { font-size: 36px; display: block; margin-bottom: 4px; }
+    .verdict-banner .v-title { font-size: 18px; font-weight: 900; letter-spacing: 0.3px; }
+    .verdict-banner .v-sub { font-size: 12.5px; font-weight: 600; margin-top: 4px; }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--fnpss-navy);
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+      display: none;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <div class="drc-ribbon"></div>
+  <header>
+    <div class="brand">
+      <div class="brand-crest">FNPSS</div>
+      <div class="brand-title">
+        <h1>Guichet Unique Dématérialisé du FNPSS</h1>
+        <p>République Démocratique du Congo • Ministère des Affaires Sociales, Actions Humanitaires & Solidarité Nationale</p>
+      </div>
+    </div>
+
+    <div class="role-tabs">
+      <button class="role-tab active" onclick="switchView('requerant', this)">1. Portail Requérant (ONG)</button>
+      <button class="role-tab" onclick="switchView('admin', this)">2. Back-Office FNPSS (Agent / DG)</button>
+      <button class="role-tab" onclick="switchView('dgda', this)">3. Contrôle Douanier QR (DGDA)</button>
+      <button class="role-tab" onclick="switchView('blockchain', this)">4. Registre Polygon & Audit</button>
+    </div>
+
+    <div class="status-controls">
+      <button id="netBtn" class="net-pill net-online" onclick="toggleNetwork()" title="Simuler une coupure 3G en province (SC-04)">
+        🟢 Réseau En Ligne (Polygon Amoy)
+      </button>
+      <span class="wallet-pill" id="walletBadge">Web3Auth: 0x71C...9A4B</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================================================================== -->
+    <!-- VUE 1 : PORTAIL REQUÉRANT (ONG / PARTENAIRE SOCIAL)                -->
+    <!-- ================================================================== -->
+    <section id="view-requerant" class="view-section active">
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="lbl">ORGANISATION CONNECTÉE</div>
+          <div class="val" style="font-size:16px;margin-top:6px;">ONG Espoir du Nord-Kivu</div>
+          <div class="sub">N° Enrôlement : FNPSS/ENR/2025/0112 • Goma</div>
+        </div>
+        <div class="kpi-box">
+          <div class="lbl">DEMANDES SOUMISES</div>
+          <div class="val" id="kpi-req-total">3</div>
+          <div class="sub">Suivi en temps réel à distance</div>
+        </div>
+        <div class="kpi-box" style="border-left-color: var(--fnpss-green);">
+          <div class="lbl">ACTES OFFICIELS SCELLÉS</div>
+          <div class="val" id="kpi-req-valid">2</div>
+          <div class="sub">Certifiés SHA-256 + QR Code DGDA</div>
+        </div>
+        <div class="kpi-box" style="border-left-color: var(--fnpss-gold);">
+          <div class="lbl">DÉLAI RÉGLEMENTAIRE</div>
+          <div class="val">10 j. ouvrés</div>
+          <div class="sub">Frais : 20 USD dépôt + 300 USD enquête</div>
+        </div>
+      </div>
+
+      <!-- Catalogue des 6 Services -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Catalogue des 6 Services du Guichet Unique FNPSS (Cliquez pour soumettre un dossier)</h2>
+          <span style="font-size:12px;color:var(--text-muted);">Principe « Once-Only » : vos pièces annuelles validées sont pré-attachées</span>
+        </div>
+        <div class="services-grid" id="servicesGrid"></div>
+      </div>
+
+      <!-- Formulaire Wizard de Soumission -->
+      <div class="card" id="submissionWizard" style="border: 2px solid var(--fnpss-blue);">
+        <div class="card-header">
+          <h2 id="wizardTitle">Déposer une nouvelle demande — S6 : Arrêté ministériel portant avis favorable pour l'exonération</h2>
+          <span class="badge badge-soumis" id="draftStatusBadge">💾 Brouillon PWA sauvegardé</span>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Service administratif demandé (S1 à S6)</label>
+            <select id="formServiceCode" onchange="updateWizardService()">
+              <option value="S1">S1 — Attestation d'enrôlement au FNPSS</option>
+              <option value="S2">S2 — Convention de partenariat avec le Gouvernement</option>
+              <option value="S3">S3 — Attestation des biens à exonérer</option>
+              <option value="S4">S4 — Certificat d'exonérations</option>
+              <option value="S5">S5 — Certificat de philanthropie</option>
+              <option value="S6" selected>S6 — Arrêté ministériel portant avis favorable pour l'exonération</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Intitulé du projet ou programme humanitaire / social</label>
+            <input type="text" id="formProjectTitle" value="Programme d'urgence sanitaire et cliniques mobiles — Nord-Kivu 2026" oninput="saveDraftPWA()" />
+          </div>
+          <div class="form-group">
+            <label>Référence de quittance bancaire / Mobile Money (20 USD + 300 USD)</label>
+            <input type="text" id="formPaymentRef" value="RAWBANK-CDF-2026-88412" oninput="saveDraftPWA()" />
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Liste détaillée et valeur estimée des biens / équipements humanitaires (pour S3, S4, S6)</label>
+          <textarea id="formGoods" rows="2" oninput="saveDraftPWA()">2 Ambulances médicalisées 4x4 Toyota Land Cruiser, 500 Kits chirurgicaux d'urgence, 12 Générateurs solaires hospitaliers (Valeur estimée : 148 000 USD).</textarea>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--fnpss-navy);margin-bottom:8px;">
+            Pièces justificatives exigées (Format PDF/A — Calcul d'empreinte locale SHA-256 à l'ajout) :
+          </label>
+          <div id="requiredDocsList">
+            <div class="doc-check-row">
+              <span>✅ <strong>P1.</strong> Requête adressée au Ministre de tutelle avec copie au DG FNPSS (<code>requete_ministre_dg.pdf</code>)</span>
+              <span class="mono">SHA-256: 4b227777d4dd1fc61c6f884f48641d02...</span>
+            </div>
+            <div class="doc-check-row">
+              <span>✅ <strong>P2.</strong> Copie de l'attestation d'enrôlement au FNPSS (<code>FNPSS/ENR/2025/0112.pdf</code> — <em>Pré-rempli Once-Only</em>)</span>
+              <span class="mono">SHA-256: e3b0c44298fc1c149afbf4c8996fb924...</span>
+            </div>
+            <div class="doc-check-row">
+              <span>✅ <strong>P3.</strong> Copie du plan d'action pour l'année en cours 2026 (<code>plan_action_2026.pdf</code>)</span>
+              <span class="mono">SHA-256: 8f434346648f6b96df89dda901c5176b...</span>
+            </div>
+            <div class="doc-check-row">
+              <span>✅ <strong>P4.</strong> Copie du rapport annuel d'activités écoulé 2025 (<code>rapport_annuel_2025.pdf</code>)</span>
+              <span class="mono">SHA-256: 2c26b46b68ffc68ff99b453c1d304134...</span>
+            </div>
+            <div class="doc-check-row">
+              <span>✅ <strong>P5.</strong> Projet social/humanitaire détaillé & colisage (<code>descriptif_projet_biens.pdf</code>)</span>
+              <span class="mono">SHA-256: 7f83b1657ff1fc53b92dc18148a1d65d...</span>
+            </div>
+            <div class="doc-check-row">
+              <span>✅ <strong>P6.</strong> Preuve de paiement des frais : 20 USD dépôt + 300 USD enquête (<code>quittance_320usd.pdf</code>)</span>
+              <span class="mono">SHA-256: 9f86d081884c7d659a2feaa0c55ad015...</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <span style="font-size:12px;color:var(--text-muted);">
+            ⏱️ Le délai de <strong>10 jours ouvrables</strong> démarre dès validation de la quittance P6 par le FNPSS.
+          </span>
+          <button class="btn btn-primary" onclick="submitNewApplication()">
+            📤 Soumettre la demande officielle au FNPSS
+          </button>
+        </div>
+      </div>
+
+      <!-- Liste des demandes de l'ONG -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Suivi de mes demandes en temps réel & Téléchargement des actes scellés</h2>
+          <button class="btn btn-outline" onclick="exportApplicationsCSV()">⬇ Exporter CSV / Excel</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>N° Dossier</th>
+              <th>Service</th>
+              <th>Projet / Objet</th>
+              <th>Frais (20$+300$)</th>
+              <th>Statut</th>
+              <th>Acte Officiel & Blockchain</th>
+            </tr>
+          </thead>
+          <tbody id="reqApplicationsTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- VUE 2 : BACK-OFFICE D'ADMINISTRATION FNPSS (AGENT & DG)            -->
+    <!-- ================================================================== -->
+    <section id="view-admin" class="view-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>File d'instruction des dossiers FNPSS (Contrôle de recevabilité, Enquête & Scellement Blockchain)</h2>
+          <span style="font-size:12px;color:var(--text-muted);">Cliquez sur « Ouvrir / Instruire » pour afficher le dossier dans le poste côte-à-côte</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>N° Dossier</th>
+              <th>Requérant (ONG)</th>
+              <th>Service</th>
+              <th>Quittance (320$)</th>
+              <th>SLA (10j ouvrés)</th>
+              <th>Statut</th>
+              <th>Action Agent / DG</th>
+            </tr>
+          </thead>
+          <tbody id="adminApplicationsTable"></tbody>
+        </table>
+      </div>
+
+      <div class="admin-split">
+        <!-- Colonne Gauche : Poste de décision -->
+        <div class="card">
+          <div class="card-header">
+            <h2 id="adminSelectedTitle">Poste d'Instruction & Signature Numérique</h2>
+            <span class="badge badge-instruction" id="adminSelectedStatus">Sélectionné</span>
+          </div>
+          <div id="adminDecisionPanel"></div>
+        </div>
+
+        <!-- Colonne Droite : Visionneuse PDF & Aperçu de l'Acte Scellé -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Visionneuse PDF Intégrée & Aperçu de l'Acte Officiel Scellé</h2>
+            <span class="mono" id="previewHashBadge">SHA-256</span>
+          </div>
+          <div class="pdf-preview" id="adminPdfPreview"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- VUE 3 : CONTRÔLE DOUANIER INSTANTANÉ DGDA (SCAN QR CODE)           -->
+    <!-- ================================================================== -->
+    <section id="view-dgda" class="view-section">
+      <div class="dgda-layout">
+        <!-- Simulateur Smartphone Douanier -->
+        <div class="phone-frame">
+          <div style="text-align:center;font-size:11px;color:#9ca3af;margin-bottom:8px;">
+            📱 TERMINAL MOBILE INSPECTEUR DGDA • POSTE FRONTIÈRE (3G)
+          </div>
+          <div class="phone-screen" id="dgdaPhoneScreen"></div>
+        </div>
+
+        <!-- Panneau de test des scénarios douaniers -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h2>Simulateur de Scan QR Code & Vérification Cryptographique en Douane (DGDA)</h2>
+            </div>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
+              Aux postes frontières (Kasumbalesa, Matadi, Aéroport de N'Djili, Goma), l'inspecteur de la DGDA scanne le QR Code imprimé sur le document présenté par l'ONG. Le portail interroge gratuitement la fonction <code>verifyDocument(bytes32 docHash)</code> du Smart Contract <strong>FNPSSRegistry.sol</strong> sur Polygon et restitue le verdict en moins de 3 secondes :
+            </p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+              <button class="btn btn-success" onclick="triggerDgdaPreset('VALID')">
+                🟢 Simuler Scan Certificat Authentique (SC-01)
+              </button>
+              <button class="btn btn-danger" onclick="triggerDgdaPreset('TAMPERED')">
+                🔴 Simuler Scan PDF Falsifié / Altéré (SC-03)
+              </button>
+              <button class="btn btn-danger" style="background:#202124;" onclick="triggerDgdaPreset('REVOKED')">
+                🔴 Simuler Scan Certificat Révoqué (CU06)
+              </button>
+              <button class="btn btn-outline" onclick="triggerDgdaPreset('EXPIRED')">
+                ⚪ Simuler Scan Certificat Expiré
+              </button>
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+              <label>Ou vérifier directement par empreinte SHA-256 / Numéro d'acte :</label>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="dgdaInputHash" class="mono" placeholder="Ex: 0x8f92a4... ou FNPSS-EXO-2026-00124" />
+                <button class="btn btn-primary" onclick="verifyCustomHash()">Vérifier On-Chain</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Actes disponibles dans le registre pour test de scan en 1 clic</h2>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>N° Acte Officiel</th>
+                  <th>Service</th>
+                  <th>ONG Bénéficiaire</th>
+                  <th>État On-Chain</th>
+                  <th>Action Douanier</th>
+                </tr>
+              </thead>
+              <tbody id="dgdaCertificatesTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- VUE 4 : REGISTRE BLOCKCHAIN POLYGON & JOURNAL D'AUDIT IMMUABLE     -->
+    <!-- ================================================================== -->
+    <section id="view-blockchain" class="view-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>Transactions d'Ancrage On-Chain — Smart Contract <code>FNPSSRegistry.sol</code> (Polygon Amoy / Mainnet)</h2>
+          <span class="badge" style="background:#ede7f6;color:#311b92;">0 Donnée personnelle on-chain • Hash SHA-256 uniquement</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>N° Acte</th>
+              <th>Hash SHA-256 du PDF Scellé</th>
+              <th>Transaction Polygon (TxHash)</th>
+              <th>Statut On-Chain</th>
+              <th>Horodatage</th>
+            </tr>
+          </thead>
+          <tbody id="blockchainLedgerTable"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Journal d'Audit Immuable de la Plateforme (`ADM-07` / `F18`)</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Horodatage</th>
+              <th>Acteur & Rôle</th>
+              <th>Action Exécutée</th>
+              <th>Cible / Dossier</th>
+              <th>Détails Techniques</th>
+            </tr>
+          </thead>
+          <tbody id="auditLogTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // =========================================================================
+    // REFERENTIEL DES 6 SERVICES DU GUICHET UNIQUE FNPSS (S1 A S6)
+    // =========================================================================
+    const SERVICES = [
+      { code: 'S1', title: "Attestation d'enrôlement au FNPSS", desc: "Reconnaissance officielle de l'acteur humanitaire ou social auprès du FNPSS.", ministry: false },
+      { code: 'S2', title: "Convention de partenariat avec le Gouvernement", desc: "Accord-cadre bilatéral permettant d'opérer des programmes sociaux d'envergure en RDC.", ministry: true },
+      { code: 'S3', title: "Attestation des biens à exonérer", desc: "Validation qualitative et quantitative des équipements, véhicules, vivres ou médicaments.", ministry: false },
+      { code: 'S4', title: "Certificat d'exonérations", desc: "Document conférant une franchise douanière et fiscale vérifiable par QR Code par la DGDA.", ministry: false },
+      { code: 'S5', title: "Certificat de philanthropie", desc: "Attestation d'utilité publique accordée aux donateurs, fondations et mécènes sociaux.", ministry: false },
+      { code: 'S6', title: "Arrêté ministériel portant avis favorable pour l'exonération", desc: "Acte réglementaire signé par la tutelle après avis technique favorable du FNPSS.", ministry: true }
+    ];
+
+    let isOnline = true;
+    let selectedAppId = 'DEM-002';
+
+    const state = {
+      applications: [
+        {
+          id: 'DEM-001',
+          ref: 'FNPSS/DEM/2026/00041',
+          org: 'ONG Espoir du Nord-Kivu',
+          serviceCode: 'S1',
+          projectTitle: 'Enrôlement institutionnel biennal 2025-2027',
+          goods: 'Sans objet (Enrôlement structurel)',
+          paymentRef: 'RAWBANK-CDF-2026-11204',
+          paymentValidated: true,
+          slaDaysElapsed: 4,
+          status: 'VALIDE_DELIVRE',
+          certNumber: 'FNPSS-ENR-2026-00089',
+          docHash: '0x6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b',
+          txHash: '0x91a8f0c3e4129b775a81d2c904f8a1e72c6b5d4e3f2a1b0c9d8e7f6a5b4c3d2e',
+          certStatus: 'ACTIVE',
+          issuedAt: '28/10/2026',
+          expiresAt: '28/10/2028',
+          revocationReason: ''
+        },
+        {
+          id: 'DEM-002',
+          ref: 'FNPSS/DEM/2026/00048',
+          org: 'ONG Espoir du Nord-Kivu',
+          serviceCode: 'S6',
+          projectTitle: 'Importation de 2 ambulances 4x4 et 500 kits médicaux — Goma',
+          goods: '2 Véhicules Ambulance 4x4 Toyota Land Cruiser, 500 Kits médicaux d\'urgence, 12 Générateurs solaires (148 000 USD)',
+          paymentRef: 'BCDC-CDF-2026-99481',
+          paymentValidated: true,
+          slaDaysElapsed: 3,
+          status: 'VALIDE_DELIVRE',
+          certNumber: 'FNPSS-EXO-2026-00124',
+          docHash: '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
+          txHash: '0x3c7e92b14f08a6d5e219c847b3a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3',
+          certStatus: 'ACTIVE',
+          issuedAt: '02/11/2026',
+          expiresAt: '02/11/2027',
+          revocationReason: ''
+        },
+        {
+          id: 'DEM-003',
+          ref: 'FNPSS/DEM/2026/00052',
+          org: 'Fondation Solidarité Kasaï',
+          serviceCode: 'S4',
+          projectTitle: 'Équipements de forage d\'eau potable — Kananga (10 puits)',
+          goods: '2 Camions foreuses hydrauliques, 40 Pompes solaires immergées, tuyauterie PVC (92 500 USD)',
+          paymentRef: 'EQUITYBCDC-2026-77319',
+          paymentValidated: false,
+          slaDaysElapsed: 1,
+          status: 'SOUMIS',
+          certNumber: '',
+          docHash: '',
+          txHash: '',
+          certStatus: 'NONE',
+          issuedAt: '',
+          expiresAt: '',
+          revocationReason: ''
+        }
+      ],
+      auditLogs: [
+        { ts: '02/11/2026 09:15', actor: 'ONG Espoir du Nord-Kivu (REQUERANT)', action: 'APPLICATION_SUBMITTED', target: 'FNPSS/DEM/2026/00048', detail: 'Dépôt S6 + 6 pièces PDF/A + Quittance 20$+300$' },
+        { ts: '02/11/2026 10:05', actor: 'Patrick K. (AGENT FNPSS)', action: 'PAYMENT_VALIDATED', target: 'FNPSS/DEM/2026/00048', detail: 'Validation quittance BCDC-CDF-2026-99481 -> Démarrage SLA 10j ouvrables' },
+        { ts: '02/11/2026 11:40', actor: 'Jean-Pierre L. (DG FNPSS)', action: 'CERTIFICATE_SEALED_ONCHAIN', target: 'FNPSS-EXO-2026-00124', detail: 'Ancrage SHA-256 sur Polygon (registerDocument) + QR Code généré' }
+      ]
+    };
+
+    // Calcul SHA-256 réel via Web Crypto API
+    async function sha256Hex(text) {
+      const data = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 4000);
+    }
+
+    function switchView(viewId, btnEl) {
+      document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+      document.getElementById('view-' + viewId).classList.add('active');
+      if (btnEl) {
+        document.querySelectorAll('.role-tab').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+      }
+      renderAll();
+    }
+
+    function toggleNetwork() {
+      isOnline = !isOnline;
+      const btn = document.getElementById('netBtn');
+      if (isOnline) {
+        btn.className = 'net-pill net-online';
+        btn.textContent = '🟢 Réseau En Ligne (Polygon Amoy)';
+        showToast('Connexion rétablie : synchronisation automatique de la file PWA / Blockchain effectuée.');
+      } else {
+        btn.className = 'net-pill net-offline';
+        btn.textContent = '🟠 Mode Hors-Ligne PWA (File locale active)';
+        showToast('Mode Hors-Ligne activé (SC-04) : les saisies sont conservées dans IndexedDB/LocalStorage.');
+      }
+    }
+
+    function selectServiceForWizard(code) {
+      document.getElementById('formServiceCode').value = code;
+      updateWizardService();
+      document.getElementById('submissionWizard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function updateWizardService() {
+      const code = document.getElementById('formServiceCode').value;
+      const svc = SERVICES.find(s => s.code === code);
+      document.getElementById('wizardTitle').textContent = `Déposer une nouvelle demande — ${svc.code} : ${svc.title}`;
+    }
+
+    function saveDraftPWA() {
+      const draft = {
+        serviceCode: document.getElementById('formServiceCode').value,
+        projectTitle: document.getElementById('formProjectTitle').value,
+        paymentRef: document.getElementById('formPaymentRef').value,
+        goods: document.getElementById('formGoods').value,
+        savedAt: new Date().toLocaleTimeString('fr-FR')
+      };
+      try { localStorage.setItem('fnpss_pwa_draft', JSON.stringify(draft)); } catch (e) {}
+      document.getElementById('draftStatusBadge').textContent = `💾 Brouillon PWA sauvegardé à ${draft.savedAt}`;
+    }
+
+    async function submitNewApplication() {
+      const serviceCode = document.getElementById('formServiceCode').value;
+      const projectTitle = document.getElementById('formProjectTitle').value.trim();
+      const paymentRef = document.getElementById('formPaymentRef').value.trim();
+      const goods = document.getElementById('formGoods').value.trim();
+      if (!projectTitle || !paymentRef) {
+        showToast('Veuillez renseigner l\'intitulé du projet et la référence de quittance.');
+        return;
+      }
+      const nextNum = 49 + state.applications.length;
+      const newApp = {
+        id: 'DEM-00' + (state.applications.length + 1),
+        ref: `FNPSS/DEM/2026/000${nextNum}`,
+        org: 'ONG Espoir du Nord-Kivu',
+        serviceCode,
+        projectTitle,
+        goods: goods || 'Conforme au descriptif P5 joint',
+        paymentRef,
+        paymentValidated: false,
+        slaDaysElapsed: 0,
+        status: 'SOUMIS',
+        certNumber: '',
+        docHash: '',
+        txHash: '',
+        certStatus: 'NONE',
+        issuedAt: '',
+        expiresAt: '',
+        revocationReason: ''
+      };
+      state.applications.unshift(newApp);
+      selectedAppId = newApp.id;
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'ONG Espoir du Nord-Kivu (REQUERANT)',
+        action: isOnline ? 'APPLICATION_SUBMITTED' : 'PWA_OFFLINE_QUEUED',
+        target: newApp.ref,
+        detail: `Soumission ${serviceCode} (${projectTitle}) + Quittance ${paymentRef}`
+      });
+      renderAll();
+      showToast(`Dossier ${newApp.ref} enregistré ! Vous pouvez maintenant l'instruire dans l'onglet « 2. Back-Office FNPSS ».`);
+    }
+
+    function statusBadgeHtml(status, certStatus) {
+      if (certStatus === 'REVOKED') return '<span class="badge badge-revoque">⛔ ACTE RÉVOQUÉ ON-CHAIN</span>';
+      switch (status) {
+        case 'SOUMIS': return '<span class="badge badge-soumis">Soumis (Attente validation frais)</span>';
+        case 'EN_COURS_INSTRUCTION': return '<span class="badge badge-instruction">En cours d\'instruction (SLA actif)</span>';
+        case 'COMPLEMENT_REQUIS': return '<span class="badge badge-complement">Complément requis (SLA suspendu)</span>';
+        case 'VALIDE_DELIVRE': return '<span class="badge badge-valide">✓ Validé & Scellé Blockchain</span>';
+        default: return `<span class="badge">${status}</span>`;
+      }
+    }
+
+    function openInAdmin(appId) {
+      selectedAppId = appId;
+      const tabs = document.querySelectorAll('.role-tab');
+      switchView('admin', tabs[1]);
+    }
+
+    function openInDgda(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      const tabs = document.querySelectorAll('.role-tab');
+      switchView('dgda', tabs[2]);
+      if (app && app.docHash) {
+        renderDgdaVerdictForApp(app);
+      }
+    }
+
+    function validatePayment(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      app.paymentValidated = true;
+      if (app.status === 'SOUMIS') app.status = 'EN_COURS_INSTRUCTION';
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'Patrick K. (AGENT FNPSS)',
+        action: 'PAYMENT_VALIDATED',
+        target: app.ref,
+        detail: `Quittance ${app.paymentRef} (20$ + 300$) validée -> Démarrage chrono 10 jours ouvrables`
+      });
+      renderAll();
+      showToast(`Paiement validé pour ${app.ref} : le compte à rebours de 10 jours ouvrables est démarré.`);
+    }
+
+    function requestComplement(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      app.status = 'COMPLEMENT_REQUIS';
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'Patrick K. (AGENT FNPSS)',
+        action: 'COMPLEMENT_REQUESTED',
+        target: app.ref,
+        detail: 'Demande de pièce complémentaire envoyée à l\'ONG (suspension temporaire du SLA)'
+      });
+      renderAll();
+      showToast(`Notification envoyée à l'ONG pour ${app.ref} : statut passé à « Complément requis ».`);
+    }
+
+    async function sealAndPublishCertificate(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      app.paymentValidated = true;
+      app.status = 'VALIDE_DELIVRE';
+      const numSuffix = String(125 + state.applications.indexOf(app)).padStart(5, '0');
+      app.certNumber = `FNPSS-${app.serviceCode}-2026-${numSuffix}`;
+      const payload = `${app.certNumber}|${app.org}|${app.serviceCode}|${app.projectTitle}|${app.goods}|${Date.now()}`;
+      app.docHash = await sha256Hex(payload);
+      app.txHash = await sha256Hex('TX|' + payload);
+      app.certStatus = 'ACTIVE';
+      app.issuedAt = '02/11/2026';
+      app.expiresAt = '02/11/2027';
+      app.revocationReason = '';
+
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'Jean-Pierre L. (DG FNPSS)',
+        action: 'CERTIFICATE_SEALED_ONCHAIN',
+        target: app.certNumber,
+        detail: `registerDocument(${app.docHash.slice(0, 18)}...) confirmé sur Polygon (Tx: ${app.txHash.slice(0, 14)}...)`
+      });
+      renderAll();
+      showToast(`Acte ${app.certNumber} généré, scellé sur Polygon et publié avec son QR Code dynamique !`);
+    }
+
+    function revokeCertificate(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app || !app.docHash) return;
+      app.certStatus = 'REVOKED';
+      app.revocationReason = 'Suspension administrative suite à contrôle de conformité terrain (CU06)';
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'Jean-Pierre L. (DG FNPSS)',
+        action: 'CERTIFICATE_REVOKED_ONCHAIN',
+        target: app.certNumber,
+        detail: `revokeDocument(${app.docHash.slice(0, 18)}...) -> État on-chain passé à REVOKED`
+      });
+      renderAll();
+      showToast(`Acte ${app.certNumber} RÉVOQUÉ sur la blockchain ! Tout scan DGDA affichera désormais la Pastille Rouge.`);
+    }
+
+    // Générateur visuel de QR Code SVG déterministe à partir du hash
+    function generateQrSvg(seedStr, size = 112) {
+      const cells = 15;
+      let hash = 2166136261;
+      for (let i = 0; i < seedStr.length; i++) {
+        hash ^= seedStr.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      const cellSize = size / cells;
+      let rects = '';
+      const isFinder = (r, c) => (r < 4 && c < 4) || (r < 4 && c >= cells - 4) || (r >= cells - 4 && c < 4);
+      for (let r = 0; r < cells; r++) {
+        for (let c = 0; c < cells; c++) {
+          let fill = false;
+          if (isFinder(r, c)) {
+            const lr = r >= cells - 4 ? r - (cells - 4) : r;
+            const lc = c >= cells - 4 ? c - (cells - 4) : c;
+            fill = (lr === 0 || lr === 3 || lc === 0 || lc === 3 || (lr >= 1 && lr <= 2 && lc >= 1 && lc <= 2));
+          } else {
+            hash ^= (r * 31 + c * 17);
+            hash = Math.imul(hash, 16777619);
+            fill = (Math.abs(hash) % 2 === 0);
+          }
+          if (fill) {
+            rects += `<rect x="${(c * cellSize).toFixed(1)}" y="${(r * cellSize).toFixed(1)}" width="${cellSize.toFixed(1)}" height="${cellSize.toFixed(1)}" fill="#0a2540"/>`;
+          }
+        }
+      }
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="border:4px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.2);background:#fff;">${rects}</svg>`;
+    }
+
+    function renderServicesCatalog() {
+      const grid = document.getElementById('servicesGrid');
+      grid.innerHTML = SERVICES.map(s => `
+        <div class="service-card">
+          <div>
+            <span class="service-badge">Service ${s.code} ${s.ministry ? '• Contre-seing Ministériel' : '• Acte Direct FNPSS'}</span>
+            <h3>${s.title}</h3>
+            <p>${s.desc}</p>
+          </div>
+          <div>
+            <div class="service-meta">
+              💰 <strong>Frais :</strong> 20 USD (dépôt) + 300 USD (enquête) &nbsp;|&nbsp; ⏱️ <strong>Délai :</strong> 10 jours ouvrables
+            </div>
+            <button class="btn btn-primary" style="width:100%;" onclick="selectServiceForWizard('${s.code}')">
+              Commencer par ici (${s.code}) →
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderRequerantTable() {
+      document.getElementById('kpi-req-total').textContent = state.applications.length;
+      document.getElementById('kpi-req-valid').textContent = state.applications.filter(a => a.status === 'VALIDE_DELIVRE' && a.certStatus === 'ACTIVE').length;
+
+      const tbody = document.getElementById('reqApplicationsTable');
+      tbody.innerHTML = state.applications.map(a => `
+        <tr>
+          <td class="mono"><strong>${a.ref}</strong></td>
+          <td><strong>${a.serviceCode}</strong></td>
+          <td>${a.projectTitle}</td>
+          <td>${a.paymentValidated ? '✅ Validés (320$)' : '⏳ Preuve déposée'}</td>
+          <td>${statusBadgeHtml(a.status, a.certStatus)}</td>
+          <td>
+            ${a.docHash ? `
+              <button class="btn btn-success" style="padding:5px 10px;font-size:11.5px;" onclick="openInAdmin('${a.id}')">📄 Voir Acte & QR</button>
+              <button class="btn btn-outline" style="padding:5px 10px;font-size:11.5px;" onclick="openInDgda('${a.id}')">📷 Tester en Douane</button>
+            ` : `
+              <button class="btn btn-outline" style="padding:5px 10px;font-size:11.5px;" onclick="openInAdmin('${a.id}')">Instruire dans Back-Office →</button>
+            `}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAdminView() {
+      const tbody = document.getElementById('adminApplicationsTable');
+      tbody.innerHTML = state.applications.map(a => `
+        <tr style="${a.id === selectedAppId ? 'background:#e8f0fe;' : ''}">
+          <td class="mono"><strong>${a.ref}</strong></td>
+          <td>${a.org}</td>
+          <td><strong>${a.serviceCode}</strong></td>
+          <td>${a.paymentValidated ? '✅ Validée' : '🟠 À vérifier'}</td>
+          <td>${a.paymentValidated ? `⏳ J+${a.slaDaysElapsed} / 10j` : 'En attente frais'}</td>
+          <td>${statusBadgeHtml(a.status, a.certStatus)}</td>
+          <td>
+            <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="selectedAppId='${a.id}';renderAdminView();">
+              👁 Ouvrir / Instruire
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      const app = state.applications.find(a => a.id === selectedAppId) || state.applications[0];
+      if (!app) return;
+
+      document.getElementById('adminSelectedTitle').textContent = `Dossier ${app.ref} (${app.serviceCode})`;
+      document.getElementById('adminSelectedStatus').textContent = app.certStatus === 'REVOKED' ? 'RÉVOQUÉ' : app.status;
+      document.getElementById('previewHashBadge').textContent = app.docHash ? app.docHash.slice(0, 22) + '...' : 'Non scellé';
+
+      document.getElementById('adminDecisionPanel').innerHTML = `
+        <div style="font-size:13px;margin-bottom:12px;">
+          <p><strong>Organisation :</strong> ${app.org}</p>
+          <p><strong>Objet / Projet :</strong> ${app.projectTitle}</p>
+          <p><strong>Biens / Périmètre :</strong> ${app.goods}</p>
+          <p><strong>Référence Quittance (20$ + 300$) :</strong> <code>${app.paymentRef}</code> ${app.paymentValidated ? '✅' : '🟠'}</p>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 12px;border-radius:6px;margin-bottom:14px;font-size:12.5px;">
+          <strong>Check-list de recevabilité des 6 pièces (ADM-05) :</strong>
+          <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+            <span>☑ P1. Requête Ministre / DG</span>
+            <span>☑ P2. Attestation d'enrôlement S1</span>
+            <span>☑ P3. Plan d'action annuel</span>
+            <span>☑ P4. Rapport annuel d'activités</span>
+            <span>☑ P5. Projet détaillé & colisage</span>
+            <span>☑ P6. Preuve paiement 320 USD</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${!app.paymentValidated ? `
+            <button class="btn btn-accent" onclick="validatePayment('${app.id}')">
+              ✅ 1. Valider la Quittance (Démarrer SLA 10j)
+            </button>
+          ` : ''}
+          <button class="btn btn-purple" onclick="sealAndPublishCertificate('${app.id}')">
+            🔏 ${app.docHash ? 'Re-sceller' : '2. Approuver, Sceller sur Polygon & Publier QR Code'}
+          </button>
+          <button class="btn btn-outline" onclick="requestComplement('${app.id}')">
+            ✉️ Demander Complément
+          </button>
+          ${app.docHash && app.certStatus === 'ACTIVE' ? `
+            <button class="btn btn-danger" onclick="revokeCertificate('${app.id}')">
+              ⛔ Révoquer l'Acte On-Chain (CU06)
+            </button>
+          ` : ''}
+        </div>
+      `;
+
+      const svc = SERVICES.find(s => s.code === app.serviceCode);
+      document.getElementById('adminPdfPreview').innerHTML = `
+        <div class="pdf-seal-banner">
+          <h4>RÉPUBLIQUE DÉMOCRATIQUE DU CONGO</h4>
+          <p>Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale</p>
+          <p><strong>FONDS NATIONAL DE PROMOTION ET DE SERVICE SOCIAL (FNPSS)</strong></p>
+        </div>
+        <div style="font-size:12.5px;">
+          <p style="text-align:center;font-weight:800;color:var(--fnpss-blue);font-size:14px;margin-bottom:10px;">
+            ${svc ? svc.title.toUpperCase() : app.serviceCode}<br/>
+            <span class="mono" style="font-size:12px;color:#111827;">N° ${app.certNumber || 'EN ATTENTE DE SCELLEMENT'}</span>
+          </p>
+          <p style="margin-bottom:6px;"><strong>Bénéficiaire :</strong> ${app.org}</p>
+          <p style="margin-bottom:6px;"><strong>Programme / Projet :</strong> ${app.projectTitle}</p>
+          <p style="margin-bottom:10px;"><strong>Biens & Franchise autorisés :</strong> ${app.goods}</p>
+
+          ${app.docHash ? `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8fafc;border:1px solid #cbd5e1;padding:10px;border-radius:8px;margin-top:12px;">
+              <div style="font-size:11px;">
+                <p><strong>🔒 SCEAU CRYPTOGRAPHIQUE BLOCKCHAIN (POLYGON)</strong></p>
+                <p class="mono">SHA-256 : ${app.docHash}</p>
+                <p class="mono">TxHash  : ${app.txHash}</p>
+                <p>Émis le : ${app.issuedAt} • Expire le : ${app.expiresAt} • Statut : <strong>${app.certStatus}</strong></p>
+              </div>
+              <div>
+                ${generateQrSvg(app.docHash, 96)}
+              </div>
+            </div>
+          ` : `
+            <div style="padding:14px;background:#fff8e1;border:1px dashed #f59e0b;border-radius:6px;text-align:center;font-size:12px;color:#b45309;">
+              Document en cours d'instruction — Cliquez sur « Approuver, Sceller sur Polygon & Publier QR Code » pour générer l'empreinte SHA-256 et le QR Code dynamique.
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderDgdaVerdictForApp(app) {
+      const screen = document.getElementById('dgdaPhoneScreen');
+      const isRevoked = app.certStatus === 'REVOKED';
+      const isExpired = app.certStatus === 'EXPIRED';
+      const isValid = app.certStatus === 'ACTIVE';
+
+      let bannerClass = 'verdict-green';
+      let icon = '🟢';
+      let title = 'PASTILLE VERTE : ACTE AUTHENTIQUE & VALIDE';
+      let sub = 'Empreinte SHA-256 certifiée sur Polygon • Franchise autorisée';
+
+      if (isRevoked) {
+        bannerClass = 'verdict-red';
+        icon = '🔴';
+        title = 'PASTILLE ROUGE : CERTIFICAT RÉVOQUÉ';
+        sub = 'Retrait administratif par le FNPSS — Retenir la marchandise';
+      } else if (isExpired) {
+        bannerClass = 'verdict-gray';
+        icon = '⚪';
+        title = 'PASTILLE GRISE : CERTIFICAT EXPIRÉ';
+        sub = 'Acte authentique mais période de validité échue';
+      }
+
+      screen.innerHTML = `
+        <div style="text-align:center;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:var(--fnpss-navy);">🇨🇩 PORTAIL PUBLIC DE CONTRÔLE DOUANIER FNPSS / DGDA</div>
+          <div style="font-size:10px;color:var(--text-muted);">Vérification directe Smart Contract Polygon (< 1,2 seconde)</div>
+        </div>
+        <div class="verdict-banner ${bannerClass}">
+          <span class="v-icon">${icon}</span>
+          <div class="v-title">${title}</div>
+          <div class="v-sub">${sub}</div>
+        </div>
+        <div style="font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+          <p style="margin-bottom:5px;"><strong>N° Acte Officiel :</strong> <span class="mono">${app.certNumber}</span></p>
+          <p style="margin-bottom:5px;"><strong>Service :</strong> ${app.serviceCode}</p>
+          <p style="margin-bottom:5px;"><strong>ONG Bénéficiaire :</strong> ${app.org}</p>
+          <p style="margin-bottom:5px;"><strong>Validité :</strong> ${app.issuedAt} → ${app.expiresAt}</p>
+          <p style="margin-bottom:5px;"><strong>Biens exonérés autorisés :</strong><br/>${app.goods}</p>
+          ${isRevoked ? `<p style="color:#d93025;font-weight:700;margin-top:6px;">Motif de révocation : ${app.revocationReason}</p>` : ''}
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:8px 0;"/>
+          <p class="mono" style="font-size:10.5px;word-break:break-all;"><strong>SHA-256 :</strong> ${app.docHash}</p>
+          <p class="mono" style="font-size:10.5px;word-break:break-all;"><strong>TxHash :</strong> ${app.txHash}</p>
+        </div>
+      `;
+    }
+
+    function triggerDgdaPreset(mode) {
+      const baseApp = state.applications.find(a => a.docHash) || state.applications[0];
+      if (mode === 'VALID') {
+        renderDgdaVerdictForApp({ ...baseApp, certStatus: 'ACTIVE' });
+      } else if (mode === 'REVOKED') {
+        renderDgdaVerdictForApp({
+          ...baseApp,
+          certStatus: 'REVOKED',
+          revocationReason: 'Suspension administrative FNPSS (Usage non conforme constaté)'
+        });
+      } else if (mode === 'EXPIRED') {
+        renderDgdaVerdictForApp({
+          ...baseApp,
+          certStatus: 'EXPIRED',
+          issuedAt: '01/06/2024',
+          expiresAt: '01/06/2025'
+        });
+      } else if (mode === 'TAMPERED') {
+        const screen = document.getElementById('dgdaPhoneScreen');
+        screen.innerHTML = `
+          <div style="text-align:center;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--fnpss-navy);">🇨🇩 PORTAIL PUBLIC DE CONTRÔLE DOUANIER FNPSS / DGDA</div>
+            <div style="font-size:10px;color:var(--text-muted);">Vérification directe Smart Contract Polygon</div>
+          </div>
+          <div class="verdict-banner verdict-red">
+            <span class="v-icon">🔴</span>
+            <div class="v-title">PASTILLE ROUGE : DOCUMENT FALSIFIÉ OU INCONNU</div>
+            <div class="v-sub">ALERTE FRAUDE DOUANIÈRE (SC-03) — Aucune correspondance sur la Blockchain</div>
+          </div>
+          <div style="font-size:12px;background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;padding:12px;color:#742a2a;">
+            <p style="margin-bottom:6px;"><strong>Diagnostic cryptographique :</strong></p>
+            <p style="margin-bottom:6px;">L'empreinte SHA-256 calculée sur le PDF présenté (<code>0xdeadbeef99102...</code>) est <strong>absente du registre FNPSSRegistry.sol</strong>.</p>
+            <p style="margin-bottom:6px;">Cela signifie que le document a été créé frauduleusement ou qu'une mention (quantité de biens, date, nom de l'ONG) a été modifiée après émission.</p>
+            <p style="font-weight:800;margin-top:8px;">👉 CONSIGNE DGDA : Bloquer immédiatement le dédouanement et saisir la brigade antifraude.</p>
+          </div>
+        `;
+      }
+    }
+
+    function verifyCustomHash() {
+      const q = document.getElementById('dgdaInputHash').value.trim().toLowerCase();
+      if (!q) {
+        showToast('Saisissez un hash SHA-256 ou un numéro d\'acte (ex: FNPSS-EXO-2026-00124).');
+        return;
+      }
+      const found = state.applications.find(a =>
+        (a.docHash && a.docHash.toLowerCase().includes(q)) ||
+        (a.certNumber && a.certNumber.toLowerCase().includes(q))
+      );
+      if (found && found.docHash) {
+        renderDgdaVerdictForApp(found);
+      } else {
+        triggerDgdaPreset('TAMPERED');
+      }
+    }
+
+    function renderDgdaTable() {
+      const tbody = document.getElementById('dgdaCertificatesTable');
+      const certs = state.applications.filter(a => a.docHash);
+      tbody.innerHTML = certs.map(a => `
+        <tr>
+          <td class="mono"><strong>${a.certNumber}</strong></td>
+          <td><strong>${a.serviceCode}</strong></td>
+          <td>${a.org}</td>
+          <td>${statusBadgeHtml(a.status, a.certStatus)}</td>
+          <td>
+            <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="openInDgda('${a.id}')">
+              📷 Scanner ce QR Code
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderBlockchainAndAudit() {
+      const certs = state.applications.filter(a => a.docHash);
+      document.getElementById('blockchainLedgerTable').innerHTML = certs.map(a => `
+        <tr>
+          <td class="mono"><strong>${a.certNumber}</strong></td>
+          <td class="mono">${a.docHash}</td>
+          <td class="mono">${a.txHash.slice(0, 26)}...</td>
+          <td>${statusBadgeHtml(a.status, a.certStatus)}</td>
+          <td>${a.issuedAt}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('auditLogTable').innerHTML = state.auditLogs.map(l => `
+        <tr>
+          <td class="mono">${l.ts}</td>
+          <td><strong>${l.actor}</strong></td>
+          <td class="mono">${l.action}</td>
+          <td class="mono">${l.target}</td>
+          <td>${l.detail}</td>
+        </tr>
+      `).join('');
+    }
+
+    function exportApplicationsCSV() {
+      const headers = ['Reference', 'Service', 'Organisation', 'Projet', 'Quittance', 'Statut', 'Numero_Acte', 'SHA256_Hash'];
+      const rows = state.applications.map(a => [
+        a.ref, a.serviceCode, `"${a.org}"`, `"${a.projectTitle}"`, a.paymentRef, a.status, a.certNumber, a.docHash
+      ]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'fnpss_demandes_export.csv';
+      a.click();
+      showToast('Export CSV généré (fnpss_demandes_export.csv).');
+    }
+
+    function renderAll() {
+      renderServicesCatalog();
+      renderRequerantTable();
+      renderAdminView();
+      renderDgdaTable();
+      renderBlockchainAndAudit();
+    }
+
+    // Initialisation au chargement
+    renderAll();
+    const defaultCert = state.applications.find(a => a.id === 'DEM-002');
+    if (defaultCert) renderDgdaVerdictForApp(defaultCert);
+  </script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+name: CI - Validation Backlog, Contrats & Prototype
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-project:
+    name: Vérification intégrité Backlog, SQL, Solidity & Prototype
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate backlog.json structure and counts
+        shell: pwsh
+        run: |
+          $backlog = Get-Content -Raw -Encoding UTF8 ".github/planning/backlog.json" | ConvertFrom-Json
+          Write-Host "Epics: $($backlog.epics.Count) | Issues: $($backlog.issues.Count)"
+          if ($backlog.epics.Count -ne 10) { throw "Expected 10 epics in backlog.json" }
+          if ($backlog.issues.Count -ne 87) { throw "Expected 87 issues in backlog.json" }
+
+      - name: Verify required project deliverables exist
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            "documentation du projet/SPECIFICATIONS_FONCTIONNELLES_ET_CAS_UTILISATION.md",
+            "documentation du projet/PLANIFICATION_GLOBALE.md",
+            "documentation du projet/CHARTE_PROJET_ET_GOUVERNANCE.md",
+            "documentation du projet/CARTOGRAPHIE_DES_FLUX_ET_ATELIERS_S1_S6.md",
+            "documentation du projet/ADR_DECISIONS_CADRAGE.md",
+            "documentation du projet/PERSONAS_ET_PARCOURS_UTILISATEURS.md",
+            "documentation du projet/ARCHITECTURE_TECHNIQUE_ET_MODELE_DONNEES.md",
+            "documentation du projet/WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md",
+            "contracts/FNPSSRegistry.sol",
+            "database/schema.sql",
+            "database/seed.sql",
+            "prototype/index.html"
+          )
+          foreach ($f in $requiredFiles) {
+            if (-not (Test-Path $f)) { throw "Missing required file: $f" }
+            Write-Host "OK: $f"
+          }
