@@ -1,0 +1,41 @@
+name: Bootstrap GitHub Backlog (Labels, Milestones & 87 Issues)
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Lundi de démarrage de la Semaine 1 (format YYYY-MM-DD)"
+        required: false
+        default: "2026-11-02"
+      limit:
+        description: "Nombre max d'issues à créer (0 = toutes les 87 issues + 10 epics)"
+        required: false
+        default: "0"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bootstrap-backlog.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bootstrap:
+    name: Déployer Labels, Jalons M1-M4, 10 Epics et 87 Issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout du dépôt
+        uses: actions/checkout@v4
+
+      - name: Exécuter bootstrap-github.ps1 (Labels, Jalons M1-M4, Epics & 87 Issues)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $startDate = "${{ github.event.inputs.start_date }}"
+          if (-not $startDate) { $startDate = "2026-11-02" }
+          $rawLimit = "${{ github.event.inputs.limit }}"
+          $limit = if ($rawLimit) { [int]$rawLimit } else { 0 }
+          ./.github/planning/bootstrap-github.ps1 -StartDate $startDate -Limit $limit -Owner "${{ github.repository_owner }}" -Repo "${{ github.event.repository.name }}" -SkipProject

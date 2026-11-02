@@ -170,9 +170,11 @@ foreach ($p in 'Must', 'Should', 'Could') {
 # ------------------------------------------------------------------ prerequis gh
 if (-not $DryRun) {
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "GitHub CLI (gh) introuvable. Installez-le : winget install --id GitHub.cli" }
-    $status = Invoke-Gh -GhArgs @('auth', 'status')
-    if (-not $SkipProject -and $status -notmatch 'project') {
-        throw "Le jeton gh n'a pas la portee 'project'. Executez : gh auth refresh -s project"
+    if (-not $SkipProject) {
+        $status = Invoke-Gh -GhArgs @('auth', 'status')
+        if ($status -notmatch 'project') {
+            throw "Le jeton gh n'a pas la portee 'project'. Executez : gh auth refresh -s project"
+        }
     }
 }
 
@@ -361,6 +363,23 @@ $script:initialStatus = 'Todo'
 if ($fields.ContainsKey('Status') -and ($fields['Status'].options | Where-Object { $_.name -eq 'Backlog' })) { $script:initialStatus = 'Backlog' }
 
 Write-Host "`n[4/4] Epics et issues" -ForegroundColor Cyan
+if (-not $DryRun) {
+    try {
+        $rawIssues = Invoke-Gh -GhArgs @('issue', 'list', '--repo', "$Owner/$Repo", '--state', 'all', '--limit', '200', '--json', 'number,title,url')
+        if ($rawIssues) {
+            foreach ($ex in ($rawIssues | ConvertFrom-Json)) {
+                if ($ex.title -match '^\[([A-Z0-9-]+)\]') {
+                    $idKey = $Matches[1]
+                    if (-not $state.issues.ContainsKey($idKey)) {
+                        $state.issues[$idKey] = @{ number = [int]$ex.number; url = $ex.url; itemId = $null }
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Warning "Impossible de precharger les issues existantes : $_"
+    }
+}
 foreach ($e in $epics) { New-PlanIssue $e $true }
 $created = 0
 foreach ($it in $items) {

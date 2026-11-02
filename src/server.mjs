@@ -5,6 +5,7 @@
  */
 
 import http from 'node:http';
+import { Readable } from 'node:stream';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +41,7 @@ export function createGuichetServer() {
   const adminAddr = '0x1111111111111111111111111111111111111111';
   const relayerAddr = '0x2222222222222222222222222222222222222222';
   const registry = new FNPSSRegistryContract(adminAddr, relayerAddr);
+  registry.setMinistrySigner(adminAddr, relayerAddr, true);
   const engine = new GuichetUniqueEngine(registry, relayerAddr);
 
   const defaultActors = {
@@ -60,7 +62,7 @@ export function createGuichetServer() {
   });
 
   // Pré-amorçage de 3 dossiers réalistes dans le moteur métier
-  const allDocs = ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT_ANNUEL', 'P5_PROJET_BIENS', 'P6_PREUVE_PAIEMENT'];
+  const allDocs = ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'];
 
   const app1 = engine.submitApplication(defaultActors.requerant, {
     organizationName: 'ONG Espoir du Nord-Kivu',
@@ -78,7 +80,7 @@ export function createGuichetServer() {
     serviceCode: 'S6',
     projectTitle: 'Importation de 2 ambulances 4x4 et 500 kits médicaux — Goma',
     goodsSummary: '2 Véhicules Ambulance 4x4 Toyota Land Cruiser, 500 Kits médicaux d\'urgence, 12 Générateurs solaires (148 000 USD)',
-    uploadedDocTypes: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT_ANNUEL', 'P5_PROJET_BIENS', 'P6_PREUVE_PAIEMENT'],
+    uploadedDocTypes: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
     paymentReference: 'BCDC-CDF-2026-99481',
     hasActiveS1Enrollment: true
   });
@@ -95,8 +97,8 @@ export function createGuichetServer() {
     paymentReference: 'EQUITYBCDC-2026-77319'
   });
 
-  const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const requestListener = async (req, res) => {
+    const url = new URL(req.url, `http://${req.headers?.host || 'localhost'}`);
 
     try {
       if (req.method === 'GET' && url.pathname === '/api/health') {
@@ -162,7 +164,7 @@ export function createGuichetServer() {
           engine.validatePaymentAndStartSla(defaultActors.agent, body.referenceNumber);
         }
         const sealedApp = engine.approveAndSealCertificate(defaultActors.dg, body.referenceNumber);
-        if (FNPSS_SERVICES[sealedApp.serviceCode]?.requiresMinistryCoSignature) {
+        if (FNPSS_SERVICES[sealedApp.serviceCode]?.requiresMinistrySignoff) {
           engine.recordMinistryCoSignature(defaultActors.ministere, body.referenceNumber);
         }
         const { pdfBuffer, ...certMeta } = engine.getApplication(body.referenceNumber).certificate;
@@ -231,10 +233,47 @@ export function createGuichetServer() {
     } catch (err) {
       return sendJson(res, 400, { error: err.message });
     }
-  });
+  };
 
+  const server = http.createServer(requestListener);
   server.engine = engine;
   server.registry = registry;
+
+  /**
+   * Exécute une requête REST en mémoire (sans socket TCP) pour les tests unitaires/E2E en bac à sable.
+   */
+  server.dispatch = async ({ method = 'GET', url = '/', body = null } = {}) => {
+    const payloadBuf = body ? Buffer.from(typeof body === 'string' ? body : JSON.stringify(body), 'utf8') : Buffer.alloc(0);
+    const req = Readable.from(payloadBuf.length ? [payloadBuf] : []);
+    req.method = method;
+    req.url = url;
+    req.headers = { host: 'localhost', 'content-type': 'application/json' };
+
+    return new Promise((resolve) => {
+      let statusCode = 200;
+      let headers = {};
+      const chunks = [];
+      const res = {
+        writeHead(code, hdrs = {}) {
+          statusCode = code;
+          headers = Object.fromEntries(Object.entries(hdrs).map(([k, v]) => [k.toLowerCase(), v]));
+        },
+        end(data) {
+          if (data) chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8'));
+          const rawBuffer = Buffer.concat(chunks);
+          resolve({
+            status: statusCode,
+            headers,
+            rawBuffer,
+            json: () => JSON.parse(rawBuffer.toString('utf8')),
+            text: () => rawBuffer.toString('utf8')
+          });
+        }
+      };
+      requestListener(req, res);
+    });
+  };
+
   return server;
 }
 

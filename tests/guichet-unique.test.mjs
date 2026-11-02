@@ -35,6 +35,9 @@ import {
   GuichetUniqueEngine
 } from '../src/workflow/application-engine.mjs';
 
+import { generateOfficialPdfBuffer } from '../src/pdf/certificate-generator.mjs';
+import { createGuichetServer } from '../src/server.mjs';
+
 const ADMIN_ADDR = '0x1000000000000000000000000000000000000001';
 const RELAYER_ADDR = '0x2000000000000000000000000000000000000002';
 const MINISTRY_ADDR = '0x3000000000000000000000000000000000000003';
@@ -262,4 +265,96 @@ test('4. Scénarios Opérationnels de bout en bout (SC-01 Nominal, SC-02 Complé
   // Vérification du journal d'audit immuable (ADM-07)
   assert.equal(engine.auditLogs.length, 5);
 });
+
+test('5. Générateur PDF Officiel (%PDF-1.4) et API REST complète (VER-01, VER-02, VER-05)', async () => {
+  const samplePdf = generateOfficialPdfBuffer({
+    certificateNumber: 'FNPSS-EXO-2026-00999',
+    serviceCode: 'S6',
+    organizationName: 'ONG Espoir du Nord-Kivu',
+    projectTitle: 'Cliniques mobiles Goma',
+    goodsSummary: '2 Ambulances 4x4',
+    issuedAtIso: '2026-11-02T10:00:00Z',
+    expiresAtIso: '2027-11-02T10:00:00Z',
+    docHash: '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
+    txHash: '0x3c7e92b14f08a6d5e219c847b3a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3',
+    verificationUrl: 'https://guichet.fnpss.cd/verify?hash=0x7f83...'
+  });
+
+  const pdfText = samplePdf.toString('ascii');
+  assert.ok(pdfText.startsWith('%PDF-1.4\n'));
+  assert.ok(pdfText.endsWith('%%EOF\n'));
+  assert.ok(pdfText.includes('FNPSS-EXO-2026-00999'));
+
+  // Test du serveur HTTP et des routes REST E2E (via server.dispatch sans socket réseau)
+  const server = createGuichetServer();
+
+  const healthRes = await server.dispatch({ method: 'GET', url: '/api/health' });
+  assert.equal(healthRes.status, 200);
+  const health = healthRes.json();
+  assert.equal(health.status, 'ok');
+  assert.equal(health.totalApplications, 3);
+
+  // Création d'un nouveau dossier via POST /api/applications
+  const createRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications',
+    body: {
+      organizationName: 'Médecins d\'Afrique Kivu',
+      serviceCode: 'S6',
+      projectTitle: 'Hôpital de campagne Masisi',
+      goodsSummary: '1 Unité chirurgicale mobile',
+      paymentReference: 'RAWBANK-2026-55511',
+      hasActiveS1Enrollment: true
+    }
+  });
+  assert.equal(createRes.status, 201);
+  const { application: createdApp } = createRes.json();
+  assert.equal(createdApp.status, 'SOUMIS');
+
+  // Validation des frais + Scellement Blockchain + Co-signature ministérielle D1
+  const sealRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/approve-seal',
+    body: { referenceNumber: createdApp.referenceNumber }
+  });
+  assert.equal(sealRes.status, 200);
+  const { application: sealedApp } = sealRes.json();
+  assert.equal(sealedApp.status, 'VALIDE_DELIVRE');
+  assert.equal(sealedApp.ministryCoSigned, true);
+  assert.match(sealedApp.certificate.docHash, /^0x[0-9a-f]{64}$/);
+
+  // Téléchargement du PDF officiel scellé
+  const pdfRes = await server.dispatch({
+    method: 'GET',
+    url: `/api/applications/certificate.pdf?ref=${encodeURIComponent(createdApp.referenceNumber)}`
+  });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.ok(pdfRes.text().startsWith('%PDF-1.4'));
+
+  // Vérification douanière DGDA par numéro de certificat
+  const verifyRes = await server.dispatch({
+    method: 'GET',
+    url: `/api/verify?hash=${encodeURIComponent(sealedApp.certificate.certificateNumber)}`
+  });
+  const verifyJson = verifyRes.json();
+  assert.equal(verifyJson.isValid, true);
+  assert.equal(verifyJson.verdict, CustomsBadgeVerdict.GREEN_VALID);
+
+  // Révocation administrative et re-vérification DGDA
+  const revokeRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/revoke',
+    body: { referenceNumber: createdApp.referenceNumber, reason: 'Fraude documentaire avérée' }
+  });
+  assert.equal(revokeRes.status, 200);
+
+  const verifyAfterRevoke = (await server.dispatch({
+    method: 'GET',
+    url: `/api/verify?hash=${sealedApp.certificate.docHash}`
+  })).json();
+  assert.equal(verifyAfterRevoke.isValid, false);
+  assert.equal(verifyAfterRevoke.verdict, CustomsBadgeVerdict.RED_REVOKED);
+});
+
 

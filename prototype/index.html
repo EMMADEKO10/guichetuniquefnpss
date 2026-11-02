@@ -797,6 +797,88 @@
       return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // Pont d'intégration REST vers GuichetUniqueEngine (`src/server.mjs`) avec repli hors-ligne
+    let backendConnected = false;
+
+    function mapBackendApp(bApp, idx) {
+      const cert = bApp.certificate || {};
+      return {
+        id: bApp.referenceNumber || ('DEM-00' + (idx + 1)),
+        ref: bApp.referenceNumber,
+        org: bApp.organizationName,
+        serviceCode: bApp.serviceCode,
+        projectTitle: bApp.projectTitle,
+        goods: bApp.goodsSummary || 'Sans objet',
+        paymentRef: bApp.paymentReference,
+        paymentValidated: Boolean(bApp.paymentValidated),
+        slaDaysElapsed: bApp.paymentValidated ? 2 : 0,
+        status: bApp.status === 'REVOQUE' ? 'VALIDE_DELIVRE' : bApp.status,
+        certNumber: cert.certificateNumber || '',
+        docHash: cert.docHash || '',
+        txHash: cert.txHash || '',
+        certStatus: cert.status || (cert.docHash ? 'ACTIVE' : 'NONE'),
+        issuedAt: cert.issuedAtIso ? new Date(cert.issuedAtIso).toLocaleDateString('fr-FR') : '',
+        expiresAt: cert.expiresAtIso ? new Date(cert.expiresAtIso).toLocaleDateString('fr-FR') : 'Illimitée',
+        revocationReason: cert.revocationReason || ''
+      };
+    }
+
+    async function syncWithBackendApi() {
+      if (!isOnline || window.location.protocol === 'file:') return false;
+      try {
+        const res = await fetch('/api/applications');
+        if (!res.ok) return false;
+        const data = await res.json();
+        backendConnected = true;
+        state.applications = (data.applications || []).map(mapBackendApp);
+        state.auditLogs = (data.auditLogs || []).map(l => ({
+          ts: new Date(l.timestamp).toLocaleString('fr-FR'),
+          actor: `${l.actorId} (${l.actorRole})`,
+          action: l.action,
+          target: l.targetId,
+          detail: JSON.stringify(l.metadata || {})
+        }));
+        if (!state.applications.find(a => a.id === selectedAppId) && state.applications[0]) {
+          selectedAppId = state.applications[0].id;
+        }
+        renderAll();
+        return true;
+      } catch (_) {
+        backendConnected = false;
+        return false;
+      }
+    }
+
+    function downloadOfficialPdf(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app || !app.docHash) {
+        showToast('Veuillez d\'abord sceller l\'acte sur la blockchain avant de télécharger le PDF.');
+        return;
+      }
+      if (backendConnected && isOnline) {
+        window.open(`/api/applications/certificate.pdf?ref=${encodeURIComponent(app.ref)}`, '_blank');
+        showToast(`Téléchargement du PDF officiel scellé (${app.certNumber}.pdf) lancé depuis l'API FNPSS.`);
+        return;
+      }
+      // Repli autonome client-side (%PDF-1.4 valide)
+      const lines = [
+        'REPUBLIQUE DEMOCRATIQUE DU CONGO - FNPSS',
+        `ACTE OFFICIEL SCELLE : ${app.certNumber} (${app.serviceCode})`,
+        `Beneficiaire : ${app.org}`,
+        `Projet : ${app.projectTitle}`,
+        `SHA-256 : ${app.docHash}`,
+        `TxHash Polygon : ${app.txHash}`
+      ];
+      const stream = 'BT\n/F1 11 Tf\n' + lines.map((t, i) => `1 0 0 1 50 ${760 - i * 24} Tm (${t.replace(/[()\\]/g, '')}) Tj`).join('\n') + '\nET\n';
+      const pdfContent = `%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n`;
+      const blob = new Blob([pdfContent], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${app.certNumber}.pdf`;
+      a.click();
+      showToast(`Acte officiel ${app.certNumber}.pdf téléchargé.`);
+    }
+
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.textContent = msg;
@@ -862,6 +944,28 @@
         showToast('Veuillez renseigner l\'intitulé du projet et la référence de quittance.');
         return;
       }
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/applications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationName: 'ONG Espoir du Nord-Kivu',
+            serviceCode,
+            projectTitle,
+            goodsSummary: goods || 'Conforme au descriptif P5 joint',
+            paymentReference: paymentRef,
+            hasActiveS1Enrollment: true
+          })
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          await syncWithBackendApi();
+          selectedAppId = payload.application.referenceNumber;
+          renderAll();
+          showToast(`Dossier ${payload.application.referenceNumber} enregistré via l'API REST GuichetUniqueEngine !`);
+          return;
+        }
+      }
       const nextNum = 49 + state.applications.length;
       const newApp = {
         id: 'DEM-00' + (state.applications.length + 1),
@@ -921,9 +1025,21 @@
       }
     }
 
-    function validatePayment(appId) {
+    async function validatePayment(appId) {
       const app = state.applications.find(a => a.id === appId);
       if (!app) return;
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/applications/validate-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referenceNumber: app.ref })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          showToast(`Paiement validé pour ${app.ref} via l'API : le SLA de 10 jours ouvrés est démarré.`);
+          return;
+        }
+      }
       app.paymentValidated = true;
       if (app.status === 'SOUMIS') app.status = 'EN_COURS_INSTRUCTION';
       state.auditLogs.unshift({
@@ -937,9 +1053,21 @@
       showToast(`Paiement validé pour ${app.ref} : le compte à rebours de 10 jours ouvrables est démarré.`);
     }
 
-    function requestComplement(appId) {
+    async function requestComplement(appId) {
       const app = state.applications.find(a => a.id === appId);
       if (!app) return;
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/applications/request-complement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referenceNumber: app.ref, reason: 'Préciser le numéro de châssis ou colisage détaillé (P5)' })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          showToast(`Demande de complément enregistrée pour ${app.ref} (SLA suspendu).`);
+          return;
+        }
+      }
       app.status = 'COMPLEMENT_REQUIS';
       state.auditLogs.unshift({
         ts: new Date().toLocaleString('fr-FR'),
@@ -955,6 +1083,19 @@
     async function sealAndPublishCertificate(appId) {
       const app = state.applications.find(a => a.id === appId);
       if (!app) return;
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/applications/approve-seal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referenceNumber: app.ref })
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          await syncWithBackendApi();
+          showToast(`Acte ${payload.application.certificate.certificateNumber} scellé sur Polygon & PDF officiel généré !`);
+          return;
+        }
+      }
       app.paymentValidated = true;
       app.status = 'VALIDE_DELIVRE';
       const numSuffix = String(125 + state.applications.indexOf(app)).padStart(5, '0');
@@ -978,9 +1119,24 @@
       showToast(`Acte ${app.certNumber} généré, scellé sur Polygon et publié avec son QR Code dynamique !`);
     }
 
-    function revokeCertificate(appId) {
+    async function revokeCertificate(appId) {
       const app = state.applications.find(a => a.id === appId);
       if (!app || !app.docHash) return;
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/applications/revoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceNumber: app.ref,
+            reason: 'Suspension administrative suite à contrôle de conformité terrain (CU06)'
+          })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          showToast(`Acte ${app.certNumber} RÉVOQUÉ sur le Smart Contract Polygon !`);
+          return;
+        }
+      }
       app.certStatus = 'REVOKED';
       app.revocationReason = 'Suspension administrative suite à contrôle de conformité terrain (CU06)';
       state.auditLogs.unshift({
@@ -1061,6 +1217,7 @@
           <td>
             ${a.docHash ? `
               <button class="btn btn-success" style="padding:5px 10px;font-size:11.5px;" onclick="openInAdmin('${a.id}')">📄 Voir Acte & QR</button>
+              <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="downloadOfficialPdf('${a.id}')">⬇ PDF Officiel</button>
               <button class="btn btn-outline" style="padding:5px 10px;font-size:11.5px;" onclick="openInDgda('${a.id}')">📷 Tester en Douane</button>
             ` : `
               <button class="btn btn-outline" style="padding:5px 10px;font-size:11.5px;" onclick="openInAdmin('${a.id}')">Instruire dans Back-Office →</button>
@@ -1125,6 +1282,11 @@
           <button class="btn btn-outline" onclick="requestComplement('${app.id}')">
             ✉️ Demander Complément
           </button>
+          ${app.docHash ? `
+            <button class="btn btn-success" onclick="downloadOfficialPdf('${app.id}')">
+              ⬇ Télécharger l'Acte PDF Officiel Scellé
+            </button>
+          ` : ''}
           ${app.docHash && app.certStatus === 'ACTIVE' ? `
             <button class="btn btn-danger" onclick="revokeCertificate('${app.id}')">
               ⛔ Révoquer l'Acte On-Chain (CU06)
@@ -1337,10 +1499,16 @@
       renderBlockchainAndAudit();
     }
 
-    // Initialisation au chargement
+    // Initialisation au chargement (synchronisation automatique avec l'API REST si disponible)
     renderAll();
     const defaultCert = state.applications.find(a => a.id === 'DEM-002');
     if (defaultCert) renderDgdaVerdictForApp(defaultCert);
+    syncWithBackendApi().then(synced => {
+      if (synced) {
+        const firstSealed = state.applications.find(a => a.docHash);
+        if (firstSealed) renderDgdaVerdictForApp(firstSealed);
+      }
+    });
   </script>
 </body>
 </html>
