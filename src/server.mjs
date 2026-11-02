@@ -76,3 +76,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Guichet Unique FNPSS actif sur http://localhost:${port}`);
   });
 }
+

@@ -5,6 +5,7 @@
 
 import { FNPSS_SERVICES, validateRequiredDocuments, computeSlaDueDate } from '../domain/services-catalog.mjs';
 import { sealOfficialAct } from '../crypto/document-sealer.mjs';
+import { generateOfficialPdfBuffer } from '../pdf/certificate-generator.mjs';
 
 export const Roles = Object.freeze({
   REQUERANT: 'REQUERANT',
@@ -97,6 +98,8 @@ export class GuichetUniqueEngine {
       slaDueAt: null,
       slaPaused: false,
       complementReason: null,
+      ministryCoSigned: false,
+      ministryReference: null,
       certificate: null
     };
 
@@ -178,14 +181,17 @@ export class GuichetUniqueEngine {
     const certificateNumber = `FNPSS-${svc.prefix}-2026-${seq}`;
     const expiresAtTimestamp = validityDays > 0 ? issuedAtTimestamp + validityDays * 86400 : 0;
 
+    const issuedAtIso = new Date(issuedAtTimestamp * 1000).toISOString();
+    const expiresAtIso = expiresAtTimestamp ? new Date(expiresAtTimestamp * 1000).toISOString() : null;
+
     const sealed = sealOfficialAct({
       certificateNumber,
       serviceCode: app.serviceCode,
       organizationName: app.organizationName,
       projectTitle: app.projectTitle,
       goodsSummary: app.goodsSummary,
-      issuedAtIso: new Date(issuedAtTimestamp * 1000).toISOString(),
-      expiresAtIso: expiresAtTimestamp ? new Date(expiresAtTimestamp * 1000).toISOString() : null
+      issuedAtIso,
+      expiresAtIso
     });
 
     const serviceNumericCode = Number(app.serviceCode.replace('S', ''));
@@ -198,13 +204,24 @@ export class GuichetUniqueEngine {
       nowTimestamp: issuedAtTimestamp
     });
 
-    app.status = 'VALIDE_DELIVRE';
-    app.certificate = {
+    const certDetails = {
       ...sealed,
+      serviceCode: app.serviceCode,
+      organizationName: app.organizationName,
+      projectTitle: app.projectTitle,
+      goodsSummary: app.goodsSummary,
+      issuedAtIso,
+      expiresAtIso,
       txHash: onChainResult.txHash,
       issuedAtTimestamp,
-      expiresAtTimestamp
+      expiresAtTimestamp,
+      status: 'ACTIVE',
+      revocationReason: ''
     };
+    certDetails.pdfBuffer = generateOfficialPdfBuffer(certDetails);
+
+    app.status = 'VALIDE_DELIVRE';
+    app.certificate = certDetails;
 
     this._logAudit(actor, 'CERTIFICATE_ISSUED_AND_ANCHORED', referenceNumber, {
       certificateNumber,
@@ -213,6 +230,74 @@ export class GuichetUniqueEngine {
     });
 
     return { ...app };
+  }
+
+  /**
+   * Co-signature / Contre-seing par le Point Focal du Ministère de Tutelle (D1 / ADM-06).
+   */
+  recordMinistryCoSignature(actor, referenceNumber, { ministryReference = 'CAB/MIN-AS/2026/001' } = {}) {
+    assertPermission(actor, 'COSIGN_MINISTRY_ACT');
+    const app = this._getApp(referenceNumber);
+    if (!app.certificate || !app.certificate.docHash) {
+      throw new Error('Le dossier doit d\'abord disposer d\'un acte scellé pour recevoir la co-signature ministérielle');
+    }
+    const tx = this.registry.coSignDocument({
+      caller: this.relayerAddress,
+      docHash: app.certificate.docHash
+    });
+    app.ministryCoSigned = true;
+    app.ministryReference = ministryReference;
+    this._logAudit(actor, 'MINISTRY_COSIGNED_ONCHAIN', referenceNumber, {
+      docHash: app.certificate.docHash,
+      ministryReference,
+      txHash: tx.txHash
+    });
+    return { ...app };
+  }
+
+  /**
+   * Révocation administrative d'un certificat par la Direction Générale (CU06 / SC-04).
+   */
+  revokeCertificate(actor, referenceNumber, reason) {
+    assertPermission(actor, 'REVOKE_CERTIFICATE');
+    const app = this._getApp(referenceNumber);
+    if (!app.certificate || !app.certificate.docHash) {
+      throw new Error('Aucun certificat scellé à révoquer sur ce dossier');
+    }
+    const tx = this.registry.revokeDocument({
+      caller: this.relayerAddress,
+      docHash: app.certificate.docHash,
+      reason
+    });
+    app.status = 'REVOQUE';
+    app.certificate.status = 'REVOKED';
+    app.certificate.revocationReason = reason;
+    this._logAudit(actor, 'CERTIFICATE_REVOKED_ONCHAIN', referenceNumber, {
+      certificateNumber: app.certificate.certificateNumber,
+      docHash: app.certificate.docHash,
+      reason,
+      txHash: tx.txHash
+    });
+    return { ...app };
+  }
+
+  listApplications() {
+    return Array.from(this.applications.values()).map(app => {
+      const clone = { ...app };
+      if (clone.certificate) {
+        const { pdfBuffer, ...certMeta } = clone.certificate;
+        clone.certificate = certMeta;
+      }
+      return clone;
+    });
+  }
+
+  getApplication(referenceNumber) {
+    return this._getApp(referenceNumber);
+  }
+
+  getAuditLogs() {
+    return [...this.auditLogs].reverse();
   }
 
   _getApp(referenceNumber) {

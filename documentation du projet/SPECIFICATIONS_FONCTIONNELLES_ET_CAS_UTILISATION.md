@@ -306,7 +306,10 @@ flowchart TD
         UC5[Suivre le statut en temps réel]
         UC6[Télécharger l'acte officiel scellé]
         
-        UC7[Examiner recevabilité des pièces]
+        UC7[Examiner recevabilité des piè
+        
+        
+        ces]
         UC8[Demander complément d'informations]
         UC9[Instruire l'enquête de conformité]
         

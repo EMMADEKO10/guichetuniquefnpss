@@ -54,3 +54,4 @@ ON CONFLICT (code) DO UPDATE SET
     sla_business_days = EXCLUDED.sla_business_days,
     requires_ministry_signoff = EXCLUDED.requires_ministry_signoff,
     required_document_types = EXCLUDED.required_document_types;
+

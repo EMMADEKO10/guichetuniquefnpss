@@ -198,3 +198,4 @@ CREATE INDEX IF NOT EXISTS idx_applications_org ON applications(organization_id)
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
 CREATE INDEX IF NOT EXISTS idx_certificates_hash ON certificates(pdf_sha256_hash);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_target ON audit_logs(target_type, target_id);
+

@@ -166,3 +166,4 @@ Optimisé pour smartphone en extérieur (plein soleil, réseau 2G/3G, temps de r
 | **UAT-SC03** | Altération volontaire d'un chiffre dans le PDF d'exonération émis, puis scan ou upload sur le portail de vérification DGDA (`VER-03`, `VER-04`). | Détection immédiate de la divergence de hash SHA-256 : affichage de la **Pastille Rouge (Document Falsifié)**. |
 | **UAT-SC04** | Révocation administrative d'un certificat actif par la Direction Générale (`VER-06`) suivie d'un nouveau scan douanier. | État on-chain passé à `REVOKED`, affichage immédiat de la **Pastille Rouge (Document Révoqué)** avec le motif et la date. |
 | **UAT-SC05** | Coupure de la connexion internet au milieu du remplissage du formulaire `S4`, fermeture puis réouverture au retour du réseau. | Brouillon restauré intégralement depuis `IndexedDB` sans aucune perte de saisie (`REQ-11`). |
+

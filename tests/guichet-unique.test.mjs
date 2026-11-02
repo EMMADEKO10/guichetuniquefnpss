@@ -262,3 +262,4 @@ test('4. Scénarios Opérationnels de bout en bout (SC-01 Nominal, SC-02 Complé
   // Vérification du journal d'audit immuable (ADM-07)
   assert.equal(engine.auditLogs.length, 5);
 });
+

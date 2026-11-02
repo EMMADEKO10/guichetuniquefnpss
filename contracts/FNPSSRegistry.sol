@@ -248,3 +248,4 @@ contract FNPSSRegistry {
         return _numberToHash[keccak256(bytes(certificateNumber))];
     }
 }
+

@@ -412,3 +412,4 @@ contract FNPSSRegistry is AccessControl, Pausable {
    * L'administrateur `DEFAULT_ADMIN_ROLE` est détenu par un portefeuille multisig froid du FNPSS permettant de révoquer instantanément un relayer compromis.
 3. **Sauvegarde et Reprise d'Activité (`OPS-05`) :**
    * Base PostgreSQL sauvegardée quotidiennement (`pg_dump` chiffré + WAL archiving) avec rétention de 30 jours et test de restauration mensuel.
+
