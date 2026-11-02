@@ -78,3 +78,4 @@ export function generateOfficialPdfBuffer(cert) {
 
   return Buffer.from(pdf, 'ascii');
 }
+
