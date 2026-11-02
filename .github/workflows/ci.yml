@@ -1,4 +1,4 @@
-name: CI - Validation Backlog, Contrats & Prototype
+name: CI - Validation Backlog, Contrats, Tests & Prototype
 
 on:
   push:
@@ -7,12 +7,17 @@ on:
     branches: [main]
 
 jobs:
-  validate-project:
-    name: Vérification intégrité Backlog, SQL, Solidity & Prototype
+  validate-and-test:
+    name: Vérification Backlog, SQL, Solidity, Tests Automatisés & Prototype
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Validate backlog.json structure and counts
         shell: pwsh
@@ -37,9 +42,15 @@ jobs:
             "contracts/FNPSSRegistry.sol",
             "database/schema.sql",
             "database/seed.sql",
-            "prototype/index.html"
+            "prototype/index.html",
+            "docker-compose.yml",
+            ".env.example",
+            "package.json"
           )
           foreach ($f in $requiredFiles) {
             if (-not (Test-Path $f)) { throw "Missing required file: $f" }
             Write-Host "OK: $f"
           }
+
+      - name: Run automated unit & scenario test suite (SC-01 to SC-05)
+        run: npm test

@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fnpss_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fnpss_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fnpss_dev_secret_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-fnpss_guichet}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - fnpss_pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-fnpss_admin} -d $${POSTGRES_DB:-fnpss_guichet}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: fnpss_storage
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-fnpss_storage_admin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-fnpss_storage_secret_change_me}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - fnpss_storage_data:/data
+
+volumes:
+  fnpss_pgdata:
+  fnpss_storage_data:

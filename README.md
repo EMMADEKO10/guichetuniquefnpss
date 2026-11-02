@@ -15,11 +15,28 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
 - **Architecture Technique, Schéma PostgreSQL & Smart Contract (`GOV-08`, `OPS-03`, `BLK-04`) :** [ARCHITECTURE_TECHNIQUE_ET_MODELE_DONNEES.md](documentation%20du%20projet/ARCHITECTURE_TECHNIQUE_ET_MODELE_DONNEES.md)
 - **Wireframes UI (Requérant, Back-Office, DGDA) & Plan Qualité (`UX-02`, `UX-03`, `UX-06`, `SEC-01`) :** [WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md](documentation%20du%20projet/WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md)
 
-## Socle Technique & Prototype Interactif (Sprint 0 / Sprint 1)
+## Socle Technique, Moteur Métier & Prototype Interactif (Sprint 0 / Sprint 1)
 - **Prototype Interactif UI Haute Fidélité (`UX-04`) :** [prototype/index.html](prototype/index.html) *(Portail Requérant `S1`–`S6`, Back-Office d'instruction & scellement SHA-256, Contrôle Douanier QR DGDA, Registre Polygon & Audit)*
 - **Smart Contract Solidity (`BLK-05`, `BLK-06`, `BLK-07`) :** [contracts/FNPSSRegistry.sol](contracts/FNPSSRegistry.sol)
 - **Schéma Base de Données PostgreSQL & Référentiel S1–S6 (`OPS-03`) :** [database/schema.sql](database/schema.sql) · [database/seed.sql](database/seed.sql)
+- **Moteur Métier, Cryptographie & Registre On-Chain (`REQ`, `ADM`, `BLK`, `VER`) :**
+  - Catalogue des 6 services, calcul des frais (`20$ + 300$`) et SLA 10 jours ouvrables : [src/domain/services-catalog.mjs](src/domain/services-catalog.mjs)
+  - Scellement SHA-256, chiffrement AES-256-GCM (`OPS-05`) et QR Code : [src/crypto/document-sealer.mjs](src/crypto/document-sealer.mjs)
+  - Simulateur Smart Contract & File d'ancrage résiliente hors-ligne (`BLK-10`) : [src/blockchain/registry-simulator.mjs](src/blockchain/registry-simulator.mjs)
+  - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
+  - Serveur HTTP & API d'interopérabilité DGDA (`VER-05`) : [src/server.mjs](src/server.mjs)
+- **Suite de Tests Automatisés (`BLK-08`, `SEC-01`, `SEC-02`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+- **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml)
+
+## Démarrage rapide en local
+```bash
+# Exécuter la suite de tests automatisés (Services S1-S6, Cryptographie, Smart Contract, Scénarios SC-01 à SC-05)
+npm test
+
+# Lancer le serveur local (Prototype interactif + API DGDA sur http://localhost:3000)
+npm run serve:prototype
+```
 
 ## Pilotage du projet
 - **Mise en route GitHub Projects, jalons et issues :** [.github/planning/README.md](.github/planning/README.md)
