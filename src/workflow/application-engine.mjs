@@ -6,6 +6,7 @@
 import { FNPSS_SERVICES, validateRequiredDocuments, computeSlaDueDate } from '../domain/services-catalog.mjs';
 import { sealOfficialAct } from '../crypto/document-sealer.mjs';
 import { generateOfficialPdfBuffer } from '../pdf/certificate-generator.mjs';
+import { NotificationCenter } from '../notifications/notification-center.mjs';
 
 export const Roles = Object.freeze({
   REQUERANT: 'REQUERANT',
@@ -38,9 +39,10 @@ export function assertPermission(actor, permission) {
 }
 
 export class GuichetUniqueEngine {
-  constructor(registryContract, relayerAddress) {
+  constructor(registryContract, relayerAddress, notificationCenter = new NotificationCenter()) {
     this.registry = registryContract;
     this.relayerAddress = relayerAddress;
+    this.notifications = notificationCenter;
     this.applications = new Map();
     this.auditLogs = [];
     this.seqCounter = 1;
@@ -105,6 +107,12 @@ export class GuichetUniqueEngine {
 
     this.applications.set(referenceNumber, app);
     this._logAudit(actor, 'APPLICATION_SUBMITTED', referenceNumber, { serviceCode, paymentReference });
+    this.notifications?.notifyTransactionalEvent({
+      userId: actor.id,
+      eventType: 'APPLICATION_SUBMITTED',
+      referenceNumber,
+      details: { organizationName, serviceCode }
+    });
     return { ...app };
   }
 
@@ -123,6 +131,12 @@ export class GuichetUniqueEngine {
     this._logAudit(actor, 'PAYMENT_VALIDATED_SLA_STARTED', referenceNumber, {
       slaDueAt: app.slaDueAt.toISOString()
     });
+    this.notifications?.notifyTransactionalEvent({
+      userId: app.ownerId,
+      eventType: 'PAYMENT_VALIDATED',
+      referenceNumber,
+      details: { organizationName: app.organizationName, slaDueAt: app.slaDueAt.toISOString().slice(0, 10) }
+    });
     return { ...app };
   }
 
@@ -140,6 +154,18 @@ export class GuichetUniqueEngine {
     app.complementReason = reason.trim();
 
     this._logAudit(actor, 'COMPLEMENT_REQUESTED', referenceNumber, { reason: app.complementReason });
+    this.notifications?.notifyTransactionalEvent({
+      userId: app.ownerId,
+      eventType: 'COMPLEMENT_REQUESTED',
+      referenceNumber,
+      details: { organizationName: app.organizationName, reason: app.complementReason }
+    });
+    this.notifications?.addDossierMessage({
+      referenceNumber,
+      authorId: actor.id,
+      authorRole: actor.role,
+      message: `Demande de complément : ${app.complementReason}`
+    });
     return { ...app };
   }
 
@@ -160,6 +186,13 @@ export class GuichetUniqueEngine {
     app.complementReason = null;
 
     this._logAudit(actor, 'COMPLEMENT_PROVIDED', referenceNumber, { additionalDocType });
+    this.notifications?.addDossierMessage({
+      referenceNumber,
+      authorId: actor.id,
+      authorRole: actor.role,
+      message: `Pièce complémentaire déposée : ${additionalDocType}`,
+      attachmentDocType: additionalDocType
+    });
     return { ...app };
   }
 
@@ -228,6 +261,16 @@ export class GuichetUniqueEngine {
       docHash: sealed.docHash,
       txHash: onChainResult.txHash
     });
+    this.notifications?.notifyTransactionalEvent({
+      userId: app.ownerId,
+      eventType: 'CERTIFICATE_ISSUED',
+      referenceNumber,
+      details: {
+        organizationName: app.organizationName,
+        certificateNumber,
+        docHash: sealed.docHash
+      }
+    });
 
     return { ...app };
   }
@@ -277,6 +320,16 @@ export class GuichetUniqueEngine {
       docHash: app.certificate.docHash,
       reason,
       txHash: tx.txHash
+    });
+    this.notifications?.notifyTransactionalEvent({
+      userId: app.ownerId,
+      eventType: 'CERTIFICATE_REVOKED',
+      referenceNumber,
+      details: {
+        organizationName: app.organizationName,
+        certificateNumber: app.certificate.certificateNumber,
+        reason
+      }
     });
     return { ...app };
   }

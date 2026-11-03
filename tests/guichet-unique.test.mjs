@@ -35,8 +35,10 @@ import {
   GuichetUniqueEngine
 } from '../src/workflow/application-engine.mjs';
 
-import { generateOfficialPdfBuffer } from '../src/pdf/certificate-generator.mjs';
+import { generateOfficialPdfBuffer, OFFICIAL_ACT_TEMPLATES } from '../src/pdf/certificate-generator.mjs';
 import { createGuichetServer } from '../src/server.mjs';
+import { AuthService } from '../src/auth/auth-service.mjs';
+import { NotificationCenter } from '../src/notifications/notification-center.mjs';
 
 const ADMIN_ADDR = '0x1000000000000000000000000000000000000001';
 const RELAYER_ADDR = '0x2000000000000000000000000000000000000002';
@@ -356,5 +358,114 @@ test('5. Générateur PDF Officiel (%PDF-1.4) et API REST complète (VER-01, VER
   assert.equal(verifyAfterRevoke.isValid, false);
   assert.equal(verifyAfterRevoke.verdict, CustomsBadgeVerdict.RED_REVOKED);
 });
+
+test('6. Authentification Hybride Web2/Web3Auth, Google OAuth 2.0, Reset Mot de Passe & Administration ONG (REQ-01..04, BLK-02/03, ADM-03)', () => {
+  const auth = new AuthService();
+
+  // Inscription nominale (REQ-01) + dérivation automatique de portefeuille Web3Auth (BLK-03)
+  const registered = auth.registerUser({
+    email: 'secretariat@action-bukavu.cd',
+    password: 'StrongPassword#2026',
+    firstName: 'Chantal',
+    lastName: 'Mirindi',
+    organizationName: 'Action Sociale Bukavu',
+    province: 'Sud-Kivu'
+  });
+  assert.match(registered.walletAddress, /^0x[0-9a-f]{40}$/);
+  assert.equal(registered.status, 'ACTIVE');
+
+  // Connexion réussie
+  const loginOk = auth.loginWithEmail({ email: 'secretariat@action-bukavu.cd', password: 'StrongPassword#2026' });
+  assert.ok(loginOk.sessionToken);
+
+  // Verrouillage anti-brute-force au bout de 5 tentatives erronées
+  for (let i = 0; i < 4; i++) {
+    assert.throws(() => {
+      auth.loginWithEmail({ email: 'secretariat@action-bukavu.cd', password: 'WrongPassword' });
+    }, /Identifiants invalides/);
+  }
+  assert.throws(() => {
+    auth.loginWithEmail({ email: 'secretariat@action-bukavu.cd', password: 'WrongPassword' });
+  }, /verrouillé/);
+
+  // Réinitialisation du mot de passe à usage unique (REQ-03)
+  const resetReq = auth.requestPasswordReset('secretariat@action-bukavu.cd', 1000);
+  assert.ok(resetReq._devResetToken);
+  auth.confirmPasswordReset(resetReq._devResetToken, 'NewSecurePass#2027', 2000);
+
+  // Le jeton à usage unique ne peut pas être réutilisé
+  assert.throws(() => {
+    auth.confirmPasswordReset(resetReq._devResetToken, 'AnotherPass#2027', 3000);
+  }, /invalide ou expiré/);
+
+  // Connexion Google OAuth 2.0 avec pré-remplissage nom/post-nom (REQ-02)
+  const oauthSession = auth.loginWithGoogleOAuth({
+    googleEmail: 'coord.ituri@gmail.com',
+    givenName: 'Jean-Paul',
+    familyName: 'Mbuyi',
+    organizationName: 'Solidarité Ituri'
+  });
+  assert.equal(oauthSession.user.firstName, 'Jean-Paul');
+  assert.equal(oauthSession.user.lastName, 'Mbuyi');
+  assert.match(oauthSession.user.walletAddress, /^0x[0-9a-f]{40}$/);
+
+  // Suspension d'un compte par l'administrateur FNPSS (ADM-03)
+  const adminActor = { id: 'admin-1', role: Roles.ADMIN };
+  const suspended = auth.setApplicantAccountStatus(adminActor, registered.id, 'SUSPENDED', 'Dossier frauduleux signalé');
+  assert.equal(suspended.status, 'SUSPENDED');
+  assert.throws(() => {
+    auth.loginWithEmail({ email: 'secretariat@action-bukavu.cd', password: 'NewSecurePass#2027' });
+  }, /suspendu/);
+});
+
+test('7. Centre de Notifications (Email & In-App), Messagerie de Dossier et 6 Gabarits PDF S1-S6 (NOT-01..04, VER-01)', () => {
+  // Vérification des 6 gabarits normés S1 à S6
+  for (const code of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']) {
+    assert.ok(OFFICIAL_ACT_TEMPLATES[code]);
+    const buf = generateOfficialPdfBuffer({
+      serviceCode: code,
+      certificateNumber: `FNPSS-${code}-2026-00001`,
+      organizationName: 'ONG Test RDC'
+    });
+    assert.ok(buf.toString('ascii').includes(OFFICIAL_ACT_TEMPLATES[code].officialTitle));
+  }
+
+  const nc = new NotificationCenter();
+  // Envoi avec serveur SMTP indisponible -> mis en file RETRY_QUEUED puis relancé (NOT-01)
+  const evt = nc.notifyTransactionalEvent({
+    userId: 'usr-0001',
+    email: 'contact@espoir-kivu.org',
+    eventType: 'APPLICATION_SUBMITTED',
+    referenceNumber: 'FNPSS/DEM/2026/00100',
+    details: { organizationName: 'ONG Espoir', serviceCode: 'S4' },
+    smtpAvailable: false
+  });
+  assert.equal(evt.emailEntry.status, 'RETRY_QUEUED');
+  assert.equal(nc.flushEmailRetryQueue(true), 1);
+  assert.equal(nc.emailOutbox[0].status, 'SENT');
+
+  // Marquage lu/non-lu dans le centre in-app (NOT-02)
+  assert.equal(nc.getUserNotifications('usr-0001').unreadCount, 1);
+  nc.markNotificationRead(evt.inApp.id, true);
+  assert.equal(nc.getUserNotifications('usr-0001').unreadCount, 0);
+
+  // Communication générale de l'administration (NOT-03)
+  nc.sendBroadcastCommunication({
+    senderId: 'admin-fnpss',
+    subject: 'Clôture du dépôt des rapports annuels 2025',
+    message: 'Toutes les ONG sont invitées à mettre à jour leur pièce P4 avant le 30 novembre.'
+  });
+  assert.equal(nc.getUserNotifications('usr-0001').unreadCount, 1);
+
+  // Fil de discussion sur un dossier (NOT-04)
+  nc.addDossierMessage({
+    referenceNumber: 'FNPSS/DEM/2026/00100',
+    authorId: 'agent-1',
+    authorRole: Roles.AGENT,
+    message: 'Merci de joindre la facture proforma signée.'
+  });
+  assert.equal(nc.getDossierMessages('FNPSS/DEM/2026/00100').length, 1);
+});
+
 
 

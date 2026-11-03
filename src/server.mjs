@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { FNPSS_SERVICES, calculateServiceFees } from './domain/services-catalog.mjs';
 import { FNPSSRegistryContract } from './blockchain/registry-simulator.mjs';
 import { GuichetUniqueEngine, Roles } from './workflow/application-engine.mjs';
+import { AuthService } from './auth/auth-service.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
@@ -43,13 +44,34 @@ export function createGuichetServer() {
   const registry = new FNPSSRegistryContract(adminAddr, relayerAddr);
   registry.setMinistrySigner(adminAddr, relayerAddr, true);
   const engine = new GuichetUniqueEngine(registry, relayerAddr);
+  const auth = new AuthService();
 
   const defaultActors = {
     requerant: { id: 'ong-espoir-goma', role: Roles.REQUERANT },
     agent: { id: 'agent-patrick-k', role: Roles.AGENT },
     dg: { id: 'dg-jean-pierre-l', role: Roles.DG },
-    ministere: { id: 'min-tutelle-focal', role: Roles.MINISTERE }
+    ministere: { id: 'min-tutelle-focal', role: Roles.MINISTERE },
+    admin: { id: 'admin-fnpss-1', role: Roles.ADMIN }
   };
+
+  // Pré-amorçage des comptes ONG avec dérivation Web3Auth
+  auth.registerUser({
+    email: 'contact@espoir-kivu.org',
+    password: 'PasswordRDC#2026',
+    firstName: 'Amina',
+    lastName: 'Kahindo',
+    organizationName: 'ONG Espoir du Nord-Kivu',
+    province: 'Nord-Kivu (Goma)',
+    enrollmentNumber: 'FNPSS/ENR/2025/0112'
+  });
+  auth.registerUser({
+    email: 'direction@solidarite-kasai.org',
+    password: 'PasswordRDC#2026',
+    firstName: 'Dieudonné',
+    lastName: 'Tshibangu',
+    organizationName: 'Fondation Solidarité Kasaï',
+    province: 'Kasaï-Central (Kananga)'
+  });
 
   // Acte de démonstration historique pré-ancré pour l'API d'interopérabilité DGDA
   const demoHash = '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069';
@@ -222,6 +244,54 @@ export function createGuichetServer() {
         return sendJson(res, 200, { auditLogs: engine.getAuditLogs() });
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/auth/register') {
+        const body = await readJsonBody(req);
+        const user = auth.registerUser(body);
+        return sendJson(res, 201, { user });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/auth/login') {
+        const body = await readJsonBody(req);
+        const session = auth.loginWithEmail(body);
+        return sendJson(res, 200, session);
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/auth/google') {
+        const body = await readJsonBody(req);
+        const session = auth.loginWithGoogleOAuth(body);
+        return sendJson(res, 200, session);
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/applicants') {
+        return sendJson(res, 200, { applicants: auth.listApplicants() });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/applicants/status') {
+        const body = await readJsonBody(req);
+        const updated = auth.setApplicantAccountStatus(defaultActors.admin, body.userId, body.status, body.reason);
+        return sendJson(res, 200, { applicant: updated });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/notifications') {
+        const userId = url.searchParams.get('userId') || '';
+        return sendJson(res, 200, {
+          ...engine.notifications.getUserNotifications(userId),
+          emailOutboxCount: engine.notifications.emailOutbox.length
+        });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/notifications/broadcast') {
+        const body = await readJsonBody(req);
+        const comm = engine.notifications.sendBroadcastCommunication({
+          senderId: defaultActors.admin.id,
+          targetSegment: body.targetSegment || 'ALL_APPLICANTS',
+          recipientUserId: body.recipientUserId || null,
+          subject: body.subject,
+          message: body.message
+        });
+        return sendJson(res, 201, { communication: comm });
+      }
+
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         const html = fs.readFileSync(prototypeHtmlPath, 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -238,6 +308,7 @@ export function createGuichetServer() {
   const server = http.createServer(requestListener);
   server.engine = engine;
   server.registry = registry;
+  server.auth = auth;
 
   /**
    * Exécute une requête REST en mémoire (sans socket TCP) pour les tests unitaires/E2E en bac à sable.
