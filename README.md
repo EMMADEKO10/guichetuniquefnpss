@@ -18,6 +18,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
 - **Wireframes UI (Requérant, Back-Office, DGDA) & Plan Qualité (`UX-02`, `UX-03`, `UX-06`, `SEC-01`) :** [WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md](documentation%20du%20projet/WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md) · [Version Google Docs](https://docs.google.com/document/d/10zLGEgYxIU9nDXG1L4Lo6Usi1vQ67e_t6hlAgaYGQPQ/edit)
 - **Conformité Juridique RDC, Valeur Probante SHA-256 & Protection des Données (`SEC-06`) :** [CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md](documentation%20du%20projet/CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md) · [Version Google Docs](https://docs.google.com/document/d/1CMMC2k_NBfkidQzGD0y6a-0ECuOTSYEizOWCNJS9ydw/edit)
 - **Audit Smart Contract, Pen-Test OWASP Top 10, Recette UAT & Guides Utilisateurs (`SEC-03`, `SEC-04`, `SEC-07`, `DEP-03`) :** [AUDIT_SECURITE_SMART_CONTRACT_ET_PENTEST_OWASP.md](documentation%20du%20projet/AUDIT_SECURITE_SMART_CONTRACT_ET_PENTEST_OWASP.md) · [Version Google Docs](https://docs.google.com/document/d/14aiNXXQd_zyoXK1AVSgrjJl5QeFtUX0JKArvb9Ju6JE/edit)
+- **Rapport COPIL S1, Déploiement Polygon Amoy/Mainnet, Production Souveraine & Plan Pilote G4 (`GOV-09`..`13`, `BLK-11`/`12`, `OPS-07`, `DEP-01`..`09`) :** [RAPPORT_COPIL_S1_DEPLOIEMENT_POLYGON_ET_PLAN_PILOTE_G4.md](documentation%20du%20projet/RAPPORT_COPIL_S1_DEPLOIEMENT_POLYGON_ET_PLAN_PILOTE_G4.md) · [Version Google Docs](https://docs.google.com/document/d/18-bUVz4DOCVP7YHiO-Ll5KroRmJvihyT6QyTL7XlJbM/edit)
 
 ## Socle Technique, Moteur Métier & Prototype Interactif (Sprint 0 / Sprint 1)
 - **Prototype Interactif UI Haute Fidélité (`UX-04`) :** [prototype/index.html](prototype/index.html) *(Portail Requérant `S1`–`S6`, Back-Office d'instruction & scellement SHA-256, Contrôle Douanier QR & PDF DGDA, Registre Polygon & Audit)*
@@ -35,6 +36,8 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Scellement SHA-256, chiffrement AES-256-GCM (`OPS-05`) et QR Code : [src/crypto/document-sealer.mjs](src/crypto/document-sealer.mjs)
   - Générateur des 6 gabarits officiels PDF 1.4 (`VER-01`, `VER-02`) : [src/pdf/certificate-generator.mjs](src/pdf/certificate-generator.mjs)
   - Simulateur Smart Contract & File d'ancrage résiliente hors-ligne (`BLK-10`) : [src/blockchain/registry-simulator.mjs](src/blockchain/registry-simulator.mjs)
+  - Déployeur & Vérificateur Polygon Amoy Testnet (`80002`) / Mainnet (`137`) (`BLK-11`, `BLK-12`) : [src/blockchain/polygon-deployer.mjs](src/blockchain/polygon-deployer.mjs)
+  - Sauvegarde/Restauration Chiffrée `AES-256-GCM` (`OPS-05`), Go/No-Go `G1`–`G4` (`DEP-02`) & Suivi Pilote/Hypercare (`DEP-06`, `DEP-07`) : [src/ops/backup-and-pilot-manager.mjs](src/ops/backup-and-pilot-manager.mjs)
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
   - Serveur HTTP, API REST du moteur & API d'interopérabilité DGDA (`VER-05`) : [src/server.mjs](src/server.mjs)
 - **Suite de Tests Automatisés (`BLK-08`, `SEC-01`, `SEC-02`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)

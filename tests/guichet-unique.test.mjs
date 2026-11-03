@@ -43,6 +43,13 @@ import { validateAndInspectPdfUpload, verifyUploadedPdfAgainstRegistry } from '.
 import { NewsAndStatsService } from '../src/cms/news-and-stats.mjs';
 import { PartnerApiGateway } from '../src/security/partner-api-gateway.mjs';
 import { OfflinePwaSyncQueue } from '../src/pwa/offline-sync-queue.mjs';
+import { deployAndVerifyRegistryContract } from '../src/blockchain/polygon-deployer.mjs';
+import {
+  createEncryptedSystemBackup,
+  restoreEncryptedSystemBackup,
+  evaluateGoNoGoGates,
+  PilotAndHypercareTracker
+} from '../src/ops/backup-and-pilot-manager.mjs';
 
 const ADMIN_ADDR = '0x1000000000000000000000000000000000000001';
 const RELAYER_ADDR = '0x2000000000000000000000000000000000000002';
@@ -745,6 +752,89 @@ test('11. Passerelle API Partenaires DGDA/DGRAD/DGI (VER-05, SEC-04), File Hors-
   assert.equal(sup.req12PerformanceBudget.withinBudget, true);
   assert.ok(sup.req12PerformanceBudget.estimated3gLoadSeconds < 3.0);
 });
+
+test('12. Déploiement & Vérification Smart Contract sur Polygon Amoy Testnet (BLK-11) et Garde Mainnet (BLK-12)', () => {
+  // Rejet strict du testnet déprécié Polygon Mumbai (80001)
+  assert.throws(() => {
+    deployAndVerifyRegistryContract({ networkKey: 'polygon-mumbai' });
+  }, /Mumbai \(80001\) est déprécié/);
+
+  // Déploiement nominal et smoke test sur Polygon Amoy Testnet (Chain ID 80002 — BLK-11)
+  const amoyReceipt = deployAndVerifyRegistryContract({
+    networkKey: 'polygon-amoy',
+    adminAddress: ADMIN_ADDR,
+    relayerAddress: RELAYER_ADDR,
+    ministrySignerAddress: MINISTRY_ADDR
+  });
+  assert.equal(amoyReceipt.network.chainId, 80002);
+  assert.equal(amoyReceipt.sourceCodeVerified, true);
+  assert.equal(amoyReceipt.smokeTest.passed, true);
+  assert.equal(amoyReceipt.smokeTest.verdict, CustomsBadgeVerdict.GREEN_VALID);
+
+  // Déploiement sur Polygon Mainnet (Chain ID 137) refusé si l'audit SEC-03 n'est pas validé (BLK-12)
+  assert.throws(() => {
+    deployAndVerifyRegistryContract({ networkKey: 'polygon-mainnet', auditPassed: false });
+  }, /audit de sécurité/);
+
+  // Déploiement sur Polygon Mainnet autorisé dès que auditPassed = true (BLK-12)
+  const mainnetReceipt = deployAndVerifyRegistryContract({
+    networkKey: 'polygon-mainnet',
+    auditPassed: true,
+    initialRelayerBalancePol: 250
+  });
+  assert.equal(mainnetReceipt.network.chainId, 137);
+  assert.equal(mainnetReceipt.smokeTest.passed, true);
+});
+
+test('13. Sauvegarde/Restauration Chiffrée AES-256-GCM (OPS-05, DEP-01), Jalons Go/No-Go G1-G4 (DEP-02) & Cohorte Pilote Hypercare (DEP-06, DEP-07)', async () => {
+  const server = createGuichetServer();
+
+  // Sauvegarde chiffrée AES-256-GCM via POST /api/ops/backup
+  const backupRes = await server.dispatch({ method: 'POST', url: '/api/ops/backup', body: {} });
+  assert.equal(backupRes.status, 200);
+  const { backup } = backupRes.json();
+  assert.equal(backup.cipherAlgorithm, 'AES-256-GCM');
+  assert.equal(backup.counts.applications, 3);
+
+  // Restauration avec vérification d'intégrité SHA-256 via POST /api/ops/restore
+  const restoreRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/ops/restore',
+    body: { backup }
+  });
+  assert.equal(restoreRes.status, 200);
+  const restored = restoreRes.json();
+  assert.equal(restored.restored, true);
+  assert.equal(restored.integrityVerified, true);
+  assert.equal(restored.counts.applications, 3);
+
+  // Évaluation Go/No-Go (DEP-02) et suivi Pilote/Hypercare (DEP-06, DEP-07)
+  const goNoGoBlocked = evaluateGoNoGoGates({ smartContractAuditPassedG3: false });
+  assert.equal(goNoGoBlocked.decision, 'NO_GO_BLOCKED');
+
+  const goNoGoGreen = evaluateGoNoGoGates();
+  assert.equal(goNoGoGreen.decision, 'GO_PRODUCTION');
+
+  const tracker = new PilotAndHypercareTracker();
+  const ticket = tracker.logHypercareIncident({
+    reporterOrg: 'ONG Espoir du Nord-Kivu',
+    severity: 'CRITICAL',
+    summary: 'Question sur la lecture du QR Code au poste de Goma',
+    openedAtMs: 100000
+  });
+  const resolvedTicket = tracker.resolveHypercareIncident(ticket.ticketId, {
+    resolutionNote: 'Connectivité 3G vérifiée et scan validé en 1,1 seconde',
+    resolvedAtMs: 100000 + 25 * 60000 // 25 minutes <= 120 minutes SLA
+  });
+  assert.equal(resolvedTicket.slaMet, true);
+  assert.equal(tracker.getPilotStatusSummary().hypercareSlaCompliancePct, 100);
+
+  const goNoGoApiRes = await server.dispatch({ method: 'GET', url: '/api/ops/go-nogo' });
+  assert.equal(goNoGoApiRes.status, 200);
+  assert.equal(goNoGoApiRes.json().gates.decision, 'GO_PRODUCTION');
+  assert.equal(goNoGoApiRes.json().pilot.pilotCohortSize, 5);
+});
+
 
 
 

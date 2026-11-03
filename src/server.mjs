@@ -17,6 +17,13 @@ import { validateAndInspectPdfUpload, verifyUploadedPdfAgainstRegistry } from '.
 import { NewsAndStatsService } from './cms/news-and-stats.mjs';
 import { PartnerApiGateway, OWASP_SECURITY_HEADERS } from './security/partner-api-gateway.mjs';
 import { OfflinePwaSyncQueue } from './pwa/offline-sync-queue.mjs';
+import { deployAndVerifyRegistryContract } from './blockchain/polygon-deployer.mjs';
+import {
+  createEncryptedSystemBackup,
+  restoreEncryptedSystemBackup,
+  evaluateGoNoGoGates,
+  PilotAndHypercareTracker
+} from './ops/backup-and-pilot-manager.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
@@ -56,6 +63,7 @@ export function createGuichetServer() {
   const cms = new NewsAndStatsService();
   const partnerGateway = new PartnerApiGateway();
   const pwaQueue = new OfflinePwaSyncQueue();
+  const pilotTracker = new PilotAndHypercareTracker();
 
   const defaultActors = {
     requerant: { id: 'ong-espoir-goma', role: Roles.REQUERANT },
@@ -410,6 +418,40 @@ export function createGuichetServer() {
         return sendJson(res, 200, snapshot);
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/blockchain/deploy') {
+        const body = await readJsonBody(req);
+        const receipt = deployAndVerifyRegistryContract({
+          networkKey: body.networkKey || 'polygon-amoy',
+          adminAddress: adminAddr,
+          relayerAddress: relayerAddr,
+          auditPassed: Boolean(body.auditPassed)
+        });
+        return sendJson(res, 200, { deployment: receipt });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/ops/backup') {
+        const body = await readJsonBody(req);
+        const backup = createEncryptedSystemBackup({
+          engine,
+          auth,
+          cms,
+          encryptionKeyHex: body.encryptionKeyHex || undefined
+        });
+        return sendJson(res, 200, { backup });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/ops/restore') {
+        const body = await readJsonBody(req);
+        const restored = restoreEncryptedSystemBackup(body.backup, body.encryptionKeyHex || undefined);
+        return sendJson(res, 200, restored);
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/ops/go-nogo') {
+        const gates = evaluateGoNoGoGates();
+        const pilot = pilotTracker.getPilotStatusSummary();
+        return sendJson(res, 200, { gates, pilot });
+      }
+
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         const html = fs.readFileSync(prototypeHtmlPath, 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -430,6 +472,7 @@ export function createGuichetServer() {
   server.cms = cms;
   server.partnerGateway = partnerGateway;
   server.pwaQueue = pwaQueue;
+  server.pilotTracker = pilotTracker;
 
   /**
    * Exécute une requête REST en mémoire (sans socket TCP) pour les tests unitaires/E2E en bac à sable.
