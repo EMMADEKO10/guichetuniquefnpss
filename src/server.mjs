@@ -15,6 +15,8 @@ import { GuichetUniqueEngine, Roles } from './workflow/application-engine.mjs';
 import { AuthService } from './auth/auth-service.mjs';
 import { validateAndInspectPdfUpload, verifyUploadedPdfAgainstRegistry } from './storage/document-upload-guard.mjs';
 import { NewsAndStatsService } from './cms/news-and-stats.mjs';
+import { PartnerApiGateway, OWASP_SECURITY_HEADERS } from './security/partner-api-gateway.mjs';
+import { OfflinePwaSyncQueue } from './pwa/offline-sync-queue.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
@@ -35,8 +37,12 @@ function readJsonBody(req) {
   });
 }
 
-function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+function sendJson(res, statusCode, payload, extraHeaders = {}) {
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...OWASP_SECURITY_HEADERS,
+    ...extraHeaders
+  });
   res.end(JSON.stringify(payload));
 }
 
@@ -48,10 +54,13 @@ export function createGuichetServer() {
   const engine = new GuichetUniqueEngine(registry, relayerAddr);
   const auth = new AuthService();
   const cms = new NewsAndStatsService();
+  const partnerGateway = new PartnerApiGateway();
+  const pwaQueue = new OfflinePwaSyncQueue();
 
   const defaultActors = {
     requerant: { id: 'ong-espoir-goma', role: Roles.REQUERANT },
     agent: { id: 'agent-patrick-k', role: Roles.AGENT },
+    chefDivision: { id: 'div-chief-marie-m', role: Roles.CHEF_DIVISION },
     dg: { id: 'dg-jean-pierre-l', role: Roles.DG },
     ministere: { id: 'min-tutelle-focal', role: Roles.MINISTERE },
     admin: { id: 'admin-fnpss-1', role: Roles.ADMIN }
@@ -170,6 +179,32 @@ export function createGuichetServer() {
         return sendJson(res, 200, { application: updated });
       }
 
+      if (req.method === 'PUT' && url.pathname === '/api/applications') {
+        const body = await readJsonBody(req);
+        const updated = engine.updateApplicationBeforeInstruction(
+          defaultActors.requerant,
+          body.referenceNumber,
+          body
+        );
+        return sendJson(res, 200, { application: updated });
+      }
+
+      if (req.method === 'DELETE' && url.pathname === '/api/applications') {
+        const body = await readJsonBody(req);
+        const ref = body.referenceNumber || url.searchParams.get('ref') || '';
+        const resWithdraw = engine.withdrawApplicationBeforeInstruction(defaultActors.requerant, ref);
+        return sendJson(res, 200, resWithdraw);
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/applications/division-opinion') {
+        const body = await readJsonBody(req);
+        const updated = engine.emitDivisionChiefOpinion(defaultActors.chefDivision, body.referenceNumber, {
+          favorable: body.favorable !== false,
+          opinionNote: body.opinionNote
+        });
+        return sendJson(res, 200, { application: updated });
+      }
+
       if (req.method === 'POST' && url.pathname === '/api/applications/request-complement') {
         const body = await readJsonBody(req);
         const updated = engine.requestComplement(defaultActors.agent, body.referenceNumber, body.reason || 'Pièce justificative à clarifier');
@@ -230,6 +265,12 @@ export function createGuichetServer() {
 
       if (req.method === 'GET' && url.pathname === '/api/verify') {
         const query = (url.searchParams.get('hash') || '').trim();
+        const apiKey = req.headers?.['x-api-key'] || null;
+        const rateInfo = partnerGateway.authenticateAndRateLimitPartner({
+          apiKey,
+          endpoint: '/api/verify',
+          queryTarget: query
+        });
         let targetHash = query;
         if (!query.startsWith('0x')) {
           for (const app of engine.applications.values()) {
@@ -240,7 +281,7 @@ export function createGuichetServer() {
           }
         }
         const verification = registry.verifyDocument(targetHash);
-        return sendJson(res, 200, verification);
+        return sendJson(res, 200, { ...verification, partnerId: rateInfo.partnerId }, rateInfo.headers);
       }
 
       if (req.method === 'GET' && url.pathname === '/api/audit-logs') {
@@ -338,6 +379,37 @@ export function createGuichetServer() {
         return sendJson(res, 200, { stats });
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/pwa/sync') {
+        const body = await readJsonBody(req);
+        const queued = pwaQueue.enqueueOfflineSubmission(defaultActors.requerant, {
+          organizationName: body.organizationName || 'ONG Espoir du Nord-Kivu',
+          serviceCode: body.serviceCode || 'S6',
+          projectTitle: body.projectTitle,
+          goodsSummary: body.goodsSummary || '',
+          uploadedDocTypes: body.uploadedDocTypes || allDocs,
+          paymentReference: body.paymentReference,
+          hasActiveS1Enrollment: Boolean(body.hasActiveS1Enrollment)
+        }, { idempotencyKey: body.idempotencyKey || null });
+        const syncedList = pwaQueue.syncQueuedSubmissions(engine, {
+          isOnline: body.isOnline !== false
+        });
+        const match = syncedList.find(item => item.idempotencyKey === queued.idempotencyKey) || queued;
+        return sendJson(res, 200, { syncResult: match, deduplicated: queued.deduplicated });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/ops/supervision') {
+        let htmlBytes = 65000;
+        try {
+          htmlBytes = fs.statSync(prototypeHtmlPath).size;
+        } catch (_) {}
+        const snapshot = partnerGateway.getSupervisionSnapshot({
+          totalApplications: engine.applications.size,
+          auditLogsCount: engine.auditLogs.length,
+          prototypeHtmlBytes: htmlBytes
+        });
+        return sendJson(res, 200, snapshot);
+      }
+
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         const html = fs.readFileSync(prototypeHtmlPath, 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -356,16 +428,21 @@ export function createGuichetServer() {
   server.registry = registry;
   server.auth = auth;
   server.cms = cms;
+  server.partnerGateway = partnerGateway;
+  server.pwaQueue = pwaQueue;
 
   /**
    * Exécute une requête REST en mémoire (sans socket TCP) pour les tests unitaires/E2E en bac à sable.
    */
-  server.dispatch = async ({ method = 'GET', url = '/', body = null } = {}) => {
+  server.dispatch = async ({ method = 'GET', url = '/', body = null, headers: reqHeaders = {} } = {}) => {
     const payloadBuf = body ? Buffer.from(typeof body === 'string' ? body : JSON.stringify(body), 'utf8') : Buffer.alloc(0);
     const req = Readable.from(payloadBuf.length ? [payloadBuf] : []);
     req.method = method;
     req.url = url;
-    req.headers = { host: 'localhost', 'content-type': 'application/json' };
+    const normalizedReqHeaders = Object.fromEntries(
+      Object.entries(reqHeaders).map(([k, v]) => [k.toLowerCase(), v])
+    );
+    req.headers = { host: 'localhost', 'content-type': 'application/json', ...normalizedReqHeaders };
 
     return new Promise((resolve) => {
       let statusCode = 200;

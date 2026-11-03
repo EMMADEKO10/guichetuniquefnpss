@@ -1,6 +1,7 @@
 /**
- * @fileoverview Moteur de workflow des demandes FNPSS, contrôle d'accès RBAC (ADM-01)
- * et journal d'audit immuable (ADM-07).
+ * @fileoverview Moteur de workflow des demandes FNPSS, contrôle d'accès RBAC (ADM-01),
+ * circuit d'approbation multi-niveaux (ADM-08), modification/retrait avant instruction (REQ-08),
+ * double confirmation de révocation (VER-06) et journal d'audit immuable (ADM-07).
  */
 
 import { FNPSS_SERVICES, validateRequiredDocuments, computeSlaDueDate } from '../domain/services-catalog.mjs';
@@ -19,7 +20,13 @@ export const Roles = Object.freeze({
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
-  [Roles.REQUERANT]: new Set(['SUBMIT_APPLICATION', 'UPLOAD_COMPLEMENT', 'DOWNLOAD_OWN_CERTIFICATE']),
+  [Roles.REQUERANT]: new Set([
+    'SUBMIT_APPLICATION',
+    'UPDATE_OWN_DRAFT_APPLICATION',
+    'WITHDRAW_OWN_DRAFT_APPLICATION',
+    'UPLOAD_COMPLEMENT',
+    'DOWNLOAD_OWN_CERTIFICATE'
+  ]),
   [Roles.AGENT]: new Set(['VALIDATE_PAYMENT', 'INSPECT_APPLICATION', 'REQUEST_COMPLEMENT']),
   [Roles.CHEF_DIVISION]: new Set(['VALIDATE_PAYMENT', 'INSPECT_APPLICATION', 'REQUEST_COMPLEMENT', 'EMIT_FAVORABLE_OPINION']),
   [Roles.DG]: new Set(['APPROVE_AND_SEAL_CERTIFICATE', 'REVOKE_CERTIFICATE', 'REJECT_APPLICATION']),
@@ -100,6 +107,15 @@ export class GuichetUniqueEngine {
       slaDueAt: null,
       slaPaused: false,
       complementReason: null,
+      divisionOpinion: null,
+      approvalSteps: [
+        {
+          step: 'DEPOT_REQUERANT',
+          actorId: actor.id,
+          actorRole: actor.role,
+          timestamp: new Date().toISOString()
+        }
+      ],
       ministryCoSigned: false,
       ministryReference: null,
       certificate: null
@@ -117,6 +133,53 @@ export class GuichetUniqueEngine {
   }
 
   /**
+   * Modification d'une demande par le requérant uniquement tant que le traitement n'a pas démarré (REQ-08).
+   */
+  updateApplicationBeforeInstruction(actor, referenceNumber, updates = {}) {
+    assertPermission(actor, 'UPDATE_OWN_DRAFT_APPLICATION');
+    const app = this._getApp(referenceNumber);
+    if (app.ownerId !== actor.id) {
+      throw new Error('RBAC: Seul le propriétaire du dossier peut le modifier');
+    }
+    if (app.status !== 'SOUMIS' || app.paymentValidated) {
+      throw new Error('REQ-08: Modification impossible une fois l\'instruction du dossier démarrée');
+    }
+
+    if (updates.projectTitle) app.projectTitle = updates.projectTitle.trim();
+    if (updates.goodsSummary !== undefined) app.goodsSummary = String(updates.goodsSummary).trim();
+    if (updates.paymentReference) app.paymentReference = updates.paymentReference.trim();
+    if (Array.isArray(updates.uploadedDocTypes)) {
+      app.uploadedDocTypes = [...updates.uploadedDocTypes];
+    }
+
+    this._logAudit(actor, 'APPLICATION_UPDATED_BEFORE_INSTRUCTION', referenceNumber, {
+      projectTitle: app.projectTitle,
+      paymentReference: app.paymentReference
+    });
+    return { ...app };
+  }
+
+  /**
+   * Suppression / retrait d'une demande par le requérant uniquement avant le démarrage de l'instruction (REQ-08).
+   */
+  withdrawApplicationBeforeInstruction(actor, referenceNumber) {
+    assertPermission(actor, 'WITHDRAW_OWN_DRAFT_APPLICATION');
+    const app = this._getApp(referenceNumber);
+    if (app.ownerId !== actor.id) {
+      throw new Error('RBAC: Seul le propriétaire du dossier peut le retirer');
+    }
+    if (app.status !== 'SOUMIS' || app.paymentValidated) {
+      throw new Error('REQ-08: Suppression impossible une fois l\'instruction du dossier démarrée');
+    }
+
+    this.applications.delete(referenceNumber);
+    this._logAudit(actor, 'APPLICATION_WITHDRAWN_BEFORE_INSTRUCTION', referenceNumber, {
+      serviceCode: app.serviceCode
+    });
+    return { withdrawn: true, referenceNumber };
+  }
+
+  /**
    * Validation de la preuve de paiement (20 USD + 300 USD) par un agent FNPSS -> Démarre le SLA de 10 jours ouvrables (CU03 / REQ-10).
    */
   validatePaymentAndStartSla(actor, referenceNumber, nowDate = new Date(), holidaysIsoList = []) {
@@ -127,6 +190,12 @@ export class GuichetUniqueEngine {
     app.slaStartedAt = new Date(nowDate.getTime());
     app.slaDueAt = computeSlaDueDate(app.slaStartedAt, FNPSS_SERVICES[app.serviceCode].slaBusinessDays, holidaysIsoList);
     app.slaPaused = false;
+    app.approvalSteps.push({
+      step: 'VALIDATION_PAIEMENT_AGENT',
+      actorId: actor.id,
+      actorRole: actor.role,
+      timestamp: app.slaStartedAt.toISOString()
+    });
 
     this._logAudit(actor, 'PAYMENT_VALIDATED_SLA_STARTED', referenceNumber, {
       slaDueAt: app.slaDueAt.toISOString()
@@ -136,6 +205,42 @@ export class GuichetUniqueEngine {
       eventType: 'PAYMENT_VALIDATED',
       referenceNumber,
       details: { organizationName: app.organizationName, slaDueAt: app.slaDueAt.toISOString().slice(0, 10) }
+    });
+    return { ...app };
+  }
+
+  /**
+   * Avis technique intermédiaire du Chef de Division avant signature finale DG (Circuit multi-niveaux ADM-08).
+   */
+  emitDivisionChiefOpinion(actor, referenceNumber, {
+    favorable = true,
+    opinionNote = 'Avis technique favorable après contrôle de conformité des pièces P1 à P6'
+  } = {}) {
+    assertPermission(actor, 'EMIT_FAVORABLE_OPINION');
+    const app = this._getApp(referenceNumber);
+    if (!app.paymentValidated) {
+      throw new Error('ADM-08: La quittance des frais doit être validée par un agent avant l\'avis du Chef de Division');
+    }
+
+    const signedAt = new Date().toISOString();
+    app.divisionOpinion = {
+      favorable: Boolean(favorable),
+      opinionNote: opinionNote.trim(),
+      reviewerId: actor.id,
+      reviewerRole: actor.role,
+      signedAt
+    };
+    app.approvalSteps.push({
+      step: favorable ? 'AVIS_FAVORABLE_CHEF_DIVISION' : 'AVIS_RESERVE_CHEF_DIVISION',
+      actorId: actor.id,
+      actorRole: actor.role,
+      note: app.divisionOpinion.opinionNote,
+      timestamp: signedAt
+    });
+
+    this._logAudit(actor, 'DIVISION_CHIEF_OPINION_EMITTED', referenceNumber, {
+      favorable: app.divisionOpinion.favorable,
+      opinionNote: app.divisionOpinion.opinionNote
     });
     return { ...app };
   }
@@ -257,6 +362,14 @@ export class GuichetUniqueEngine {
 
     app.status = 'VALIDE_DELIVRE';
     app.certificate = certDetails;
+    app.approvalSteps.push({
+      step: 'APPROBATION_DG_ET_ANCRAGE_BLOCKCHAIN',
+      actorId: actor.id,
+      actorRole: actor.role,
+      certificateNumber,
+      docHash: sealed.docHash,
+      timestamp: issuedAtIso
+    });
 
     this._logAudit(actor, 'CERTIFICATE_ISSUED_AND_ANCHORED', referenceNumber, {
       certificateNumber,
@@ -292,6 +405,13 @@ export class GuichetUniqueEngine {
     });
     app.ministryCoSigned = true;
     app.ministryReference = ministryReference;
+    app.approvalSteps.push({
+      step: 'COSIGNATURE_MINISTERE_TUTELLE',
+      actorId: actor.id,
+      actorRole: actor.role,
+      ministryReference,
+      timestamp: new Date().toISOString()
+    });
     this._logAudit(actor, 'MINISTRY_COSIGNED_ONCHAIN', referenceNumber, {
       docHash: app.certificate.docHash,
       ministryReference,
@@ -301,10 +421,13 @@ export class GuichetUniqueEngine {
   }
 
   /**
-   * Révocation administrative d'un certificat par la Direction Générale (CU06 / SC-04).
+   * Révocation administrative d'un certificat par la Direction Générale avec double confirmation et alerte régies (CU06 / VER-06).
    */
-  revokeCertificate(actor, referenceNumber, reason) {
+  revokeCertificate(actor, referenceNumber, reason, { doubleConfirmed = true } = {}) {
     assertPermission(actor, 'REVOKE_CERTIFICATE');
+    if (!doubleConfirmed) {
+      throw new Error('VER-06: La double confirmation explicite de la Direction Générale est requise pour révoquer un acte');
+    }
     const app = this._getApp(referenceNumber);
     if (!app.certificate || !app.certificate.docHash) {
       throw new Error('Aucun certificat scellé à révoquer sur ce dossier');
@@ -317,10 +440,19 @@ export class GuichetUniqueEngine {
     app.status = 'REVOQUE';
     app.certificate.status = 'REVOKED';
     app.certificate.revocationReason = reason;
+    app.certificate.regiesNotified = ['DGDA', 'DGRAD', 'DGI'];
+    app.approvalSteps.push({
+      step: 'REVOCATION_DG_ONCHAIN',
+      actorId: actor.id,
+      actorRole: actor.role,
+      note: reason,
+      timestamp: new Date().toISOString()
+    });
     this._logAudit(actor, 'CERTIFICATE_REVOKED_ONCHAIN', referenceNumber, {
       certificateNumber: app.certificate.certificateNumber,
       docHash: app.certificate.docHash,
       reason,
+      regiesNotified: app.certificate.regiesNotified,
       txHash: tx.txHash
     });
     this.notifications?.notifyTransactionalEvent({

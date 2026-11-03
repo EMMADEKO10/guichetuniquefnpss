@@ -268,3 +268,4 @@ paths:
       responses:
         "201":
           description: Actualité créée et publiée
+

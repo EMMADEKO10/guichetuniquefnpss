@@ -69,3 +69,4 @@ Chaque document PDF généré par `src/pdf/certificate-generator.mjs` comporte d
    - L'empreinte `SHA-256 (docHash)` en 66 caractères hexadécimaux ;
    - Le hash de transaction `TxHash Polygon` ;
    - L'URL publique de vérification QR Code (`https://guichet.fnpss.cd/verifier?hash=...`) opposable lors des contrôles de la DGDA.
+

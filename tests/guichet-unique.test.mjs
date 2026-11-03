@@ -41,6 +41,8 @@ import { AuthService } from '../src/auth/auth-service.mjs';
 import { NotificationCenter } from '../src/notifications/notification-center.mjs';
 import { validateAndInspectPdfUpload, verifyUploadedPdfAgainstRegistry } from '../src/storage/document-upload-guard.mjs';
 import { NewsAndStatsService } from '../src/cms/news-and-stats.mjs';
+import { PartnerApiGateway } from '../src/security/partner-api-gateway.mjs';
+import { OfflinePwaSyncQueue } from '../src/pwa/offline-sync-queue.mjs';
 
 const ADMIN_ADDR = '0x1000000000000000000000000000000000000001';
 const RELAYER_ADDR = '0x2000000000000000000000000000000000000002';
@@ -601,6 +603,149 @@ test('9. CMS des Actualités FNPSS (REQ-13, ADM-10), Tableau de Bord Statistique
   assert.equal(verifyPdfTamperedRes.status, 200);
   assert.equal(verifyPdfTamperedRes.json().verdict, CustomsBadgeVerdict.RED_FALSIFIED_OR_UNKNOWN);
 });
+
+test('10. Modification/Retrait avant instruction (REQ-08), Approbation Multi-Niveaux Chef de Division (ADM-08) & Double Confirmation Révocation (VER-06)', () => {
+  const registry = new FNPSSRegistryContract(ADMIN_ADDR, RELAYER_ADDR);
+  const engine = new GuichetUniqueEngine(registry, RELAYER_ADDR);
+  const allDocs = ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'];
+
+  const ongActor = { id: 'ong-1', role: Roles.REQUERANT };
+  const agentActor = { id: 'agent-1', role: Roles.AGENT };
+  const divChiefActor = { id: 'div-chief-1', role: Roles.CHEF_DIVISION };
+  const dgActor = { id: 'dg-1', role: Roles.DG };
+
+  // Création d'un dossier brouillon/soumis puis retrait avant instruction (REQ-08)
+  const draftToWithdraw = engine.submitApplication(ongActor, {
+    organizationName: 'ONG Action Kasaï',
+    serviceCode: 'S3',
+    projectTitle: 'Projet initial à retirer',
+    uploadedDocTypes: allDocs,
+    paymentReference: 'RAWBANK-001'
+  });
+  const withdrawn = engine.withdrawApplicationBeforeInstruction(ongActor, draftToWithdraw.referenceNumber);
+  assert.equal(withdrawn.withdrawn, true);
+
+  // Création d'un second dossier, modification avant instruction (REQ-08)
+  const app = engine.submitApplication(ongActor, {
+    organizationName: 'ONG Action Kasaï',
+    serviceCode: 'S4',
+    projectTitle: 'Forage solaire v1',
+    goodsSummary: '5 pompes solaires',
+    uploadedDocTypes: allDocs,
+    paymentReference: 'RAWBANK-002'
+  });
+  const updated = engine.updateApplicationBeforeInstruction(ongActor, app.referenceNumber, {
+    projectTitle: 'Forage solaire v2 (10 puits)',
+    goodsSummary: '10 pompes solaires immergées'
+  });
+  assert.equal(updated.projectTitle, 'Forage solaire v2 (10 puits)');
+
+  // Dès que le paiement est validé et l'instruction démarrée, toute modification ou suppression par l'ONG est bloquée (REQ-08)
+  engine.validatePaymentAndStartSla(agentActor, app.referenceNumber);
+  assert.throws(() => {
+    engine.updateApplicationBeforeInstruction(ongActor, app.referenceNumber, { projectTitle: 'Interdit' });
+  }, /Modification impossible/);
+  assert.throws(() => {
+    engine.withdrawApplicationBeforeInstruction(ongActor, app.referenceNumber);
+  }, /Suppression impossible/);
+
+  // Circuit d'approbation multi-niveaux (ADM-08) : avis favorable du Chef de Division avant signature DG
+  const withOpinion = engine.emitDivisionChiefOpinion(divChiefActor, app.referenceNumber, {
+    favorable: true,
+    opinionNote: 'Dossier complet et conforme au plan d\'action annuel 2026'
+  });
+  assert.equal(withOpinion.divisionOpinion.favorable, true);
+
+  engine.approveAndSealCertificate(dgActor, app.referenceNumber, { issuedAtTimestamp: 1793613600 });
+
+  // VER-06 : la révocation échoue si doubleConfirmed est false
+  assert.throws(() => {
+    engine.revokeCertificate(dgActor, app.referenceNumber, 'Motif', { doubleConfirmed: false });
+  }, /double confirmation/);
+
+  const revoked = engine.revokeCertificate(dgActor, app.referenceNumber, 'Irrégularité douanière constatée', {
+    doubleConfirmed: true
+  });
+  assert.deepEqual(revoked.certificate.regiesNotified, ['DGDA', 'DGRAD', 'DGI']);
+  assert.equal(revoked.approvalSteps.length, 5); // Dépôt -> Paiement Agent -> Avis Chef Division -> Scellement DG -> Révocation DG
+});
+
+test('11. Passerelle API Partenaires DGDA/DGRAD/DGI (VER-05, SEC-04), File Hors-Ligne PWA Anti-Doublon (REQ-11) & Supervision 3G (OPS-06, REQ-12)', async () => {
+  const gateway = new PartnerApiGateway();
+  gateway.registerPartnerKey('test-low-quota-key', {
+    partnerId: 'TEST_POSTE_FRONTIERE',
+    institution: 'Poste Frontière Test',
+    quotaPerMinute: 2
+  });
+
+  // 2 appels autorisés dans la même minute
+  const call1 = gateway.authenticateAndRateLimitPartner({ apiKey: 'test-low-quota-key', nowMs: 60000 });
+  assert.equal(call1.headers['X-RateLimit-Remaining'], '1');
+  const call2 = gateway.authenticateAndRateLimitPartner({ apiKey: 'test-low-quota-key', nowMs: 60010 });
+  assert.equal(call2.headers['X-RateLimit-Remaining'], '0');
+
+  // 3e appel dans la même minute -> bloqué par Rate Limit 429
+  assert.throws(() => {
+    gateway.authenticateAndRateLimitPartner({ apiKey: 'test-low-quota-key', nowMs: 60020 });
+  }, /Rate Limit 429/);
+
+  // Clé API inconnue -> rejetée + alerte sécurité enregistrée
+  assert.throws(() => {
+    gateway.authenticateAndRateLimitPartner({ apiKey: 'invalid-hacker-key', nowMs: 60030 });
+  }, /invalide ou révoquée/);
+
+  // File d'attente hors-ligne PWA avec déduplication stricte (REQ-11)
+  const server = createGuichetServer();
+  const payloadPwa = {
+    organizationName: 'ONG Solidarité Ituri',
+    serviceCode: 'S5',
+    projectTitle: 'Programme philanthropique Bunia 2026',
+    goodsSummary: 'Dotation scolaire',
+    paymentReference: 'EQUITY-2026-ITURI-01',
+    idempotencyKey: 'idem_ituri_bunia_2026_001'
+  };
+
+  // Premier envoi lors du retour de la 3G
+  const sync1 = await server.dispatch({
+    method: 'POST',
+    url: '/api/pwa/sync',
+    body: payloadPwa
+  });
+  assert.equal(sync1.status, 200);
+  assert.equal(sync1.json().deduplicated, false);
+  const createdRef = sync1.json().syncResult.referenceNumber;
+  assert.ok(createdRef);
+
+  // Second envoi identique (rebond réseau 3G) -> dédupliqué, aucun doublon créé !
+  const sync2 = await server.dispatch({
+    method: 'POST',
+    url: '/api/pwa/sync',
+    body: payloadPwa
+  });
+  assert.equal(sync2.status, 200);
+  assert.equal(sync2.json().deduplicated, true);
+  assert.equal(sync2.json().syncResult.referenceNumber, createdRef);
+
+  // Vérification des en-têtes OWASP (SEC-04) et de la clé API DGDA (VER-05) sur GET /api/verify
+  const dgdaVerifyRes = await server.dispatch({
+    method: 'GET',
+    url: '/api/verify?hash=FNPSS-EXO-2026-00124',
+    headers: { 'X-API-Key': 'dgda-live-key-2026' }
+  });
+  assert.equal(dgdaVerifyRes.status, 200);
+  assert.equal(dgdaVerifyRes.headers['x-content-type-options'], 'nosniff');
+  assert.equal(dgdaVerifyRes.headers['x-frame-options'], 'DENY');
+  assert.equal(dgdaVerifyRes.headers['x-ratelimit-limit'], '600');
+  assert.equal(dgdaVerifyRes.json().partnerId, 'DGDA_SYDONIA_WORLD');
+
+  // Supervision OPS-06 & Budget de performance 3G REQ-12
+  const supRes = await server.dispatch({ method: 'GET', url: '/api/ops/supervision' });
+  assert.equal(supRes.status, 200);
+  const sup = supRes.json();
+  assert.equal(sup.req12PerformanceBudget.withinBudget, true);
+  assert.ok(sup.req12PerformanceBudget.estimated3gLoadSeconds < 3.0);
+});
+
 
 
 

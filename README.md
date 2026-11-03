@@ -17,6 +17,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
 - **Architecture Technique, Schéma PostgreSQL & Smart Contract (`GOV-08`, `OPS-03`, `BLK-04`) :** [ARCHITECTURE_TECHNIQUE_ET_MODELE_DONNEES.md](documentation%20du%20projet/ARCHITECTURE_TECHNIQUE_ET_MODELE_DONNEES.md) · [Version Google Docs](https://docs.google.com/document/d/1Ee0le054i1keJI6VXZQizJ4UP54czqBHMTdGsnDTwPk/edit)
 - **Wireframes UI (Requérant, Back-Office, DGDA) & Plan Qualité (`UX-02`, `UX-03`, `UX-06`, `SEC-01`) :** [WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md](documentation%20du%20projet/WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md) · [Version Google Docs](https://docs.google.com/document/d/10zLGEgYxIU9nDXG1L4Lo6Usi1vQ67e_t6hlAgaYGQPQ/edit)
 - **Conformité Juridique RDC, Valeur Probante SHA-256 & Protection des Données (`SEC-06`) :** [CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md](documentation%20du%20projet/CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md) · [Version Google Docs](https://docs.google.com/document/d/1CMMC2k_NBfkidQzGD0y6a-0ECuOTSYEizOWCNJS9ydw/edit)
+- **Audit Smart Contract, Pen-Test OWASP Top 10, Recette UAT & Guides Utilisateurs (`SEC-03`, `SEC-04`, `SEC-07`, `DEP-03`) :** [AUDIT_SECURITE_SMART_CONTRACT_ET_PENTEST_OWASP.md](documentation%20du%20projet/AUDIT_SECURITE_SMART_CONTRACT_ET_PENTEST_OWASP.md) · [Version Google Docs](https://docs.google.com/document/d/14aiNXXQd_zyoXK1AVSgrjJl5QeFtUX0JKArvb9Ju6JE/edit)
 
 ## Socle Technique, Moteur Métier & Prototype Interactif (Sprint 0 / Sprint 1)
 - **Prototype Interactif UI Haute Fidélité (`UX-04`) :** [prototype/index.html](prototype/index.html) *(Portail Requérant `S1`–`S6`, Back-Office d'instruction & scellement SHA-256, Contrôle Douanier QR & PDF DGDA, Registre Polygon & Audit)*
@@ -29,6 +30,8 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Centre de Notifications Transactionnelles (Email & In-App) & Messagerie Dossier (`NOT-01`..`04`) : [src/notifications/notification-center.mjs](src/notifications/notification-center.mjs)
   - Garde-fou Téléversement PDF Anti-Malware (`REQ-07`) & Vérificateur d'Intégrité PDF sans scan QR (`VER-04`) : [src/storage/document-upload-guard.mjs](src/storage/document-upload-guard.mjs)
   - CMS des Actualités FNPSS (`REQ-13`, `ADM-10`) & Tableau de Bord Statistique Exécutif (`ADM-09`) : [src/cms/news-and-stats.mjs](src/cms/news-and-stats.mjs)
+  - Passerelle de Sécurité API Partenaires DGDA/DGRAD/DGI (`VER-05`), En-têtes OWASP (`SEC-04`), Supervision & Budget 3G (`OPS-06`, `REQ-12`) : [src/security/partner-api-gateway.mjs](src/security/partner-api-gateway.mjs)
+  - File d'Attente Hors-Ligne PWA & Synchronisation Idempotente Anti-Doublon (`REQ-11`) : [src/pwa/offline-sync-queue.mjs](src/pwa/offline-sync-queue.mjs)
   - Scellement SHA-256, chiffrement AES-256-GCM (`OPS-05`) et QR Code : [src/crypto/document-sealer.mjs](src/crypto/document-sealer.mjs)
   - Générateur des 6 gabarits officiels PDF 1.4 (`VER-01`, `VER-02`) : [src/pdf/certificate-generator.mjs](src/pdf/certificate-generator.mjs)
   - Simulateur Smart Contract & File d'ancrage résiliente hors-ligne (`BLK-10`) : [src/blockchain/registry-simulator.mjs](src/blockchain/registry-simulator.mjs)
