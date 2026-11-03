@@ -39,6 +39,8 @@ import { generateOfficialPdfBuffer, OFFICIAL_ACT_TEMPLATES } from '../src/pdf/ce
 import { createGuichetServer } from '../src/server.mjs';
 import { AuthService } from '../src/auth/auth-service.mjs';
 import { NotificationCenter } from '../src/notifications/notification-center.mjs';
+import { validateAndInspectPdfUpload, verifyUploadedPdfAgainstRegistry } from '../src/storage/document-upload-guard.mjs';
+import { NewsAndStatsService } from '../src/cms/news-and-stats.mjs';
 
 const ADMIN_ADDR = '0x1000000000000000000000000000000000000001';
 const RELAYER_ADDR = '0x2000000000000000000000000000000000000002';
@@ -466,6 +468,140 @@ test('7. Centre de Notifications (Email & In-App), Messagerie de Dossier et 6 Ga
   });
   assert.equal(nc.getDossierMessages('FNPSS/DEM/2026/00100').length, 1);
 });
+
+test('8. Garde-fou Téléversement PDF Anti-Malware (REQ-07, OPS-05) & Vérification de Fichier PDF en Douane sans Scan QR (VER-04)', () => {
+  const keyHex = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  const cleanPdf = generateOfficialPdfBuffer({
+    serviceCode: 'S6',
+    certificateNumber: 'FNPSS-EXO-2026-00500',
+    organizationName: 'ONG Santé Kivu'
+  });
+
+  // Inspection nominale + chiffrement AES-256-GCM au repos
+  const inspected = validateAndInspectPdfUpload(cleanPdf, {
+    fileName: 'quittance_320usd.pdf',
+    encryptionKeyHex: keyHex
+  });
+  assert.equal(inspected.isSafePdf, true);
+  assert.equal(inspected.pdfVersion, '%PDF-1.4');
+  assert.match(inspected.sha256Hash, /^0x[0-9a-f]{64}$/);
+  assert.ok(inspected.encryptedAtRest.ciphertextBase64);
+
+  // Rejet d'un fichier qui n'est pas un vrai PDF (%PDF- absent)
+  assert.throws(() => {
+    validateAndInspectPdfUpload(Buffer.from('MZ_executable_windows_renomme.pdf', 'utf8'));
+  }, /Signature binaire invalide/);
+
+  // Rejet d'un fichier dépassant la taille maximale autorisée
+  assert.throws(() => {
+    validateAndInspectPdfUpload(cleanPdf, { maxBytes: 100 });
+  }, /dépasse la limite autorisée/);
+
+  // Rejet d'un PDF contenant un script actif malveillant (/JavaScript ou /Launch)
+  const maliciousPdf = Buffer.from('%PDF-1.4\n1 0 obj << /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >> endobj\n%%EOF', 'utf8');
+  assert.throws(() => {
+    validateAndInspectPdfUpload(maliciousPdf);
+  }, /Contenu actif potentiellement malveillant/);
+
+  // Vérification d'un fichier PDF officiel téléversé contre le registre Blockchain (VER-04)
+  const registry = new FNPSSRegistryContract(ADMIN_ADDR, RELAYER_ADDR);
+  const engine = new GuichetUniqueEngine(registry, RELAYER_ADDR);
+  const app = engine.submitApplication({ id: 'ong-1', role: Roles.REQUERANT }, {
+    organizationName: 'ONG Santé Kivu',
+    serviceCode: 'S4',
+    projectTitle: 'Clinique mobile Rutshuru',
+    goodsSummary: '1 Ambulance 4x4',
+    uploadedDocTypes: ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+    paymentReference: 'RAWBANK-2026-777'
+  });
+  engine.validatePaymentAndStartSla({ id: 'ag-1', role: Roles.AGENT }, app.referenceNumber);
+  engine.approveAndSealCertificate({ id: 'dg-1', role: Roles.DG }, app.referenceNumber, {
+    issuedAtTimestamp: 1793613600,
+    validityDays: 365
+  });
+
+  const storedApp = engine.getApplication(app.referenceNumber);
+  const checkIntactPdf = verifyUploadedPdfAgainstRegistry(
+    storedApp.certificate.pdfBuffer,
+    registry,
+    1793614000,
+    { fileName: 'FNPSS-EXO.pdf' }
+  );
+  assert.equal(checkIntactPdf.isValid, true);
+  assert.equal(checkIntactPdf.verdict, CustomsBadgeVerdict.GREEN_VALID);
+
+  // Altération d'un seul octet dans le fichier PDF -> rejet immédiat PASTILLE_ROUGE_FALSIFIE
+  const tamperedPdf = Buffer.concat([storedApp.certificate.pdfBuffer, Buffer.from(' ', 'ascii')]);
+  const checkTamperedPdf = verifyUploadedPdfAgainstRegistry(tamperedPdf, registry, 1793614000);
+  assert.equal(checkTamperedPdf.isValid, false);
+  assert.equal(checkTamperedPdf.verdict, CustomsBadgeVerdict.RED_FALSIFIED_OR_UNKNOWN);
+});
+
+test('9. CMS des Actualités FNPSS (REQ-13, ADM-10), Tableau de Bord Statistique (ADM-09) & Routes REST Jour 3', async () => {
+  const cms = new NewsAndStatsService();
+  assert.equal(cms.listPublishedNews().length, 3);
+
+  // Contrôle RBAC : un requérant ne peut pas publier une actualité officielle
+  assert.throws(() => {
+    cms.createNewsArticle({ id: 'ong-1', role: Roles.REQUERANT }, {
+      title: 'Fausse annonce',
+      summary: 'Non autorisé'
+    });
+  }, /RBAC/);
+
+  const adminActor = { id: 'admin-1', role: Roles.ADMIN };
+  const createdNews = cms.createNewsArticle(adminActor, {
+    title: 'Ouverture du guichet provincial de Lubumbashi',
+    summary: 'accompagnement de proximité pour les ONG du Haut-Katanga et du Lualaba.'
+  });
+  assert.equal(cms.listPublishedNews().length, 4);
+
+  cms.setNewsPublishedState(adminActor, createdNews.id, false);
+  assert.equal(cms.listPublishedNews().length, 3);
+  assert.equal(cms.listAllNews(adminActor).length, 4);
+
+  // Tests E2E des nouvelles routes REST dans src/server.mjs via server.dispatch
+  const server = createGuichetServer();
+
+  const statsRes = await server.dispatch({ method: 'GET', url: '/api/stats' });
+  assert.equal(statsRes.status, 200);
+  const { stats } = statsRes.json();
+  assert.equal(stats.totals.totalApplications, 3);
+  assert.equal(stats.financials.validatedPaymentsCount, 2);
+  assert.equal(stats.financials.totalCollectedFeesUsd, 640); // 2 dossiers validés * (20$ + 300$)
+
+  const newsGetRes = await server.dispatch({ method: 'GET', url: '/api/news' });
+  assert.equal(newsGetRes.status, 200);
+  assert.equal(newsGetRes.json().articles.length, 3);
+
+  const newsPostRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/news',
+    body: {
+      title: 'Campagne de contrôle de conformité 2026',
+      summary: 'Vérification conjointe FNPSS - Ministère des Affaires Sociales.'
+    }
+  });
+  assert.equal(newsPostRes.status, 201);
+
+  // Route POST /api/verify-pdf (VER-04) : PDF intact vs PDF altéré d'1 octet
+  const verifyPdfValidRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/verify-pdf',
+    body: { referenceNumber: 'FNPSS/DEM/2026/00002', tamperByte: false }
+  });
+  assert.equal(verifyPdfValidRes.status, 200);
+  assert.equal(verifyPdfValidRes.json().verdict, CustomsBadgeVerdict.GREEN_VALID);
+
+  const verifyPdfTamperedRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/verify-pdf',
+    body: { referenceNumber: 'FNPSS/DEM/2026/00002', tamperByte: true }
+  });
+  assert.equal(verifyPdfTamperedRes.status, 200);
+  assert.equal(verifyPdfTamperedRes.json().verdict, CustomsBadgeVerdict.RED_FALSIFIED_OR_UNKNOWN);
+});
+
 
 
 

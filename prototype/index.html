@@ -526,7 +526,7 @@
         </div>
       </div>
 
-      <!-- Liste des demandes de l'ONG -->
+      <!--Liste des demandes de l'ONG -->
       <div class="card">
         <div class="card-header">
           <h2>Suivi de mes demandes en temps réel & Téléchargement des actes scellés</h2>
@@ -546,12 +546,58 @@
           <tbody id="reqApplicationsTable"></tbody>
         </table>
       </div>
+
+      <!-- Fil d'Actualités FNPSS (REQ-13) & Centre de Notifications In-App (NOT-02) -->
+      <div class="admin-split">
+        <div class="card">
+          <div class="card-header">
+            <h2>📰 Actualités & Communiqués Officiels du FNPSS (REQ-13)</h2>
+            <span class="badge badge-soumis">Information officielle</span>
+          </div>
+          <div id="publicNewsList"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2>🔔 Centre de Notifications & Alertes Dossiers (NOT-02)</h2>
+            <span class="badge badge-valide" id="notifUnreadBadge">Temps réel</span>
+          </div>
+          <div id="inAppNotificationsList"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ================================================================== -->
     <!-- VUE 2 : BACK-OFFICE D'ADMINISTRATION FNPSS (AGENT & DG)            -->
     <!-- ================================================================== -->
     <section id="view-admin" class="view-section">
+      <!-- Tableau de bord statistique de pilotage DG (ADM-09) -->
+      <div class="kpi-grid" id="adminExecutiveKpis">
+        <div class="kpi-box">
+          <div class="lbl">DOSSIERS ENREGISTRÉS (S1–S6)</div>
+          <div class="val" id="adm-kpi-total">3</div>
+          <div class="sub">Répartition nationale multi-provinces</div>
+        </div>
+        <div class="kpi-box" style="border-left-color: var(--fnpss-green);">
+          <div class="lbl">RECETTES VALIDÉES (20$ + 300$)</div>
+          <div class="val" id="adm-kpi-usd">640 USD</div>
+          <div class="sub" id="adm-kpi-cdf">Soit 1 792 000 CDF encaissés</div>
+        </div>
+        <div class="kpi-box" style="border-left-color: var(--purple-web3);">
+          <div class="lbl">ACTES CO-SIGNÉS MINISTÈRE (S2/S6)</div>
+          <div class="val" id="adm-kpi-cosigned">1</div>
+          <div class="sub">Contre-seing D1 on-chain</div>
+        </div>
+        <div class="kpi-box" style="border-left-color: var(--fnpss-gold);">
+          <div class="lbl">COMMUNICATION INSTITUTIONNELLE</div>
+          <div style="margin-top:6px;">
+            <button class="btn btn-primary" style="font-size:11.5px;padding:6px 10px;" onclick="publishDemoNews()">
+              📢 Publier un communiqué FNPSS (ADM-10)
+            </button>
+          </div>
+          <div class="sub">Diffusion portail ONG & Notifications</div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <h2>File d'instruction des dossiers FNPSS (Contrôle de recevabilité, Enquête & Scellement Blockchain)</h2>
@@ -636,6 +682,24 @@
               <div style="display:flex;gap:8px;">
                 <input type="text" id="dgdaInputHash" class="mono" placeholder="Ex: 0x8f92a4... ou FNPSS-EXO-2026-00124" />
                 <button class="btn btn-primary" onclick="verifyCustomHash()">Vérifier On-Chain</button>
+              </div>
+            </div>
+
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-top:12px;">
+              <label style="display:block;font-size:12.5px;font-weight:700;color:var(--fnpss-navy);margin-bottom:6px;">
+                📄 Vérificateur d'Intégrité de Fichier PDF sans Scan QR (`VER-04` — `POST /api/verify-pdf`) :
+              </label>
+              <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+                Si le document papier est endommagé ou transmis par voie électronique, téléversez le fichier <code>.pdf</code> : le serveur inspecte l'en-tête <code>%PDF-</code>, bloque tout script actif (<code>REQ-07</code>) et recalcule l'empreinte <code>SHA-256</code> à la volée.
+              </p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input type="file" id="dgdaPdfFileInput" accept=".pdf,application/pdf" onchange="verifyUploadedPdfFile(this)" style="font-size:12px;max-width:240px;" />
+                <button class="btn btn-success" style="font-size:12px;padding:6px 11px;" onclick="testServerPdfVerification(false)">
+                  ✅ Tester PDF Officiel Intact (VER-04)
+                </button>
+                <button class="btn btn-danger" style="font-size:12px;padding:6px 11px;" onclick="testServerPdfVerification(true)">
+                  🚨 Tester PDF Altéré d'1 Octet (VER-04)
+                </button>
               </div>
             </div>
           </div>
@@ -786,6 +850,15 @@
         { ts: '02/11/2026 09:15', actor: 'ONG Espoir du Nord-Kivu (REQUERANT)', action: 'APPLICATION_SUBMITTED', target: 'FNPSS/DEM/2026/00048', detail: 'Dépôt S6 + 6 pièces PDF/A + Quittance 20$+300$' },
         { ts: '02/11/2026 10:05', actor: 'Patrick K. (AGENT FNPSS)', action: 'PAYMENT_VALIDATED', target: 'FNPSS/DEM/2026/00048', detail: 'Validation quittance BCDC-CDF-2026-99481 -> Démarrage SLA 10j ouvrables' },
         { ts: '02/11/2026 11:40', actor: 'Jean-Pierre L. (DG FNPSS)', action: 'CERTIFICATE_SEALED_ONCHAIN', target: 'FNPSS-EXO-2026-00124', detail: 'Ancrage SHA-256 sur Polygon (registerDocument) + QR Code généré' }
+      ],
+      news: [
+        { id: 'NEWS-2026-003', title: 'Protocole d\'interopérabilité FNPSS – DGDA – DGRAD aux postes frontaliers', summary: 'Vérification instantanée par scan QR ou téléversement PDF en moins de 2 secondes.', category: 'INTEROPERABILITE_DOUANE', publishedAt: '04/11/2026' },
+        { id: 'NEWS-2026-002', title: 'Rappel réglementaire : Dépôt des rapports annuels d\'activités 2025 (Pièce P4)', summary: 'Date limite fixée au 30 novembre 2026 pour les organisations humanitaires et sociales.', category: 'INSTRUCTION_ADMINISTRATIVE', publishedAt: '03/11/2026' },
+        { id: 'NEWS-2026-001', title: 'Lancement du Guichet Unique Dématérialisé avec ancrage Blockchain Polygon', summary: 'Sécurisation SHA-256 et QR Code dynamique pour les actes S1 à S6.', category: 'COMMUNIQUE_OFFICIEL', publishedAt: '02/11/2026' }
+      ],
+      notifications: [
+        { id: 'NOTIF-1', title: 'Acte officiel délivré & scellé sur Blockchain', body: 'Votre certificat FNPSS-EXO-2026-00124 (S6) est disponible au téléchargement.', read: false },
+        { id: 'NOTIF-2', title: 'Quittance validée — Démarrage du SLA (10 jours ouvrables)', body: 'La preuve de paiement BCDC-CDF-2026-99481 a été validée par le FNPSS.', read: true }
       ]
     };
 
@@ -841,6 +914,26 @@
         if (!state.applications.find(a => a.id === selectedAppId) && state.applications[0]) {
           selectedAppId = state.applications[0].id;
         }
+        try {
+          const [newsRes, notifRes] = await Promise.all([
+            fetch('/api/news'),
+            fetch('/api/notifications?userId=ong-espoir-goma')
+          ]);
+          if (newsRes.ok) {
+            const newsData = await newsRes.json();
+            state.news = (newsData.articles || []).map(n => ({
+              id: n.id,
+              title: n.title,
+              summary: n.summary,
+              category: n.category,
+              publishedAt: new Date(n.publishedAt).toLocaleDateString('fr-FR')
+            }));
+          }
+          if (notifRes.ok) {
+            const notifData = await notifRes.json();
+            state.notifications = notifData.notifications || state.notifications;
+          }
+        } catch (_) {}
         renderAll();
         return true;
       } catch (_) {
@@ -1491,9 +1584,137 @@
       showToast('Export CSV généré (fnpss_demandes_export.csv).');
     }
 
+    function renderNewsAndNotifications() {
+      const newsEl = document.getElementById('publicNewsList');
+      if (newsEl) {
+        newsEl.innerHTML = (state.news || []).map(n => `
+          <div style="border-bottom:1px solid #eef0f3;padding:8px 0;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
+              <span><strong>${n.category}</strong></span>
+              <span>${n.publishedAt}</span>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:var(--fnpss-navy);margin:2px 0;">${n.title}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${n.summary}</div>
+          </div>
+        `).join('');
+      }
+      const notifEl = document.getElementById('inAppNotificationsList');
+      const unreadBadge = document.getElementById('notifUnreadBadge');
+      if (notifEl) {
+        const list = state.notifications || [];
+        const unread = list.filter(x => !x.read).length;
+        if (unreadBadge) unreadBadge.textContent = `${unread} non lue(s)`;
+        notifEl.innerHTML = list.slice(0, 5).map(item => `
+          <div style="border-bottom:1px solid #eef0f3;padding:8px 0;font-size:12.5px;">
+            <div style="font-weight:700;color:${item.read ? 'var(--text-main)' : 'var(--fnpss-blue)'};">
+              ${item.read ? '✓' : '🔵'} ${item.title}
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);">${item.body}</div>
+          </div>
+        `).join('');
+      }
+      // Mise à jour des KPIs exécutifs ADM-09
+      const validatedCount = state.applications.filter(a => a.paymentValidated).length;
+      const totalUsd = validatedCount * 320;
+      const totalCdf = totalUsd * 2800;
+      const elTotal = document.getElementById('adm-kpi-total');
+      const elUsd = document.getElementById('adm-kpi-usd');
+      const elCdf = document.getElementById('adm-kpi-cdf');
+      const elCosign = document.getElementById('adm-kpi-cosigned');
+      if (elTotal) elTotal.textContent = state.applications.length;
+      if (elUsd) elUsd.textContent = `${totalUsd} USD`;
+      if (elCdf) elCdf.textContent = `Soit ${totalCdf.toLocaleString('fr-FR')} CDF encaissés`;
+      if (elCosign) elCosign.textContent = state.applications.filter(a => (a.serviceCode === 'S2' || a.serviceCode === 'S6') && a.docHash).length;
+    }
+
+    async function publishDemoNews() {
+      const title = 'Communiqué DG FNPSS : Permanence douanière numérique 24h/24 activée';
+      const summary = 'Les postes frontaliers de Kasumbalesa, Matadi et Goma disposent désormais du vérificateur d\'intégrité PDF VER-04.';
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/news', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, summary, category: 'COMMUNIQUE_OFFICIEL' })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          showToast('Communiqué officiel publié par l\'administrateur FNPSS (ADM-10) !');
+          return;
+        }
+      }
+      state.news.unshift({
+        id: 'NEWS-2026-00' + (state.news.length + 1),
+        title,
+        summary,
+        category: 'COMMUNIQUE_OFFICIEL',
+        publishedAt: new Date().toLocaleDateString('fr-FR')
+      });
+      renderAll();
+      showToast('Communiqué officiel publié sur le portail ONG (ADM-10) !');
+    }
+
+    async function testServerPdfVerification(tamperByte = false) {
+      const targetApp = state.applications.find(a => a.docHash) || state.applications[0];
+      if (!targetApp) return;
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/verify-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referenceNumber: targetApp.ref, tamperByte })
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (result.isValid) {
+            renderDgdaVerdictForApp({ ...targetApp, certStatus: 'ACTIVE' });
+            showToast(`VER-04 : Fichier PDF ${result.fileName} vérifié intact (${result.computedSha256.slice(0, 16)}...) !`);
+          } else {
+            triggerDgdaPreset('TAMPERED');
+            showToast(`VER-04 ALERTE : Altération binaire détectée sur ${result.fileName} (${result.verdict}) !`);
+          }
+          return;
+        }
+      }
+      if (tamperByte) {
+        triggerDgdaPreset('TAMPERED');
+        showToast('VER-04 ALERTE : Altération d\'1 octet détectée dans le fichier PDF !');
+      } else {
+        renderDgdaVerdictForApp({ ...targetApp, certStatus: 'ACTIVE' });
+        showToast('VER-04 : Intégrité binaire du PDF officiel confirmée !');
+      }
+    }
+
+    async function verifyUploadedPdfFile(inputEl) {
+      const file = inputEl.files && inputEl.files[0];
+      if (!file) return;
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+      if (backendConnected && isOnline) {
+        const res = await fetch('/api/verify-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, content: base64 })
+        });
+        const data = await res.json();
+        if (res.ok && data.isValid) {
+          const matched = state.applications.find(a => a.certNumber === data.record?.certificateNumber) || state.applications[0];
+          renderDgdaVerdictForApp({ ...matched, certStatus: 'ACTIVE' });
+          showToast(`PDF ${file.name} authentique sur la Blockchain !`);
+        } else {
+          triggerDgdaPreset('TAMPERED');
+          showToast(data.error || `PDF ${file.name} non reconnu ou altéré (${data.verdict || 'REJET'}).`);
+        }
+      } else {
+        showToast(`Inspection locale de ${file.name} (${file.size} octets) effectuée.`);
+      }
+    }
+
     function renderAll() {
       renderServicesCatalog();
       renderRequerantTable();
+      renderNewsAndNotifications();
       renderAdminView();
       renderDgdaTable();
       renderBlockchainAndAudit();

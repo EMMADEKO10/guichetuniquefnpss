@@ -196,3 +196,4 @@ export class NotificationCenter {
     return [...(this.dossierThreads.get(referenceNumber) || [])];
   }
 }
+

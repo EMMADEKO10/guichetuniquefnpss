@@ -4,7 +4,7 @@
  */
 
 import { FNPSS_SERVICES, validateRequiredDocuments, computeSlaDueDate } from '../domain/services-catalog.mjs';
-import { sealOfficialAct } from '../crypto/document-sealer.mjs';
+import { computeSha256Bytes32, sealOfficialAct } from '../crypto/document-sealer.mjs';
 import { generateOfficialPdfBuffer } from '../pdf/certificate-generator.mjs';
 import { NotificationCenter } from '../notifications/notification-center.mjs';
 
@@ -252,6 +252,8 @@ export class GuichetUniqueEngine {
       revocationReason: ''
     };
     certDetails.pdfBuffer = generateOfficialPdfBuffer(certDetails);
+    certDetails.pdfSha256 = computeSha256Bytes32(certDetails.pdfBuffer);
+    this.registry.bindRenderedPdfHash?.(sealed.docHash, certDetails.pdfSha256);
 
     app.status = 'VALIDE_DELIVRE';
     app.certificate = certDetails;

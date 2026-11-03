@@ -36,7 +36,17 @@ export class FNPSSRegistryContract {
 
     this.records = new Map();
     this.numberToHash = new Map();
+    this.pdfHashToDocHash = new Map();
     this.events = [];
+  }
+
+  /**
+   * Associe l'empreinte SHA-256 binaire du fichier PDF généré à l'empreinte canonique scellée (VER-04).
+   */
+  bindRenderedPdfHash(docHash, pdfSha256) {
+    if (this.records.has(docHash) && pdfSha256) {
+      this.pdfHashToDocHash.set(pdfSha256, docHash);
+    }
   }
 
   _requireAdmin(caller) {
@@ -210,7 +220,10 @@ export class FNPSSRegistryContract {
    * Vérification publique instantanée d'un QR Code ou d'un PDF en douane (VER-03, VER-04).
    */
   verifyDocument(docHash, nowTimestamp = Math.floor(Date.now() / 1000)) {
-    const rec = this.records.get(docHash);
+    const resolvedHash = this.records.has(docHash)
+      ? docHash
+      : (this.pdfHashToDocHash.get(docHash) || docHash);
+    const rec = this.records.get(resolvedHash);
     if (!rec) {
       return {
         isValid: false,

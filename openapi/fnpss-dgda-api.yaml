@@ -1,0 +1,270 @@
+openapi: 3.1.0
+info:
+  title: API Nationale d'Interopérabilité du Guichet Unique FNPSS (DGDA / DGRAD / DGI)
+  version: 1.0.0
+  summary: Spécification OpenAPI 3.1 de vérification cryptographique des actes S1–S6 et de pilotage FNPSS (VER-05).
+  description: |
+    Interface REST officielle du **Fonds National de Promotion et de Service Social (FNPSS — RDC)** permettant :
+    - Aux postes frontaliers de la **DGDA** (Matadi, Kasumbalesa, Goma, Aéroport de N'djili, Lubumbashi) et aux régies financières (**DGRAD**, **DGI**) de vérifier en temps réel (`< 2 secondes`) l'authenticité et la validité des actes d'exonération (`S1` à `S6`) par scan QR Code (`GET /api/verify`) ou par téléversement direct de fichier PDF (`POST /api/verify-pdf` — `VER-04`).
+    - Au portail requérant ONG et au Back-Office FNPSS d'inspecter les pièces justificatives (`REQ-07`), de suivre les dossiers, de consulter les statistiques exécutives (`ADM-09`) et les communiqués officiels (`REQ-13`, `ADM-10`).
+  contact:
+    name: Cellule Numérique du FNPSS — Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale (RDC)
+    url: https://guichet.fnpss.cd
+    email: numerique@fnpss.cd
+servers:
+  - url: https://guichet.fnpss.cd
+    description: Serveur de Production National (RDC)
+  - url: http://localhost:3000
+    description: Serveur Local de Qualification / Prototype Jalon G1
+
+components:
+  securitySchemes:
+    PartnerApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clé d'API institutionnelle attribuée aux systèmes douaniers (SYDONIA World / DGDA) et financiers (DGRAD / DGI).
+    BearerSession:
+      type: http
+      scheme: bearer
+      description: Jeton de session hybride Web2 / Web3Auth des acteurs authentifiés (ONG, Agent FNPSS, DG, Ministère).
+
+  headers:
+    X-RateLimit-Limit:
+      description: Quota maximal de requêtes autorisées par minute pour le poste frontalier ou partenaire.
+      schema:
+        type: integer
+        example: 600
+    X-RateLimit-Remaining:
+      description: Nombre de requêtes restantes dans la fenêtre courante de 60 secondes.
+      schema:
+        type: integer
+        example: 598
+
+  schemas:
+    CustomsVerificationResponse:
+      type: object
+      required:
+        - isValid
+        - isExpired
+        - status
+        - verdict
+      properties:
+        isValid:
+          type: boolean
+          description: Indique si l'acte est simultanément authentique, actif (non révoqué) et non expiré.
+          example: true
+        isExpired:
+          type: boolean
+          description: Indique si la date de validité de l'acte est dépassée.
+          example: false
+        status:
+          type: integer
+          enum: [0, 1, 2]
+          description: "État dans le Smart Contract FNPSSRegistry.sol : 0 = NONE (Inconnu/Falsifié), 1 = ACTIVE, 2 = REVOKED."
+          example: 1
+        verdict:
+          type: string
+          enum:
+            - PASTILLE_VERTE_VALIDE
+            - PASTILLE_ROUGE_FALSIFIE
+            - PASTILLE_ROUGE_REVOQUE
+            - PASTILLE_GRISE_EXPIRE
+          description: Verdict visuel normé destiné à l'inspecteur douanier DGDA (VER-03).
+          example: PASTILLE_VERTE_VALIDE
+        record:
+          type: ["object", "null"]
+          properties:
+            certificateNumber:
+              type: string
+              example: FNPSS-EXO-2026-00124
+            serviceCode:
+              type: integer
+              minimum: 1
+              maximum: 6
+              example: 6
+            issuedAt:
+              type: integer
+              description: Timestamp UNIX d'émission on-chain.
+              example: 1793613600
+            expiresAt:
+              type: integer
+              description: Timestamp UNIX d'expiration (0 = validité permanente).
+              example: 1825149600
+            issuer:
+              type: string
+              example: "0x2222222222222222222222222222222222222222"
+            ministryCoSigner:
+              type: ["string", "null"]
+              example: "0x3000000000000000000000000000000000000003"
+            revokedAt:
+              type: integer
+              example: 0
+            revocationReason:
+              type: string
+              example: ""
+
+    PdfVerificationRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+          example: FNPSS-EXO-2026-00124.pdf
+        content:
+          type: string
+          description: Contenu du fichier PDF encodé en Base64 ou chaîne `%PDF-1.4...`.
+        referenceNumber:
+          type: string
+          description: Optionnel — Référence de dossier pour vérifier directement le binaire scellé en mémoire.
+          example: FNPSS/DEM/2026/00002
+
+    PdfInspectionRequest:
+      type: object
+      required:
+        - content
+      properties:
+        fileName:
+          type: string
+          example: rapport_annuel_2025.pdf
+        content:
+          type: string
+          description: Contenu binaire du PDF (Base64 ou `%PDF-...`), limité à 10 Mo (REQ-07).
+        encryptionKeyHex:
+          type: ["string", "null"]
+          description: Clé optionnelle de 64 caractères hexadécimaux pour chiffrement au repos AES-256-GCM (OPS-05).
+
+paths:
+  /api/health:
+    get:
+      summary: État de santé du nœud API et du connecteur Blockchain Polygon
+      tags: [Système & Monitoring]
+      responses:
+        "200":
+          description: Service opérationnel
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: fnpss-guichet-unique
+                  network:
+                    type: string
+                    example: polygon-amoy
+                  totalApplications:
+                    type: integer
+                    example: 3
+
+  /api/verify:
+    get:
+      summary: Vérification instantanée d'un QR Code ou d'un numéro d'acte par la DGDA (VER-03, VER-05)
+      tags: [Interopérabilité Douane DGDA]
+      security:
+        - PartnerApiKey: []
+        - {}
+      parameters:
+        - name: hash
+          in: query
+          required: true
+          description: Empreinte SHA-256 (`0x` + 64 caractères hex) extraite du QR Code ou numéro officiel d'acte (`FNPSS-EXO-2026-00124`).
+          schema:
+            type: string
+            example: "0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069"
+      responses:
+        "200":
+          description: Verdict cryptographique restitué depuis le Smart Contract FNPSSRegistry.sol
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomsVerificationResponse"
+
+  /api/verify-pdf:
+    post:
+      summary: Vérification d'intégrité d'un fichier PDF téléversé sans scan QR Code (VER-04)
+      tags: [Interopérabilité Douane DGDA]
+      security:
+        - PartnerApiKey: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PdfVerificationRequest"
+      responses:
+        "200":
+          description: Empreinte SHA-256 du fichier PDF recalculée et confrontée au registre Blockchain
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CustomsVerificationResponse"
+                  - type: object
+                    properties:
+                      fileName:
+                        type: string
+                      byteSize:
+                        type: integer
+                      pdfVersion:
+                        type: string
+                      computedSha256:
+                        type: string
+
+  /api/documents/inspect:
+    post:
+      summary: Garde-fou de sécurité anti-malware et validation stricte d'une pièce justificative PDF (REQ-07, OPS-05)
+      tags: [Sécurité Documentaire]
+      security:
+        - BearerSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PdfInspectionRequest"
+      responses:
+        "200":
+          description: Fichier PDF authentique, sain (<= 10 Mo, sans scripts actifs) et haché en SHA-256
+        "400":
+          description: Fichier rejeté (signature `%PDF-` absente, taille > 10 Mo ou jeton actif `/JavaScript` détecté)
+
+  /api/stats:
+    get:
+      summary: Tableau de bord statistique exécutif de la Direction Générale et du Ministère (ADM-09)
+      tags: [Pilotage Exécutif & CMS]
+      security:
+        - BearerSession: []
+      responses:
+        "200":
+          description: Indicateurs agrégés par service (S1–S6), par statut, par province et recettes (20 USD + 300 USD)
+
+  /api/news:
+    get:
+      summary: Fil public des communiqués et actualités officielles du FNPSS (REQ-13)
+      tags: [Pilotage Exécutif & CMS]
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste des actualités publiées
+    post:
+      summary: Publication d'une nouvelle actualité institutionnelle par l'administrateur FNPSS (ADM-10)
+      tags: [Pilotage Exécutif & CMS]
+      security:
+        - BearerSession: []
+      responses:
+        "201":
+          description: Actualité créée et publiée

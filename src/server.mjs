@@ -13,6 +13,8 @@ import { FNPSS_SERVICES, calculateServiceFees } from './domain/services-catalog.
 import { FNPSSRegistryContract } from './blockchain/registry-simulator.mjs';
 import { GuichetUniqueEngine, Roles } from './workflow/application-engine.mjs';
 import { AuthService } from './auth/auth-service.mjs';
+import { validateAndInspectPdfUpload, verifyUploadedPdfAgainstRegistry } from './storage/document-upload-guard.mjs';
+import { NewsAndStatsService } from './cms/news-and-stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
@@ -45,6 +47,7 @@ export function createGuichetServer() {
   registry.setMinistrySigner(adminAddr, relayerAddr, true);
   const engine = new GuichetUniqueEngine(registry, relayerAddr);
   const auth = new AuthService();
+  const cms = new NewsAndStatsService();
 
   const defaultActors = {
     requerant: { id: 'ong-espoir-goma', role: Roles.REQUERANT },
@@ -292,6 +295,49 @@ export function createGuichetServer() {
         return sendJson(res, 201, { communication: comm });
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/documents/inspect') {
+        const body = await readJsonBody(req);
+        const inspection = validateAndInspectPdfUpload(body.content || '', {
+          fileName: body.fileName || 'piece-justificative.pdf',
+          encryptionKeyHex: body.encryptionKeyHex || null
+        });
+        return sendJson(res, 200, { inspection });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/verify-pdf') {
+        const body = await readJsonBody(req);
+        let pdfContent = body.content;
+        let fileName = body.fileName || 'acte-fnpss.pdf';
+        if (!pdfContent && body.referenceNumber) {
+          const app = engine.getApplication(body.referenceNumber);
+          if (!app.certificate || !app.certificate.pdfBuffer) {
+            return sendJson(res, 404, { error: 'Aucun PDF scellé disponible pour ce dossier' });
+          }
+          pdfContent = body.tamperByte
+            ? Buffer.concat([app.certificate.pdfBuffer, Buffer.from('\n%TAMPERED', 'ascii')])
+            : app.certificate.pdfBuffer;
+          fileName = `${app.certificate.certificateNumber}.pdf`;
+        }
+        const result = verifyUploadedPdfAgainstRegistry(pdfContent || '', registry, Math.floor(Date.now() / 1000), { fileName });
+        return sendJson(res, 200, result);
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/news') {
+        const category = url.searchParams.get('category') || null;
+        return sendJson(res, 200, { articles: cms.listPublishedNews({ category }) });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/news') {
+        const body = await readJsonBody(req);
+        const article = cms.createNewsArticle(defaultActors.admin, body);
+        return sendJson(res, 201, { article });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/stats') {
+        const stats = cms.computeExecutiveStats(engine.listApplications(), auth.listApplicants());
+        return sendJson(res, 200, { stats });
+      }
+
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         const html = fs.readFileSync(prototypeHtmlPath, 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -309,6 +355,7 @@ export function createGuichetServer() {
   server.engine = engine;
   server.registry = registry;
   server.auth = auth;
+  server.cms = cms;
 
   /**
    * Exécute une requête REST en mémoire (sans socket TCP) pour les tests unitaires/E2E en bac à sable.

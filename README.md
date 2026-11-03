@@ -16,15 +16,19 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
 - **Personas & Parcours Utilisateurs (`UX-01`) :** [PERSONAS_ET_PARCOURS_UTILISATEURS.md](documentation%20du%20projet/PERSONAS_ET_PARCOURS_UTILISATEURS.md) · [Version Google Docs](https://docs.google.com/document/d/1-FnsQIfRAQIwC50cufHhEjRm_x9cw7TDOcAn_Rlt0E0/edit)
 - **Architecture Technique, Schéma PostgreSQL & Smart Contract (`GOV-08`, `OPS-03`, `BLK-04`) :** [ARCHITECTURE_TECHNIQUE_ET_MODELE_DONNEES.md](documentation%20du%20projet/ARCHITECTURE_TECHNIQUE_ET_MODELE_DONNEES.md) · [Version Google Docs](https://docs.google.com/document/d/1Ee0le054i1keJI6VXZQizJ4UP54czqBHMTdGsnDTwPk/edit)
 - **Wireframes UI (Requérant, Back-Office, DGDA) & Plan Qualité (`UX-02`, `UX-03`, `UX-06`, `SEC-01`) :** [WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md](documentation%20du%20projet/WIREFRAMES_UI_ET_STRATEGIE_QUALITE.md) · [Version Google Docs](https://docs.google.com/document/d/10zLGEgYxIU9nDXG1L4Lo6Usi1vQ67e_t6hlAgaYGQPQ/edit)
+- **Conformité Juridique RDC, Valeur Probante SHA-256 & Protection des Données (`SEC-06`) :** [CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md](documentation%20du%20projet/CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md) · [Version Google Docs](https://docs.google.com/document/d/1CMMC2k_NBfkidQzGD0y6a-0ECuOTSYEizOWCNJS9ydw/edit)
 
 ## Socle Technique, Moteur Métier & Prototype Interactif (Sprint 0 / Sprint 1)
-- **Prototype Interactif UI Haute Fidélité (`UX-04`) :** [prototype/index.html](prototype/index.html) *(Portail Requérant `S1`–`S6`, Back-Office d'instruction & scellement SHA-256, Contrôle Douanier QR DGDA, Registre Polygon & Audit)*
+- **Prototype Interactif UI Haute Fidélité (`UX-04`) :** [prototype/index.html](prototype/index.html) *(Portail Requérant `S1`–`S6`, Back-Office d'instruction & scellement SHA-256, Contrôle Douanier QR & PDF DGDA, Registre Polygon & Audit)*
 - **Smart Contract Solidity (`BLK-05`, `BLK-06`, `BLK-07`) :** [contracts/FNPSSRegistry.sol](contracts/FNPSSRegistry.sol)
+- **Spécification OpenAPI 3.1 d'Interopérabilité DGDA / DGRAD / DGI (`VER-05`) :** [openapi/fnpss-dgda-api.yaml](openapi/fnpss-dgda-api.yaml)
 - **Schéma Base de Données PostgreSQL & Référentiel S1–S6 (`OPS-03`) :** [database/schema.sql](database/schema.sql) · [database/seed.sql](database/seed.sql)
-- **Moteur Métier, Authentification, Notifications, Cryptographie & Registre On-Chain (`REQ`, `ADM`, `NOT`, `BLK`, `VER`) :**
+- **Moteur Métier, Authentification, Notifications, CMS, Cryptographie & Registre On-Chain (`REQ`, `ADM`, `NOT`, `BLK`, `VER`) :**
   - Catalogue des 6 services, calcul des frais (`20$ + 300$`) et SLA 10 jours ouvrables : [src/domain/services-catalog.mjs](src/domain/services-catalog.mjs)
   - Authentification Hybride Web2/Web3Auth, Google OAuth 2.0 & Gestion Profils ONG (`REQ-01`..`04`, `BLK-02`/`03`, `ADM-03`) : [src/auth/auth-service.mjs](src/auth/auth-service.mjs)
   - Centre de Notifications Transactionnelles (Email & In-App) & Messagerie Dossier (`NOT-01`..`04`) : [src/notifications/notification-center.mjs](src/notifications/notification-center.mjs)
+  - Garde-fou Téléversement PDF Anti-Malware (`REQ-07`) & Vérificateur d'Intégrité PDF sans scan QR (`VER-04`) : [src/storage/document-upload-guard.mjs](src/storage/document-upload-guard.mjs)
+  - CMS des Actualités FNPSS (`REQ-13`, `ADM-10`) & Tableau de Bord Statistique Exécutif (`ADM-09`) : [src/cms/news-and-stats.mjs](src/cms/news-and-stats.mjs)
   - Scellement SHA-256, chiffrement AES-256-GCM (`OPS-05`) et QR Code : [src/crypto/document-sealer.mjs](src/crypto/document-sealer.mjs)
   - Générateur des 6 gabarits officiels PDF 1.4 (`VER-01`, `VER-02`) : [src/pdf/certificate-generator.mjs](src/pdf/certificate-generator.mjs)
   - Simulateur Smart Contract & File d'ancrage résiliente hors-ligne (`BLK-10`) : [src/blockchain/registry-simulator.mjs](src/blockchain/registry-simulator.mjs)
