@@ -5,6 +5,7 @@
  */
 
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,6 +28,21 @@ import {
 import { PaymentReconciliationLedger } from './finance/payment-reconciliation.mjs';
 import { verifyAndPlanSqlMigrations } from './database/migration-runner.mjs';
 import { evaluateG1Gate } from './ops/g1-gate-reviewer.mjs';
+import { findRoutePolicy, authorizeRoute, extractBearerToken } from './security/route-access-policy.mjs';
+
+/**
+ * Modes d'accès de l'API :
+ * - `ENFORCED` (défaut) : jeton de session obligatoire et matrice rôle/route appliquée (ADM-01) ;
+ * - `DEMO_OPEN` : aucune authentification, les routes agissent au nom d'acteurs prédéfinis.
+ *   Réservé à la démonstration locale du prototype, ne jamais exposer ce mode sur un réseau.
+ */
+export const AccessMode = Object.freeze({
+  ENFORCED: 'ENFORCED',
+  DEMO_OPEN: 'DEMO_OPEN'
+});
+
+const HEX_KEY_64 = /^[0-9a-fA-F]{64}$/;
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
@@ -34,7 +50,15 @@ const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
+    let received = 0;
+    req.on('data', chunk => {
+      received += chunk.length;
+      if (received > MAX_BODY_BYTES) {
+        reject(new Error('Corps de requête trop volumineux'));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       try {
         const raw = Buffer.concat(chunks).toString('utf8');
@@ -56,32 +80,36 @@ function sendJson(res, statusCode, payload, extraHeaders = {}) {
   res.end(JSON.stringify(payload));
 }
 
-export function createGuichetServer() {
+export function createGuichetServer({
+  accessMode = AccessMode.ENFORCED,
+  demoPassword = null,
+  securityAuditPassed = false,
+  sessionTtlMs
+} = {}) {
+  if (!Object.values(AccessMode).includes(accessMode)) {
+    throw new Error(`Mode d'accès inconnu : ${accessMode}`);
+  }
+  const demoOpen = accessMode === AccessMode.DEMO_OPEN;
   const adminAddr = '0x1111111111111111111111111111111111111111';
   const relayerAddr = '0x2222222222222222222222222222222222222222';
   const registry = new FNPSSRegistryContract(adminAddr, relayerAddr);
   registry.setMinistrySigner(adminAddr, relayerAddr, true);
   const engine = new GuichetUniqueEngine(registry, relayerAddr);
-  const auth = new AuthService();
+  const auth = new AuthService(sessionTtlMs ? { sessionTtlMs } : {});
   const cms = new NewsAndStatsService();
   const partnerGateway = new PartnerApiGateway();
   const pwaQueue = new OfflinePwaSyncQueue();
   const pilotTracker = new PilotAndHypercareTracker();
   const paymentLedger = new PaymentReconciliationLedger();
 
-  const defaultActors = {
-    requerant: { id: 'ong-espoir-goma', role: Roles.REQUERANT },
-    agent: { id: 'agent-patrick-k', role: Roles.AGENT },
-    chefDivision: { id: 'div-chief-marie-m', role: Roles.CHEF_DIVISION },
-    dg: { id: 'dg-jean-pierre-l', role: Roles.DG },
-    ministere: { id: 'min-tutelle-focal', role: Roles.MINISTERE },
-    admin: { id: 'admin-fnpss-1', role: Roles.ADMIN }
-  };
+  // Aucun mot de passe de compte privilégié n'est écrit dans le code : à défaut de mot de passe fourni, il est généré.
+  const seedPassword = demoPassword || `${crypto.randomBytes(12).toString('base64url')}#aA1`;
+  const generatedDemoPassword = demoPassword ? null : seedPassword;
 
   // Pré-amorçage des comptes ONG avec dérivation Web3Auth
-  auth.registerUser({
+  const espoirUser = auth.registerUser({
     email: 'contact@espoir-kivu.org',
-    password: 'PasswordRDC#2026',
+    password: seedPassword,
     firstName: 'Amina',
     lastName: 'Kahindo',
     organizationName: 'ONG Espoir du Nord-Kivu',
@@ -90,12 +118,36 @@ export function createGuichetServer() {
   });
   auth.registerUser({
     email: 'direction@solidarite-kasai.org',
-    password: 'PasswordRDC#2026',
+    password: seedPassword,
     firstName: 'Dieudonné',
     lastName: 'Tshibangu',
     organizationName: 'Fondation Solidarité Kasaï',
     province: 'Kasaï-Central (Kananga)'
   });
+
+  // Comptes du personnel FNPSS, ministère et douane (ADM-01) : créés uniquement ici, jamais via l'inscription publique.
+  const staffSeeds = [
+    { email: 'agent@fnpss.cd', role: Roles.AGENT, firstName: 'Patrick', lastName: 'K.' },
+    { email: 'chef.division@fnpss.cd', role: Roles.CHEF_DIVISION, firstName: 'Marie', lastName: 'M.' },
+    { email: 'dg@fnpss.cd', role: Roles.DG, firstName: 'Jean-Pierre', lastName: 'L.' },
+    { email: 'ministere@tutelle.cd', role: Roles.MINISTERE, firstName: 'Point', lastName: 'Focal' },
+    { email: 'douane@dgda.cd', role: Roles.DOUANE, firstName: 'Inspecteur', lastName: 'DGDA' },
+    { email: 'admin@fnpss.cd', role: Roles.ADMIN, firstName: 'Administrateur', lastName: 'FNPSS' }
+  ];
+  for (const seed of staffSeeds) {
+    auth.registerUser({ ...seed, password: seedPassword, organizationName: 'FNPSS / Administration partenaire' });
+  }
+
+  // Acteurs utilisés pour l'amorçage des dossiers et, en mode DEMO_OPEN uniquement, par les routes.
+  const defaultActors = {
+    requerant: { id: demoOpen ? 'ong-espoir-goma' : espoirUser.id, role: Roles.REQUERANT },
+    agent: { id: 'agent-patrick-k', role: Roles.AGENT },
+    chefDivision: { id: 'div-chief-marie-m', role: Roles.CHEF_DIVISION },
+    dg: { id: 'dg-jean-pierre-l', role: Roles.DG },
+    ministere: { id: 'min-tutelle-focal', role: Roles.MINISTERE },
+    admin: { id: 'admin-fnpss-1', role: Roles.ADMIN }
+  };
+
 
   // Acte de démonstration historique pré-ancré pour l'API d'interopérabilité DGDA
   const demoHash = '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069';
@@ -159,7 +211,31 @@ export function createGuichetServer() {
   const requestListener = async (req, res) => {
     const url = new URL(req.url, `http://${req.headers?.host || 'localhost'}`);
 
+    // Acteur authentifié de la requête (mode ENFORCED) ; en DEMO_OPEN, les acteurs prédéfinis sont utilisés.
+    let requestActor = null;
+    const actorFor = key => (demoOpen ? defaultActors[key] : requestActor);
+
     try {
+      if (!demoOpen && url.pathname.startsWith('/api/')) {
+        const policy = findRoutePolicy(req.method, url.pathname);
+        const token = extractBearerToken(req.headers || {});
+        let tokenRejected = false;
+        if (token) {
+          try {
+            requestActor = auth.authenticateSession(token);
+          } catch (_) {
+            tokenRejected = true;
+          }
+        }
+        if (policy && policy.access !== 'PUBLIC' && tokenRejected) {
+          return sendJson(res, 401, { error: 'Session invalide ou expirée' });
+        }
+        const decision = authorizeRoute(policy, requestActor);
+        if (!decision.allowed) {
+          return sendJson(res, decision.status, { error: decision.reason });
+        }
+      }
+
       if (req.method === 'GET' && url.pathname === '/api/health') {
         return sendJson(res, 200, {
           status: 'ok',
@@ -179,14 +255,18 @@ export function createGuichetServer() {
       }
 
       if (req.method === 'GET' && url.pathname === '/api/applications') {
-        const applications = engine.listApplications().reverse();
-        const auditLogs = engine.getAuditLogs();
+        const isApplicantView = !demoOpen && requestActor.role === Roles.REQUERANT;
+        // Un requérant ne voit que ses propres dossiers et jamais le journal d'audit global (ADM-01).
+        const applications = engine.listApplications()
+          .filter(a => !isApplicantView || a.ownerId === requestActor.id)
+          .reverse();
+        const auditLogs = isApplicantView ? [] : engine.getAuditLogs();
         return sendJson(res, 200, { applications, auditLogs });
       }
 
       if (req.method === 'POST' && url.pathname === '/api/applications') {
         const body = await readJsonBody(req);
-        const created = engine.submitApplication(defaultActors.requerant, {
+        const created = engine.submitApplication(actorFor('requerant'), {
           organizationName: body.organizationName || 'ONG Espoir du Nord-Kivu',
           serviceCode: body.serviceCode || 'S6',
           projectTitle: body.projectTitle,
@@ -206,14 +286,14 @@ export function createGuichetServer() {
 
       if (req.method === 'POST' && url.pathname === '/api/applications/validate-payment') {
         const body = await readJsonBody(req);
-        const updated = engine.validatePaymentAndStartSla(defaultActors.agent, body.referenceNumber);
+        const updated = engine.validatePaymentAndStartSla(actorFor('agent'), body.referenceNumber);
         return sendJson(res, 200, { application: updated });
       }
 
       if (req.method === 'PUT' && url.pathname === '/api/applications') {
         const body = await readJsonBody(req);
         const updated = engine.updateApplicationBeforeInstruction(
-          defaultActors.requerant,
+          actorFor('requerant'),
           body.referenceNumber,
           body
         );
@@ -223,13 +303,13 @@ export function createGuichetServer() {
       if (req.method === 'DELETE' && url.pathname === '/api/applications') {
         const body = await readJsonBody(req);
         const ref = body.referenceNumber || url.searchParams.get('ref') || '';
-        const resWithdraw = engine.withdrawApplicationBeforeInstruction(defaultActors.requerant, ref);
+        const resWithdraw = engine.withdrawApplicationBeforeInstruction(actorFor('requerant'), ref);
         return sendJson(res, 200, resWithdraw);
       }
 
       if (req.method === 'POST' && url.pathname === '/api/applications/division-opinion') {
         const body = await readJsonBody(req);
-        const updated = engine.emitDivisionChiefOpinion(defaultActors.chefDivision, body.referenceNumber, {
+        const updated = engine.emitDivisionChiefOpinion(actorFor('chefDivision'), body.referenceNumber, {
           favorable: body.favorable !== false,
           opinionNote: body.opinionNote
         });
@@ -238,25 +318,27 @@ export function createGuichetServer() {
 
       if (req.method === 'POST' && url.pathname === '/api/applications/request-complement') {
         const body = await readJsonBody(req);
-        const updated = engine.requestComplement(defaultActors.agent, body.referenceNumber, body.reason || 'Pièce justificative à clarifier');
+        const updated = engine.requestComplement(actorFor('agent'), body.referenceNumber, body.reason || 'Pièce justificative à clarifier');
         return sendJson(res, 200, { application: updated });
       }
 
       if (req.method === 'POST' && url.pathname === '/api/applications/provide-complement') {
         const body = await readJsonBody(req);
-        const updated = engine.provideComplement(defaultActors.requerant, body.referenceNumber, body.additionalDocType || 'P5_PROJET_BIENS');
+        const updated = engine.provideComplement(actorFor('requerant'), body.referenceNumber, body.additionalDocType || 'P5_PROJET_BIENS');
         return sendJson(res, 200, { application: updated });
       }
 
       if (req.method === 'POST' && url.pathname === '/api/applications/approve-seal') {
         const body = await readJsonBody(req);
         const app = engine.getApplication(body.referenceNumber);
-        if (!app.paymentValidated) {
-          engine.validatePaymentAndStartSla(defaultActors.agent, body.referenceNumber);
+        // Raccourci de démonstration : validation du paiement et co-signature au nom d'autres rôles.
+        // En mode ENFORCED, chaque étape doit être réalisée par son propre rôle authentifié.
+        if (demoOpen && !app.paymentValidated) {
+          engine.validatePaymentAndStartSla(actorFor('agent'), body.referenceNumber);
         }
-        const sealedApp = engine.approveAndSealCertificate(defaultActors.dg, body.referenceNumber);
-        if (FNPSS_SERVICES[sealedApp.serviceCode]?.requiresMinistrySignoff) {
-          engine.recordMinistryCoSignature(defaultActors.ministere, body.referenceNumber);
+        const sealedApp = engine.approveAndSealCertificate(actorFor('dg'), body.referenceNumber);
+        if (demoOpen && FNPSS_SERVICES[sealedApp.serviceCode]?.requiresMinistrySignoff) {
+          engine.recordMinistryCoSignature(actorFor('ministere'), body.referenceNumber);
         }
         const { pdfBuffer, ...certMeta } = engine.getApplication(body.referenceNumber).certificate;
         return sendJson(res, 200, {
@@ -267,10 +349,19 @@ export function createGuichetServer() {
         });
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/applications/cosign-ministry') {
+        const body = await readJsonBody(req);
+        const updated = engine.recordMinistryCoSignature(actorFor('ministere'), body.referenceNumber, {
+          ministryReference: body.ministryReference
+        });
+        const { pdfBuffer, ...certMeta } = updated.certificate || {};
+        return sendJson(res, 200, { application: { ...updated, certificate: updated.certificate ? certMeta : updated.certificate } });
+      }
+
       if (req.method === 'POST' && url.pathname === '/api/applications/revoke') {
         const body = await readJsonBody(req);
         const updated = engine.revokeCertificate(
-          defaultActors.dg,
+          actorFor('dg'),
           body.referenceNumber,
           body.reason || 'Suspension administrative suite à contrôle de conformité terrain (CU06)'
         );
@@ -281,6 +372,9 @@ export function createGuichetServer() {
       if (req.method === 'GET' && url.pathname === '/api/applications/certificate.pdf') {
         const ref = url.searchParams.get('ref') || '';
         const app = engine.getApplication(ref);
+        if (!demoOpen && requestActor.role === Roles.REQUERANT && app.ownerId !== requestActor.id) {
+          return sendJson(res, 403, { error: 'Accès refusé : ce dossier ne vous appartient pas' });
+        }
         if (!app.certificate || !app.certificate.pdfBuffer) {
           return sendJson(res, 404, { error: 'Aucun PDF scellé disponible pour ce dossier' });
         }
@@ -321,7 +415,8 @@ export function createGuichetServer() {
 
       if (req.method === 'POST' && url.pathname === '/api/auth/register') {
         const body = await readJsonBody(req);
-        const user = auth.registerUser(body);
+        // Le rôle n'est jamais choisi par l'appelant : l'inscription publique crée uniquement des requérants.
+        const user = auth.registerUser({ ...body, role: Roles.REQUERANT });
         return sendJson(res, 201, { user });
       }
 
@@ -343,12 +438,13 @@ export function createGuichetServer() {
 
       if (req.method === 'POST' && url.pathname === '/api/applicants/status') {
         const body = await readJsonBody(req);
-        const updated = auth.setApplicantAccountStatus(defaultActors.admin, body.userId, body.status, body.reason);
+        const updated = auth.setApplicantAccountStatus(actorFor('admin'), body.userId, body.status, body.reason);
         return sendJson(res, 200, { applicant: updated });
       }
 
       if (req.method === 'GET' && url.pathname === '/api/notifications') {
-        const userId = url.searchParams.get('userId') || '';
+        // Un utilisateur connecté ne consulte que ses propres notifications (ADM-01).
+        const userId = demoOpen ? (url.searchParams.get('userId') || '') : requestActor.id;
         return sendJson(res, 200, {
           ...engine.notifications.getUserNotifications(userId),
           emailOutboxCount: engine.notifications.emailOutbox.length
@@ -358,7 +454,7 @@ export function createGuichetServer() {
       if (req.method === 'POST' && url.pathname === '/api/notifications/broadcast') {
         const body = await readJsonBody(req);
         const comm = engine.notifications.sendBroadcastCommunication({
-          senderId: defaultActors.admin.id,
+          senderId: actorFor('admin').id,
           targetSegment: body.targetSegment || 'ALL_APPLICANTS',
           recipientUserId: body.recipientUserId || null,
           subject: body.subject,
@@ -401,7 +497,7 @@ export function createGuichetServer() {
 
       if (req.method === 'POST' && url.pathname === '/api/news') {
         const body = await readJsonBody(req);
-        const article = cms.createNewsArticle(defaultActors.admin, body);
+        const article = cms.createNewsArticle(actorFor('admin'), body);
         return sendJson(res, 201, { article });
       }
 
@@ -412,7 +508,7 @@ export function createGuichetServer() {
 
       if (req.method === 'POST' && url.pathname === '/api/pwa/sync') {
         const body = await readJsonBody(req);
-        const queued = pwaQueue.enqueueOfflineSubmission(defaultActors.requerant, {
+        const queued = pwaQueue.enqueueOfflineSubmission(actorFor('requerant'), {
           organizationName: body.organizationName || 'ONG Espoir du Nord-Kivu',
           serviceCode: body.serviceCode || 'S6',
           projectTitle: body.projectTitle,
@@ -447,13 +543,17 @@ export function createGuichetServer() {
           networkKey: body.networkKey || 'polygon-amoy',
           adminAddress: adminAddr,
           relayerAddress: relayerAddr,
-          auditPassed: Boolean(body.auditPassed)
+          // L'audit de sécurité (BLK-12) ne peut pas être déclaré par le client en mode ENFORCED.
+          auditPassed: demoOpen ? Boolean(body.auditPassed) : securityAuditPassed
         });
         return sendJson(res, 200, { deployment: receipt });
       }
 
       if (req.method === 'POST' && url.pathname === '/api/ops/backup') {
         const body = await readJsonBody(req);
+        if (!demoOpen && !HEX_KEY_64.test(body.encryptionKeyHex || '')) {
+          return sendJson(res, 400, { error: 'OPS-05: encryptionKeyHex (64 caractères hexadécimaux) est obligatoire hors mode démonstration' });
+        }
         const backup = createEncryptedSystemBackup({
           engine,
           auth,
@@ -465,6 +565,9 @@ export function createGuichetServer() {
 
       if (req.method === 'POST' && url.pathname === '/api/ops/restore') {
         const body = await readJsonBody(req);
+        if (!demoOpen && !HEX_KEY_64.test(body.encryptionKeyHex || '')) {
+          return sendJson(res, 400, { error: 'OPS-05: encryptionKeyHex (64 caractères hexadécimaux) est obligatoire hors mode démonstration' });
+        }
         const restored = restoreEncryptedSystemBackup(body.backup, body.encryptionKeyHex || undefined);
         return sendJson(res, 200, restored);
       }
@@ -485,7 +588,7 @@ export function createGuichetServer() {
       if (req.method === 'POST' && url.pathname === '/api/finance/reconcile') {
         const body = await readJsonBody(req);
         const receipt = paymentLedger.reconcileAndValidateReceipt(
-          defaultActors.agent,
+          actorFor('agent'),
           body.referenceNumber || body.paymentReference,
           {
             bankStatementMatch: body.bankStatementMatch !== false,
@@ -497,13 +600,15 @@ export function createGuichetServer() {
 
       if (req.method === 'PUT' && url.pathname === '/api/auth/profile') {
         const body = await readJsonBody(req);
-        const updatedUser = auth.updateOrganizationProfile(body.userId || 'usr-0001', body);
+        // Le profil modifié est toujours celui de la session, jamais un identifiant fourni par l'appelant.
+        const profileUserId = demoOpen ? (body.userId || 'usr-0001') : requestActor.id;
+        const updatedUser = auth.updateOrganizationProfile(profileUserId, body);
         return sendJson(res, 200, { user: updatedUser });
       }
 
       if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
         const body = await readJsonBody(req);
-        const resLogout = auth.logout(body.sessionToken);
+        const resLogout = auth.logout(extractBearerToken(req.headers || {}) || body.sessionToken);
         return sendJson(res, 200, resLogout);
       }
 
@@ -551,6 +656,8 @@ export function createGuichetServer() {
   server.pwaQueue = pwaQueue;
   server.pilotTracker = pilotTracker;
   server.paymentLedger = paymentLedger;
+  server.accessMode = accessMode;
+  server.generatedDemoPassword = generatedDemoPassword;
 
   /**
    * Exécute une requête REST en mémoire (sans socket TCP) pour les tests unitaires/E2E en bac à sable.
@@ -595,8 +702,20 @@ export function createGuichetServer() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 3000);
-  const server = createGuichetServer();
-  server.listen(port, () => {
-    console.log(`Guichet Unique FNPSS actif sur http://localhost:${port}`);
+  const demoOpenRequested = process.argv.includes('--demo-open');
+  const server = createGuichetServer({
+    accessMode: demoOpenRequested ? AccessMode.DEMO_OPEN : AccessMode.ENFORCED,
+    demoPassword: process.env.FNPSS_DEMO_PASSWORD || null
+  });
+  // Le mode DEMO_OPEN n'est jamais exposé au réseau : écoute locale uniquement.
+  const host = demoOpenRequested ? '127.0.0.1' : (process.env.HOST || '0.0.0.0');
+  server.listen(port, host, () => {
+    console.log(`Guichet Unique FNPSS actif sur http://localhost:${port} (mode ${server.accessMode}, hôte ${host})`);
+    if (demoOpenRequested) {
+      console.warn('ATTENTION : mode DEMO_OPEN, aucune authentification. Réservé à la démonstration locale du prototype.');
+    } else if (server.generatedDemoPassword) {
+      console.log(`Mot de passe de démonstration généré pour les comptes amorcés (affiché une seule fois) : ${server.generatedDemoPassword}`);
+      console.log('Comptes : agent@fnpss.cd, chef.division@fnpss.cd, dg@fnpss.cd, ministere@tutelle.cd, douane@dgda.cd, admin@fnpss.cd, contact@espoir-kivu.org');
+    }
   });
 }

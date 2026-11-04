@@ -43,8 +43,9 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Déployeur & Vérificateur Polygon Amoy Testnet (`80002`) / Mainnet (`137`) (`BLK-11`, `BLK-12`) : [src/blockchain/polygon-deployer.mjs](src/blockchain/polygon-deployer.mjs)
   - Sauvegarde/Restauration Chiffrée `AES-256-GCM` (`OPS-05`), Go/No-Go `G1`–`G4` (`DEP-02`) & Suivi Pilote/Hypercare (`DEP-06`, `DEP-07`) : [src/ops/backup-and-pilot-manager.mjs](src/ops/backup-and-pilot-manager.mjs)
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
-  - Serveur HTTP, API REST du moteur & API d'interopérabilité DGDA (`VER-05`) : [src/server.mjs](src/server.mjs)
-- **Suite de Tests Automatisés (`BLK-08`, `SEC-01`, `SEC-02`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+  - Matrice d'Accès Rôle/Route (Fail-Closed), Anti-IDOR & Anti-Escalade Serveur (`ADM-01`, `SEC-04`) : [src/security/route-access-policy.mjs](src/security/route-access-policy.mjs)
+  - Serveur HTTP, Modes d'Accès Sécurisé/Démo, API REST du moteur & Interopérabilité DGDA (`VER-05`, `ADM-01`) : [src/server.mjs](src/server.mjs)
+- **Suite de Tests Automatisés (17 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
 - **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue & Déploiement Backlog GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/bootstrap-backlog.yml](.github/workflows/bootstrap-backlog.yml)
 

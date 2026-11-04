@@ -159,3 +159,4 @@ Chaque fiche contient une **proposition** de l'équipe projet. Le champ « Déci
 
 > [!CAUTION]
 > Tant que ce compte rendu n'est pas signé, le jalon G1 ne doit pas être considéré comme franchi. Le module [`g1-gate-reviewer.mjs`](../src/ops/g1-gate-reviewer.mjs) ne retourne `G1_PASSED` que sur déclaration explicite de cette signature.
+

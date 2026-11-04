@@ -37,7 +37,8 @@ function verifyPasswordScrypt(password, storedHash) {
 }
 
 export class AuthService {
-  constructor() {
+  constructor({ sessionTtlMs = 8 * 60 * 60 * 1000 } = {}) {
+    this.sessionTtlMs = sessionTtlMs;
     this.usersById = new Map();
     this.usersByEmail = new Map();
     this.sessions = new Map();
@@ -263,6 +264,28 @@ export class AuthService {
 
     this._log('PROFILE_UPDATED', user.email, { userId: user.id, organizationName: user.organizationName });
     return this._sanitizeUser(user);
+  }
+
+  /**
+   * Résout un jeton de session en acteur authentifié (ADM-01) : refuse les jetons inconnus,
+   * expirés (durée de vie `sessionTtlMs`) ou appartenant à un compte suspendu.
+   */
+  authenticateSession(sessionToken, nowMs = Date.now()) {
+    const sess = this.sessions.get(sessionToken);
+    if (!sess) {
+      throw new Error('Session invalide ou expirée');
+    }
+    if (nowMs - sess.createdAt > this.sessionTtlMs) {
+      this.sessions.delete(sessionToken);
+      this._log('SESSION_EXPIRED', sess.userId, {});
+      throw new Error('Session invalide ou expirée');
+    }
+    const user = this.usersById.get(sess.userId);
+    if (!user || user.status === 'SUSPENDED') {
+      this.sessions.delete(sessionToken);
+      throw new Error('Session invalide ou expirée');
+    }
+    return { id: user.id, role: user.role, email: user.email };
   }
 
   /**

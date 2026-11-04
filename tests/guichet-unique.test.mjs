@@ -55,6 +55,7 @@ import {
   detectPaymentChannel
 } from '../src/finance/payment-reconciliation.mjs';
 import { verifyAndPlanSqlMigrations } from '../src/database/migration-runner.mjs';
+import { ROUTE_POLICY, AccessLevel, findRoutePolicy, authorizeRoute } from '../src/security/route-access-policy.mjs';
 import {
   DecisionStatus,
   createDecisionRegister,
@@ -312,7 +313,7 @@ test('5. Générateur PDF Officiel (%PDF-1.4) et API REST complète (VER-01, VER
   assert.ok(pdfText.includes('FNPSS-EXO-2026-00999'));
 
   // Test du serveur HTTP et des routes REST E2E (via server.dispatch sans socket réseau)
-  const server = createGuichetServer();
+  const server = createGuichetServer({ accessMode: 'DEMO_OPEN' });
 
   const healthRes = await server.dispatch({ method: 'GET', url: '/api/health' });
   assert.equal(healthRes.status, 200);
@@ -583,7 +584,7 @@ test('9. CMS des Actualités FNPSS (REQ-13, ADM-10), Tableau de Bord Statistique
   assert.equal(cms.listAllNews(adminActor).length, 4);
 
   // Tests E2E des nouvelles routes REST dans src/server.mjs via server.dispatch
-  const server = createGuichetServer();
+  const server = createGuichetServer({ accessMode: 'DEMO_OPEN' });
 
   const statsRes = await server.dispatch({ method: 'GET', url: '/api/stats' });
   assert.equal(statsRes.status, 200);
@@ -715,7 +716,7 @@ test('11. Passerelle API Partenaires DGDA/DGRAD/DGI (VER-05, SEC-04), File Hors-
   }, /invalide ou révoquée/);
 
   // File d'attente hors-ligne PWA avec déduplication stricte (REQ-11)
-  const server = createGuichetServer();
+  const server = createGuichetServer({ accessMode: 'DEMO_OPEN' });
   const payloadPwa = {
     organizationName: 'ONG Solidarité Ituri',
     serviceCode: 'S5',
@@ -800,7 +801,7 @@ test('12. Déploiement & Vérification Smart Contract sur Polygon Amoy Testnet (
 });
 
 test('13. Sauvegarde/Restauration Chiffrée AES-256-GCM (OPS-05, DEP-01), Jalons Go/No-Go G1-G4 (DEP-02) & Cohorte Pilote Hypercare (DEP-06, DEP-07)', async () => {
-  const server = createGuichetServer();
+  const server = createGuichetServer({ accessMode: 'DEMO_OPEN' });
 
   // Sauvegarde chiffrée AES-256-GCM via POST /api/ops/backup
   const backupRes = await server.dispatch({ method: 'POST', url: '/api/ops/backup', body: {} });
@@ -887,7 +888,7 @@ test('14. Moteur de Réconciliation Comptable & Anti-Doublon des Quittances Banc
   assert.ok(csv.includes('FNPSS/DEM/2026/00901'));
 
   // Test des routes REST GET /api/finance/ledger et POST /api/finance/reconcile
-  const server = createGuichetServer();
+  const server = createGuichetServer({ accessMode: 'DEMO_OPEN' });
   const ledgerRes = await server.dispatch({ method: 'GET', url: '/api/finance/ledger' });
   assert.equal(ledgerRes.status, 200);
   assert.equal(ledgerRes.json().summary.validatedCount, 2);
@@ -908,7 +909,7 @@ test('14. Moteur de Réconciliation Comptable & Anti-Doublon des Quittances Banc
 });
 
 test('15. Profil Requérant & Déconnexion (REQ-04), Export CSV d\'Audit Filtré (ADM-07) & Vérificateur de Migrations SQL (OPS-03)', async () => {
-  const server = createGuichetServer();
+  const server = createGuichetServer({ accessMode: 'DEMO_OPEN' });
 
   // Mise à jour du profil de l'ONG requérante (REQ-04)
   const profileRes = await server.dispatch({
@@ -1015,9 +1016,201 @@ test('16. Revue du Jalon G1 : Registre des Décisions D1-D4, Audit d\'Accessibil
   assert.equal(blockedGate.verdict, 'BLOCKED_MISSING_EVIDENCE');
 
   // Route REST
-  const server = createGuichetServer();
+  const server = createGuichetServer({ accessMode: 'DEMO_OPEN' });
   const res = await server.dispatch({ method: 'GET', url: '/api/ops/g1-gate' });
   assert.equal(res.status, 200);
   assert.equal(res.json().gate, 'G1');
   assert.equal(res.json().verdict, 'PENDING_COPIL_DECISIONS');
+});
+
+
+test('17. Contrôle d\'accès serveur par rôle et par route, anti-escalade, anti-IDOR, expiration de session (ADM-01, REQ-01, SEC-04)', async () => {
+  const PW = 'Test#Passw0rd-2026';
+  const server = createGuichetServer({ demoPassword: PW });
+  assert.equal(server.accessMode, 'ENFORCED');
+  assert.equal(server.generatedDemoPassword, null);
+
+  const headersFor = (srv, email) => {
+    const session = srv.auth.loginWithEmail({ email, password: PW });
+    return { authorization: `Bearer ${session.sessionToken}` };
+  };
+  const agentH = headersFor(server, 'agent@fnpss.cd');
+  const dgH = headersFor(server, 'dg@fnpss.cd');
+  const ministryH = headersFor(server, 'ministere@tutelle.cd');
+  const adminH = headersFor(server, 'admin@fnpss.cd');
+  const customsH = headersFor(server, 'douane@dgda.cd');
+  const espoirH = headersFor(server, 'contact@espoir-kivu.org');
+  const kasaiH = headersFor(server, 'direction@solidarite-kasai.org');
+
+  // Routes publiques accessibles sans jeton
+  for (const url of ['/api/health', '/api/services', '/api/news']) {
+    assert.equal((await server.dispatch({ method: 'GET', url })).status, 200);
+  }
+
+  // Routes protégées : 401 sans jeton
+  for (const [method, url] of [
+    ['GET', '/api/applications'],
+    ['POST', '/api/applications/approve-seal'],
+    ['GET', '/api/applicants'],
+    ['POST', '/api/ops/backup'],
+    ['GET', '/api/audit-logs']
+  ]) {
+    assert.equal((await server.dispatch({ method, url, body: method === 'POST' ? {} : null })).status, 401, `${method} ${url}`);
+  }
+
+  // Jeton falsifié : 401
+  const forged = await server.dispatch({ method: 'GET', url: '/api/applications', headers: { authorization: 'Bearer abcdef0123456789' } });
+  assert.equal(forged.status, 401);
+
+  // Route inconnue : refusée (fail-closed)
+  assert.equal((await server.dispatch({ method: 'GET', url: '/api/route-non-declaree' })).status, 404);
+
+  // Anti-escalade : l'inscription publique ne permet jamais de choisir un rôle privilégié
+  const registerRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/auth/register',
+    body: {
+      email: 'pirate@example.org',
+      password: 'MotDePasse#2026',
+      firstName: 'Pirate',
+      lastName: 'Test',
+      organizationName: 'ONG Fictive',
+      role: 'DG'
+    }
+  });
+  assert.equal(registerRes.status, 201);
+  assert.equal(registerRes.json().user.role, 'REQUERANT');
+
+  // Contrôle par rôle : 403 pour un rôle non autorisé
+  const post = (url, headers, body = {}) => server.dispatch({ method: 'POST', url, headers, body });
+  assert.equal((await post('/api/applications/approve-seal', espoirH)).status, 403);
+  assert.equal((await post('/api/applications/approve-seal', agentH)).status, 403);
+  assert.equal((await server.dispatch({ method: 'GET', url: '/api/applicants', headers: espoirH })).status, 403);
+  assert.equal((await server.dispatch({ method: 'GET', url: '/api/applicants', headers: dgH })).status, 403);
+  assert.equal((await post('/api/ops/backup', dgH)).status, 403);
+  assert.equal((await post('/api/applications/validate-payment', espoirH)).status, 403);
+  assert.equal((await post('/api/applications/cosign-ministry', dgH)).status, 403);
+  assert.equal((await server.dispatch({ method: 'GET', url: '/api/applicants', headers: adminH })).status, 200);
+
+  // Cloisonnement des dossiers : un requérant ne voit que les siens, jamais le journal d'audit global
+  const kasaiList = (await server.dispatch({ method: 'GET', url: '/api/applications', headers: kasaiH })).json();
+  assert.equal(kasaiList.applications.length, 0);
+  assert.deepEqual(kasaiList.auditLogs, []);
+  const espoirList = (await server.dispatch({ method: 'GET', url: '/api/applications', headers: espoirH })).json();
+  assert.equal(espoirList.applications.length, 3);
+  const agentList = (await server.dispatch({ method: 'GET', url: '/api/applications', headers: agentH })).json();
+  assert.equal(agentList.applications.length, 3);
+  assert.ok(agentList.auditLogs.length > 0);
+
+  // Anti-IDOR : le PDF d'un dossier d'autrui est refusé, celui du propriétaire est servi
+  const pdfUrl = '/api/applications/certificate.pdf?ref=FNPSS/DEM/2026/00001';
+  assert.equal((await server.dispatch({ method: 'GET', url: pdfUrl, headers: kasaiH })).status, 403);
+  const ownPdf = await server.dispatch({ method: 'GET', url: pdfUrl, headers: espoirH });
+  assert.equal(ownPdf.status, 200);
+  assert.ok(ownPdf.rawBuffer.toString('ascii', 0, 5) === '%PDF-');
+
+  // Anti-IDOR : le profil modifié est toujours celui de la session, pas un userId fourni
+  const espoirId = server.auth.usersByEmail.get('contact@espoir-kivu.org').id;
+  const kasaiId = server.auth.usersByEmail.get('direction@solidarite-kasai.org').id;
+  const profileRes = await server.dispatch({
+    method: 'PUT',
+    url: '/api/auth/profile',
+    headers: kasaiH,
+    body: { userId: espoirId, firstName: 'Usurpateur' }
+  });
+  assert.equal(profileRes.status, 200);
+  assert.equal(profileRes.json().user.id, kasaiId);
+  assert.equal(server.auth.usersById.get(espoirId).firstName, 'Amina');
+
+  // Notifications : toujours celles de la session, le paramètre userId est ignoré
+  const espoirNotifs = (await server.dispatch({ method: 'GET', url: '/api/notifications', headers: espoirH })).json();
+  const spyNotifs = (await server.dispatch({ method: 'GET', url: `/api/notifications?userId=${espoirId}`, headers: kasaiH })).json();
+  assert.ok(espoirNotifs.unreadCount > 0);
+  assert.equal(spyNotifs.unreadCount, 0);
+
+  // Parcours complet avec de vrais rôles : requérant -> agent -> DG -> ministère -> téléchargement
+  const submitRes = await post('/api/applications', espoirH, {
+    organizationName: 'ONG Espoir du Nord-Kivu',
+    serviceCode: 'S6',
+    projectTitle: 'Importation de 3 ambulances (parcours sécurisé)',
+    goodsSummary: '3 ambulances 4x4',
+    paymentReference: 'RAWBANK-ENF-2026-0001',
+    hasActiveS1Enrollment: true
+  });
+  assert.equal(submitRes.status, 201);
+  const newRef = submitRes.json().application.referenceNumber;
+  assert.equal(submitRes.json().application.ownerId, espoirId);
+
+  // Le DG ne peut pas sceller avant la validation du paiement par un agent (aucune étape n'est exécutée à sa place)
+  assert.equal((await post('/api/applications/approve-seal', dgH, { referenceNumber: newRef })).status, 400);
+
+  assert.equal((await post('/api/applications/validate-payment', agentH, { referenceNumber: newRef })).status, 200);
+  assert.equal((await post('/api/applications/approve-seal', dgH, { referenceNumber: newRef })).status, 200);
+  assert.equal((await post('/api/applications/cosign-ministry', ministryH, { referenceNumber: newRef, ministryReference: 'CAB/MIN-AS/2026/0150' })).status, 200);
+  const downloadRes = await server.dispatch({ method: 'GET', url: `/api/applications/certificate.pdf?ref=${newRef}`, headers: espoirH });
+  assert.equal(downloadRes.status, 200);
+
+  // Un autre requérant ne peut ni modifier ni retirer ce dossier
+  const intruderUpdate = await server.dispatch({
+    method: 'PUT',
+    url: '/api/applications',
+    headers: kasaiH,
+    body: { referenceNumber: newRef, projectTitle: 'Détourné' }
+  });
+  assert.equal(intruderUpdate.status, 400);
+
+  // Sauvegarde : clé explicite obligatoire (aucune clé par défaut en dehors du mode démonstration)
+  assert.equal((await post('/api/ops/backup', adminH)).status, 400);
+  const backupKey = 'ab'.repeat(32);
+  const backupRes = await post('/api/ops/backup', adminH, { encryptionKeyHex: backupKey });
+  assert.equal(backupRes.status, 200);
+  assert.equal((await post('/api/ops/restore', adminH, { backup: backupRes.json().backup })).status, 400);
+  const restoreRes = await post('/api/ops/restore', adminH, { backup: backupRes.json().backup, encryptionKeyHex: backupKey });
+  assert.equal(restoreRes.status, 200);
+  assert.equal(restoreRes.json().integrityVerified, true);
+
+  // Déploiement Mainnet : l'audit de sécurité ne peut pas être déclaré par le client
+  const mainnetRes = await post('/api/blockchain/deploy', adminH, { networkKey: 'polygon-mainnet', auditPassed: true });
+  assert.equal(mainnetRes.status, 400);
+  assert.match(mainnetRes.json().error, /audit/);
+
+  // Déconnexion : le jeton ne fonctionne plus ensuite
+  const tempH = headersFor(server, 'agent@fnpss.cd');
+  assert.equal((await server.dispatch({ method: 'GET', url: '/api/applications', headers: tempH })).status, 200);
+  assert.equal((await post('/api/auth/logout', tempH)).status, 200);
+  assert.equal((await server.dispatch({ method: 'GET', url: '/api/applications', headers: tempH })).status, 401);
+
+  // Compte suspendu : ses sessions existantes sont invalidées
+  assert.equal((await post('/api/applicants/status', adminH, { userId: kasaiId, status: 'SUSPENDED', reason: 'Test' })).status, 200);
+  assert.equal((await server.dispatch({ method: 'GET', url: '/api/applications', headers: kasaiH })).status, 401);
+
+  // Balayage de la matrice : chaque route protégée refuse l'anonyme (401) et le rôle DOUANE si non autorisé (403)
+  for (const policy of ROUTE_POLICY.filter(p => p.access !== AccessLevel.PUBLIC)) {
+    const anon = await server.dispatch({ method: policy.method, url: policy.path, body: policy.method === 'GET' ? null : {} });
+    assert.equal(anon.status, 401, `anonyme sur ${policy.method} ${policy.path}`);
+    if (Array.isArray(policy.access)) {
+      const customs = await server.dispatch({ method: policy.method, url: policy.path, headers: customsH, body: policy.method === 'GET' ? null : {} });
+      assert.equal(customs.status, 403, `DOUANE sur ${policy.method} ${policy.path}`);
+    }
+  }
+
+  // Unités de la matrice
+  assert.equal(authorizeRoute(findRoutePolicy('GET', '/api/health'), null).allowed, true);
+  assert.equal(authorizeRoute(findRoutePolicy('GET', '/api/inconnue'), null).status, 404);
+  assert.equal(authorizeRoute(findRoutePolicy('POST', '/api/applications/revoke'), { role: 'DG' }).allowed, true);
+
+  // Expiration des sessions
+  const shortServer = createGuichetServer({ demoPassword: PW, sessionTtlMs: 5 });
+  const shortH = headersFor(shortServer, 'agent@fnpss.cd');
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal((await shortServer.dispatch({ method: 'GET', url: '/api/applications', headers: shortH })).status, 401);
+
+  // Un mode d'accès inconnu est refusé au démarrage
+  assert.throws(() => createGuichetServer({ accessMode: 'OUVERT' }), /Mode d'accès inconnu/);
+
+  // Mot de passe généré quand aucun n'est fourni : jamais de mot de passe privilégié écrit en dur
+  const autoServer = createGuichetServer();
+  assert.ok(autoServer.generatedDemoPassword.length >= 16);
+  assert.doesNotThrow(() => autoServer.auth.loginWithEmail({ email: 'dg@fnpss.cd', password: autoServer.generatedDemoPassword }));
+  assert.throws(() => autoServer.auth.loginWithEmail({ email: 'dg@fnpss.cd', password: 'PasswordRDC#2026' }), /Identifiants invalides/);
 });
