@@ -50,6 +50,11 @@ import {
   evaluateGoNoGoGates,
   PilotAndHypercareTracker
 } from '../src/ops/backup-and-pilot-manager.mjs';
+import {
+  PaymentReconciliationLedger,
+  detectPaymentChannel
+} from '../src/finance/payment-reconciliation.mjs';
+import { verifyAndPlanSqlMigrations } from '../src/database/migration-runner.mjs';
 
 const ADMIN_ADDR = '0x1000000000000000000000000000000000000001';
 const RELAYER_ADDR = '0x2000000000000000000000000000000000000002';
@@ -834,6 +839,121 @@ test('13. Sauvegarde/Restauration Chiffrée AES-256-GCM (OPS-05, DEP-01), Jalons
   assert.equal(goNoGoApiRes.json().gates.decision, 'GO_PRODUCTION');
   assert.equal(goNoGoApiRes.json().pilot.pilotCohortSize, 5);
 });
+
+test('14. Moteur de Réconciliation Comptable & Anti-Doublon des Quittances Bancaires / Mobile Money (GOV-11, REQ-10)', async () => {
+  assert.equal(detectPaymentChannel('RAWBANK-CDF-2026-11204').code, 'RAWBANK');
+  assert.equal(detectPaymentChannel('MPESA-24381-99001').code, 'MPESA');
+
+  const ledger = new PaymentReconciliationLedger(2800);
+  const r1 = ledger.registerPaymentReceipt({
+    referenceNumber: 'FNPSS/DEM/2026/00901',
+    organizationName: 'ONG Solidarité Kasaï',
+    serviceCode: 'S4',
+    paymentReference: 'RAWBANK-CDF-2026-88811'
+  });
+  assert.equal(r1.status, 'PENDING_VERIFICATION');
+  assert.equal(r1.totalUsd, 320);
+  assert.equal(r1.totalCdf, 896000);
+
+  // Fraude ou doublon : tentative d'utiliser le même bordereau RAWBANK sur un autre dossier
+  assert.throws(() => {
+    ledger.registerPaymentReceipt({
+      referenceNumber: 'FNPSS/DEM/2026/00902',
+      organizationName: 'ONG Fraude Test',
+      serviceCode: 'S6',
+      paymentReference: 'rawbank-cdf-2026-88811'
+    });
+  }, /Fraude ou doublon détecté/);
+
+  // Rapprochement par un agent comptable habilité
+  const reconciled = ledger.reconcileAndValidateReceipt(
+    { id: 'agent-compta-1', role: Roles.AGENT },
+    'FNPSS/DEM/2026/00901',
+    { bankStatementMatch: true, bankNote: 'Relevé Rawbank certifié' }
+  );
+  assert.equal(reconciled.status, 'RECONCILED_VALIDATED');
+  assert.equal(reconciled.voucherNumber, 'BORD-FNPSS-2026-00001');
+
+  const csv = ledger.exportLedgerCsv();
+  assert.ok(csv.includes('BORD-FNPSS-2026-00001'));
+  assert.ok(csv.includes('FNPSS/DEM/2026/00901'));
+
+  // Test des routes REST GET /api/finance/ledger et POST /api/finance/reconcile
+  const server = createGuichetServer();
+  const ledgerRes = await server.dispatch({ method: 'GET', url: '/api/finance/ledger' });
+  assert.equal(ledgerRes.status, 200);
+  assert.equal(ledgerRes.json().summary.validatedCount, 2);
+  assert.equal(ledgerRes.json().summary.pendingCount, 1);
+
+  const recRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/finance/reconcile',
+    body: {
+      referenceNumber: 'FNPSS/DEM/2026/00003',
+      bankStatementMatch: true,
+      bankNote: 'Vérifié sur relevé EquityBCDC'
+    }
+  });
+  assert.equal(recRes.status, 200);
+  assert.equal(recRes.json().receipt.status, 'RECONCILED_VALIDATED');
+  assert.equal(recRes.json().receipt.voucherNumber, 'BORD-FNPSS-2026-00003');
+});
+
+test('15. Profil Requérant & Déconnexion (REQ-04), Export CSV d\'Audit Filtré (ADM-07) & Vérificateur de Migrations SQL (OPS-03)', async () => {
+  const server = createGuichetServer();
+
+  // Mise à jour du profil de l'ONG requérante (REQ-04)
+  const profileRes = await server.dispatch({
+    method: 'PUT',
+    url: '/api/auth/profile',
+    body: {
+      userId: 'usr-0001',
+      firstName: 'Marie-Claire',
+      lastName: 'Kavira',
+      phone: '+243 99 00 11 222'
+    }
+  });
+  assert.equal(profileRes.status, 200);
+  assert.equal(profileRes.json().user.firstName, 'Marie-Claire');
+  assert.equal(profileRes.json().user.lastName, 'Kavira');
+
+  // Déconnexion explicite d'une session JWT (REQ-04)
+  const loginSession = server.auth.loginWithGoogleOAuth({
+    googleEmail: 'coord.kasai@gmail.com',
+    givenName: 'Paul',
+    familyName: 'Tshisekedi',
+    organizationName: 'ONG Action Kasaï'
+  });
+  const logoutRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/auth/logout',
+    body: { sessionToken: loginSession.sessionToken }
+  });
+  assert.equal(logoutRes.status, 200);
+  assert.equal(logoutRes.json().loggedOut, true);
+
+  // Filtre et export CSV du journal d'audit (ADM-07)
+  const auditExportRes = await server.dispatch({
+    method: 'GET',
+    url: '/api/audit-logs/export?action=APPLICATION_SUBMITTED'
+  });
+  assert.equal(auditExportRes.status, 200);
+  assert.equal(auditExportRes.json().entries.length, 3);
+  assert.ok(auditExportRes.json().csv.includes('APPLICATION_SUBMITTED'));
+
+  // Vérification des migrations SQL PostgreSQL 16 (OPS-03)
+  const migReport = verifyAndPlanSqlMigrations();
+  assert.equal(migReport.isValid, true);
+  assert.equal(migReport.tablesCount, 10);
+  assert.equal(migReport.seededServices.length, 6);
+  assert.equal(migReport.migrations.length, 2);
+
+  const migApiRes = await server.dispatch({ method: 'GET', url: '/api/ops/migrations' });
+  assert.equal(migApiRes.status, 200);
+  assert.equal(migApiRes.json().isValid, true);
+  assert.equal(migApiRes.json().tablesCount, 10);
+});
+
 
 
 

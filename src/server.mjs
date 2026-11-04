@@ -24,6 +24,8 @@ import {
   evaluateGoNoGoGates,
   PilotAndHypercareTracker
 } from './ops/backup-and-pilot-manager.mjs';
+import { PaymentReconciliationLedger } from './finance/payment-reconciliation.mjs';
+import { verifyAndPlanSqlMigrations } from './database/migration-runner.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
@@ -64,6 +66,7 @@ export function createGuichetServer() {
   const partnerGateway = new PartnerApiGateway();
   const pwaQueue = new OfflinePwaSyncQueue();
   const pilotTracker = new PilotAndHypercareTracker();
+  const paymentLedger = new PaymentReconciliationLedger();
 
   const defaultActors = {
     requerant: { id: 'ong-espoir-goma', role: Roles.REQUERANT },
@@ -139,6 +142,19 @@ export function createGuichetServer() {
     paymentReference: 'EQUITYBCDC-2026-77319'
   });
 
+  // Enregistrement initial des 3 quittances dans le grand-livre de réconciliation comptable (GOV-11)
+  for (const app of engine.applications.values()) {
+    paymentLedger.registerPaymentReceipt({
+      referenceNumber: app.referenceNumber,
+      organizationName: app.organizationName,
+      serviceCode: app.serviceCode,
+      paymentReference: app.paymentReference
+    });
+    if (app.paymentValidated) {
+      paymentLedger.reconcileAndValidateReceipt(defaultActors.agent, app.referenceNumber);
+    }
+  }
+
   const requestListener = async (req, res) => {
     const url = new URL(req.url, `http://${req.headers?.host || 'localhost'}`);
 
@@ -177,6 +193,12 @@ export function createGuichetServer() {
           uploadedDocTypes: body.uploadedDocTypes || allDocs,
           paymentReference: body.paymentReference,
           hasActiveS1Enrollment: Boolean(body.hasActiveS1Enrollment)
+        });
+        paymentLedger.registerPaymentReceipt({
+          referenceNumber: created.referenceNumber,
+          organizationName: created.organizationName,
+          serviceCode: created.serviceCode,
+          paymentReference: created.paymentReference
         });
         return sendJson(res, 201, { application: created });
       }
@@ -452,6 +474,56 @@ export function createGuichetServer() {
         return sendJson(res, 200, { gates, pilot });
       }
 
+      if (req.method === 'GET' && url.pathname === '/api/finance/ledger') {
+        return sendJson(res, 200, {
+          summary: paymentLedger.getReconciliationSummary(),
+          csv: paymentLedger.exportLedgerCsv()
+        });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/finance/reconcile') {
+        const body = await readJsonBody(req);
+        const receipt = paymentLedger.reconcileAndValidateReceipt(
+          defaultActors.agent,
+          body.referenceNumber || body.paymentReference,
+          {
+            bankStatementMatch: body.bankStatementMatch !== false,
+            bankNote: body.bankNote
+          }
+        );
+        return sendJson(res, 200, { receipt });
+      }
+
+      if (req.method === 'PUT' && url.pathname === '/api/auth/profile') {
+        const body = await readJsonBody(req);
+        const updatedUser = auth.updateOrganizationProfile(body.userId || 'usr-0001', body);
+        return sendJson(res, 200, { user: updatedUser });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
+        const body = await readJsonBody(req);
+        const resLogout = auth.logout(body.sessionToken);
+        return sendJson(res, 200, resLogout);
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/audit-logs/export') {
+        const filters = {
+          actorId: url.searchParams.get('actorId') || null,
+          actorRole: url.searchParams.get('actorRole') || null,
+          action: url.searchParams.get('action') || null,
+          targetId: url.searchParams.get('targetId') || null
+        };
+        return sendJson(res, 200, {
+          entries: engine.queryAuditLogs(filters),
+          csv: engine.exportAuditLogsCsv(filters)
+        });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/ops/migrations') {
+        const plan = verifyAndPlanSqlMigrations();
+        return sendJson(res, 200, plan);
+      }
+
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         const html = fs.readFileSync(prototypeHtmlPath, 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -473,6 +545,7 @@ export function createGuichetServer() {
   server.partnerGateway = partnerGateway;
   server.pwaQueue = pwaQueue;
   server.pilotTracker = pilotTracker;
+  server.paymentLedger = paymentLedger;
 
   /**
    * Exécute une requête REST en mémoire (sans socket TCP) pour les tests unitaires/E2E en bac à sable.

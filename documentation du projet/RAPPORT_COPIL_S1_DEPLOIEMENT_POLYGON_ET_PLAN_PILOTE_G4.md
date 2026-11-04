@@ -91,3 +91,4 @@ Le module [`src/blockchain/polygon-deployer.mjs`](../src/blockchain/polygon-depl
 1. **Paiement en ligne intégré (Mobile Money M-Pesa, Airtel Money, Orange Money & passerelle bancaire Rawbank/EquityBCDC) :** réconciliation automatique instantanée de la quittance `P6` (`20 USD` + `300 USD`).
 2. **Interconnexion automatisée bidirectionnelle SYDONIA World (DGDA) :** apurement automatique des quantités dédouanées lot par lot sur les certificats `S3`/`S4`/`S6` afin d'empêcher toute réutilisation frauduleuse d'un même certificat pour plusieurs cargaisons.
 3. **Traçabilité des fonds humanitaires et décaissements conditionnels par Smart Contracts :** suivi transparent de l'exécution des projets sociaux financés en partenariat avec le FNPSS.
+

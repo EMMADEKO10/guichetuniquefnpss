@@ -19,14 +19,16 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
 - **Conformité Juridique RDC, Valeur Probante SHA-256 & Protection des Données (`SEC-06`) :** [CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md](documentation%20du%20projet/CONFORMITE_JURIDIQUE_ET_VALEUR_PROBANTE_RDC.md) · [Version Google Docs](https://docs.google.com/document/d/1CMMC2k_NBfkidQzGD0y6a-0ECuOTSYEizOWCNJS9ydw/edit)
 - **Audit Smart Contract, Pen-Test OWASP Top 10, Recette UAT & Guides Utilisateurs (`SEC-03`, `SEC-04`, `SEC-07`, `DEP-03`) :** [AUDIT_SECURITE_SMART_CONTRACT_ET_PENTEST_OWASP.md](documentation%20du%20projet/AUDIT_SECURITE_SMART_CONTRACT_ET_PENTEST_OWASP.md) · [Version Google Docs](https://docs.google.com/document/d/14aiNXXQd_zyoXK1AVSgrjJl5QeFtUX0JKArvb9Ju6JE/edit)
 - **Rapport COPIL S1, Déploiement Polygon Amoy/Mainnet, Production Souveraine & Plan Pilote G4 (`GOV-09`..`13`, `BLK-11`/`12`, `OPS-07`, `DEP-01`..`09`) :** [RAPPORT_COPIL_S1_DEPLOIEMENT_POLYGON_ET_PLAN_PILOTE_G4.md](documentation%20du%20projet/RAPPORT_COPIL_S1_DEPLOIEMENT_POLYGON_ET_PLAN_PILOTE_G4.md) · [Version Google Docs](https://docs.google.com/document/d/18-bUVz4DOCVP7YHiO-Ll5KroRmJvihyT6QyTL7XlJbM/edit)
+- **Matrice de Traçabilité des 87 Issues, Réconciliation Comptable & COPIL S2 (`GOV-07`, `GOV-10`, `GOV-11`) :** [MATRICE_TRACABILITE_87_ISSUES_ET_RECONCILIATION_COMPTABLE.md](documentation%20du%20projet/MATRICE_TRACABILITE_87_ISSUES_ET_RECONCILIATION_COMPTABLE.md) · [Version Google Docs](https://docs.google.com/document/d/1mqargKXmOVyV0Wc7xaEvl00pnhRQYpPqUGUsW9L4Xtk/edit)
 
 ## Socle Technique, Moteur Métier & Prototype Interactif (Sprint 0 / Sprint 1)
 - **Prototype Interactif UI Haute Fidélité (`UX-04`) :** [prototype/index.html](prototype/index.html) *(Portail Requérant `S1`–`S6`, Back-Office d'instruction & scellement SHA-256, Contrôle Douanier QR & PDF DGDA, Registre Polygon & Audit)*
 - **Smart Contract Solidity (`BLK-05`, `BLK-06`, `BLK-07`) :** [contracts/FNPSSRegistry.sol](contracts/FNPSSRegistry.sol)
 - **Spécification OpenAPI 3.1 d'Interopérabilité DGDA / DGRAD / DGI (`VER-05`) :** [openapi/fnpss-dgda-api.yaml](openapi/fnpss-dgda-api.yaml)
-- **Schéma Base de Données PostgreSQL & Référentiel S1–S6 (`OPS-03`) :** [database/schema.sql](database/schema.sql) · [database/seed.sql](database/seed.sql)
-- **Moteur Métier, Authentification, Notifications, CMS, Cryptographie & Registre On-Chain (`REQ`, `ADM`, `NOT`, `BLK`, `VER`) :**
+- **Schéma Base de Données PostgreSQL, Référentiel S1–S6 & Migrations SQL (`OPS-03`) :** [database/schema.sql](database/schema.sql) · [database/seed.sql](database/seed.sql) · [src/database/migration-runner.mjs](src/database/migration-runner.mjs)
+- **Moteur Métier, Authentification, Réconciliation Financière, Notifications, CMS, Cryptographie & Registre On-Chain (`REQ`, `ADM`, `NOT`, `BLK`, `VER`, `GOV`) :**
   - Catalogue des 6 services, calcul des frais (`20$ + 300$`) et SLA 10 jours ouvrables : [src/domain/services-catalog.mjs](src/domain/services-catalog.mjs)
+  - Moteur de Réconciliation Comptable & Anti-Doublon des Quittances (`GOV-11`, `REQ-10`) : [src/finance/payment-reconciliation.mjs](src/finance/payment-reconciliation.mjs)
   - Authentification Hybride Web2/Web3Auth, Google OAuth 2.0 & Gestion Profils ONG (`REQ-01`..`04`, `BLK-02`/`03`, `ADM-03`) : [src/auth/auth-service.mjs](src/auth/auth-service.mjs)
   - Centre de Notifications Transactionnelles (Email & In-App) & Messagerie Dossier (`NOT-01`..`04`) : [src/notifications/notification-center.mjs](src/notifications/notification-center.mjs)
   - Garde-fou Téléversement PDF Anti-Malware (`REQ-07`) & Vérificateur d'Intégrité PDF sans scan QR (`VER-04`) : [src/storage/document-upload-guard.mjs](src/storage/document-upload-guard.mjs)

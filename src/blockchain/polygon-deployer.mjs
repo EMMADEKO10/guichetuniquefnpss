@@ -105,3 +105,4 @@ export function deployAndVerifyRegistryContract({
     deployedAtIso: new Date(deployedAtTimestamp * 1000).toISOString()
   };
 }
+

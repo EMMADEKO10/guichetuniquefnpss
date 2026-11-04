@@ -487,6 +487,37 @@ export class GuichetUniqueEngine {
     return [...this.auditLogs].reverse();
   }
 
+  /**
+   * Recherche multicritère dans le journal d'audit immuable (ADM-07).
+   */
+  queryAuditLogs({ actorId = null, actorRole = null, action = null, targetId = null } = {}) {
+    return this.getAuditLogs().filter(entry => {
+      if (actorId && entry.actorId !== actorId) return false;
+      if (actorRole && entry.actorRole !== actorRole) return false;
+      if (action && entry.action !== action) return false;
+      if (targetId && entry.targetId !== targetId) return false;
+      return true;
+    });
+  }
+
+  /**
+   * Exporte le journal d'audit filtré au format CSV pour inspection ou archivage (ADM-07).
+   */
+  exportAuditLogsCsv(filters = {}) {
+    const entries = this.queryAuditLogs(filters);
+    const headers = ['ID', 'Timestamp_ISO', 'Acteur_ID', 'Role', 'Action', 'Cible_Dossier', 'Metadata_JSON'];
+    const rows = entries.map(e => [
+      e.id,
+      e.timestamp,
+      e.actorId,
+      e.actorRole,
+      e.action,
+      e.targetId,
+      `"${JSON.stringify(e.metadata || {}).replace(/"/g, '""')}"`
+    ]);
+    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  }
+
   _getApp(referenceNumber) {
     const app = this.applications.get(referenceNumber);
     if (!app) {
