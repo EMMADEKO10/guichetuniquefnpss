@@ -55,6 +55,14 @@ import {
   detectPaymentChannel
 } from '../src/finance/payment-reconciliation.mjs';
 import { verifyAndPlanSqlMigrations } from '../src/database/migration-runner.mjs';
+import {
+  DecisionStatus,
+  createDecisionRegister,
+  recordCopilDecision,
+  computeContrastRatio,
+  auditPrototypeAccessibility,
+  evaluateG1Gate
+} from '../src/ops/g1-gate-reviewer.mjs';
 
 const ADMIN_ADDR = '0x1000000000000000000000000000000000000001';
 const RELAYER_ADDR = '0x2000000000000000000000000000000000000002';
@@ -960,3 +968,56 @@ test('15. Profil Requérant & Déconnexion (REQ-04), Export CSV d\'Audit Filtré
 
 
 
+
+test('16. Revue du Jalon G1 : Registre des Décisions D1-D4, Audit d\'Accessibilité WCAG AA du Prototype & Verdict Sans Auto-Validation (GOV-09, UX-04, UX-05)', async () => {
+  // Contraste WCAG : noir sur blanc = 21:1, gris clair sur blanc insuffisant
+  assert.equal(computeContrastRatio('#000000', '#ffffff'), 21);
+  assert.ok(computeContrastRatio('#cccccc', '#ffffff') < 4.5);
+
+  // L'audit détecte un HTML inaccessible (pas de lang, pas de viewport, image sans alt)
+  const badAudit = auditPrototypeAccessibility('<html><head><title>x</title></head><body><img src="a.png"></body></html>');
+  assert.equal(badAudit.passed, false);
+  const failedIds = badAudit.findings.filter(f => !f.ok).map(f => f.id);
+  assert.ok(failedIds.includes('A11Y_LANG'));
+  assert.ok(failedIds.includes('A11Y_VIEWPORT'));
+  assert.ok(failedIds.includes('A11Y_IMG_ALT'));
+
+  // Le prototype réel du projet passe l'audit automatisable
+  const realGate = evaluateG1Gate();
+  assert.equal(realGate.accessibility.passed, true);
+  assert.deepEqual(realGate.blocking.missingEvidence, []);
+
+  // Aucune décision n'est présumée tranchée : le code ne décide jamais à la place du COPIL
+  assert.equal(realGate.verdict, 'PENDING_COPIL_DECISIONS');
+  assert.deepEqual(realGate.blocking.openDecisions, ['D1', 'D2', 'D3', 'D4']);
+
+  // Une décision exige un décideur nommé et un contenu
+  const register = createDecisionRegister();
+  assert.throws(() => recordCopilDecision(register, 'D1', { outcome: 'Palier 1' }), /décideur/);
+  assert.throws(() => recordCopilDecision(register, 'D1', { decidedBy: 'DG FNPSS' }), /outcome/);
+  assert.throws(() => recordCopilDecision(register, 'D9', { decidedBy: 'DG FNPSS', outcome: 'x' }), /inconnue/);
+
+  for (const id of ['D1', 'D2', 'D3', 'D4']) {
+    const d = recordCopilDecision(register, id, { decidedBy: 'COPIL FNPSS', outcome: `Décision ${id} validée` });
+    assert.equal(d.status, DecisionStatus.DECIDED);
+  }
+
+  // Décisions closes mais PV non signé : prêt pour signature, pas validé
+  const readyGate = evaluateG1Gate({ decisions: register, copilMinutesSigned: false });
+  assert.equal(readyGate.verdict, 'READY_FOR_COPIL_SIGNATURE');
+
+  // G1_PASSED uniquement avec le compte rendu signé
+  const passedGate = evaluateG1Gate({ decisions: register, copilMinutesSigned: true });
+  assert.equal(passedGate.verdict, 'G1_PASSED');
+
+  // Preuve manquante : verdict bloqué même si les décisions sont closes
+  const blockedGate = evaluateG1Gate({ rootDir: 'C:/dossier-inexistant-fnpss', decisions: register, copilMinutesSigned: true });
+  assert.equal(blockedGate.verdict, 'BLOCKED_MISSING_EVIDENCE');
+
+  // Route REST
+  const server = createGuichetServer();
+  const res = await server.dispatch({ method: 'GET', url: '/api/ops/g1-gate' });
+  assert.equal(res.status, 200);
+  assert.equal(res.json().gate, 'G1');
+  assert.equal(res.json().verdict, 'PENDING_COPIL_DECISIONS');
+});

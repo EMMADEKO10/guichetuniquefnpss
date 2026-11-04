@@ -26,6 +26,7 @@ import {
 } from './ops/backup-and-pilot-manager.mjs';
 import { PaymentReconciliationLedger } from './finance/payment-reconciliation.mjs';
 import { verifyAndPlanSqlMigrations } from './database/migration-runner.mjs';
+import { evaluateG1Gate } from './ops/g1-gate-reviewer.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prototypeHtmlPath = path.join(__dirname, '..', 'prototype', 'index.html');
@@ -517,6 +518,10 @@ export function createGuichetServer() {
           entries: engine.queryAuditLogs(filters),
           csv: engine.exportAuditLogsCsv(filters)
         });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/ops/g1-gate') {
+        return sendJson(res, 200, evaluateG1Gate());
       }
 
       if (req.method === 'GET' && url.pathname === '/api/ops/migrations') {
