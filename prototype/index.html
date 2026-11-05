@@ -1203,18 +1203,57 @@
       renderAll();
     }
 
-    function toggleNetwork() {
+    async function toggleNetwork() {
       isOnline = !isOnline;
       const btn = document.getElementById('netBtn');
       if (isOnline) {
         btn.className = 'net-pill net-online';
         btn.textContent = '🟢 Réseau En Ligne (Polygon Amoy)';
-        showToast('Connexion rétablie : synchronisation automatique de la file PWA / Blockchain effectuée.');
+        await flushOfflinePwaQueue();
+        await syncWithBackendApi();
       } else {
         btn.className = 'net-pill net-offline';
         btn.textContent = '🟠 Mode Hors-Ligne PWA (File locale active)';
-        showToast('Mode Hors-Ligne activé (SC-04) : les saisies sont conservées dans IndexedDB/LocalStorage.');
+        showToast('Mode Hors-Ligne activé (SC-04) : les saisies sont conservées dans la file locale PWA.');
       }
+    }
+
+    async function flushOfflinePwaQueue() {
+      let queue = [];
+      try {
+        queue = JSON.parse(localStorage.getItem('fnpss_offline_queue') || '[]');
+      } catch (_) {}
+      if (!queue.length) {
+        showToast('Connexion rétablie (Polygon Amoy en ligne).');
+        return;
+      }
+
+      let syncedCount = 0;
+      for (const item of queue) {
+        try {
+          const res = await authFetch('/api/pwa/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+          });
+          if (res.ok) syncedCount++;
+        } catch (_) {}
+      }
+      try { localStorage.removeItem('fnpss_offline_queue'); } catch (_) {}
+      showToast(`Connexion rétablie : ${syncedCount} demande(s) PWA synchronisée(s) sans doublon avec le registre officiel (REQ-11) !`);
+    }
+
+    window.addEventListener('online', () => {
+      if (!isOnline) toggleNetwork();
+    });
+
+    function hashCode(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+      }
+      return hash;
     }
 
     // =========================================================================
@@ -1421,6 +1460,27 @@
           return;
         }
       }
+      // Mode Hors-Ligne PWA (REQ-11)
+      const idempotencyKey = 'idem_' + Math.abs(hashCode(`${orgName}|${serviceCode}|${projectTitle}|${paymentRef}`)).toString(16);
+      const offlinePayload = {
+        organizationName: orgName,
+        serviceCode,
+        projectTitle,
+        goodsSummary: goods || 'Conforme au descriptif P5 joint',
+        paymentReference: paymentRef,
+        hasActiveS1Enrollment: hasActiveS1,
+        attachedDocuments: attachedDocsArray,
+        idempotencyKey
+      };
+
+      try {
+        const q = JSON.parse(localStorage.getItem('fnpss_offline_queue') || '[]');
+        if (!q.some(x => x.idempotencyKey === idempotencyKey)) {
+          q.push(offlinePayload);
+          localStorage.setItem('fnpss_offline_queue', JSON.stringify(q));
+        }
+      } catch (_) {}
+
       const nextNum = 49 + state.applications.length;
       const newApp = {
         id: 'DEM-00' + (state.applications.length + 1),
@@ -1440,22 +1500,25 @@
         issuedAt: '',
         expiresAt: '',
         revocationReason: '',
-        attachedDocuments: attachedDocsArray
+        attachedDocuments: attachedDocsArray,
+        isOfflineQueued: true,
+        idempotencyKey
       };
       state.applications.unshift(newApp);
       selectedAppId = newApp.id;
       state.auditLogs.unshift({
         ts: new Date().toLocaleString('fr-FR'),
-        actor: 'ONG Espoir du Nord-Kivu (REQUERANT)',
-        action: isOnline ? 'APPLICATION_SUBMITTED' : 'PWA_OFFLINE_QUEUED',
+        actor: `${orgName} (REQUERANT)`,
+        action: 'PWA_OFFLINE_QUEUED',
         target: newApp.ref,
-        detail: `Soumission ${serviceCode} (${projectTitle}) + Quittance ${paymentRef}`
+        detail: `Soumission enregistrée dans la file hors-ligne PWA (Clé: ${idempotencyKey})`
       });
       renderAll();
-      showToast(`Dossier ${newApp.ref} enregistré ! Vous pouvez maintenant l'instruire dans l'onglet « 2. Back-Office FNPSS ».`);
+      showToast(`Mode Hors-Ligne (REQ-11) : Demande ${newApp.ref} conservée dans la file PWA. Envoi automatique dès le retour du réseau.`);
     }
 
-    function statusBadgeHtml(status, certStatus) {
+    function statusBadgeHtml(status, certStatus, isOfflineQueued = false) {
+      if (isOfflineQueued) return '<span class="badge badge-soumis" style="background:#fff3cd;color:#856404;border-color:#ffeeba;">🟠 File PWA Hors-Ligne (REQ-11)</span>';
       if (certStatus === 'REVOKED') return '<span class="badge badge-revoque">⛔ ACTE RÉVOQUÉ ON-CHAIN</span>';
       switch (status) {
         case 'SOUMIS': return '<span class="badge badge-soumis">Soumis (Attente validation frais)</span>';
@@ -1678,7 +1741,7 @@
           <td><strong>${a.serviceCode}</strong></td>
           <td>${a.projectTitle}</td>
           <td>${a.paymentValidated ? '✅ Validés (320$)' : '⏳ Preuve déposée'}</td>
-          <td>${statusBadgeHtml(a.status, a.certStatus)}</td>
+          <td>${statusBadgeHtml(a.status, a.certStatus, a.isOfflineQueued)}</td>
           <td>
             ${a.docHash ? `
               <button class="btn btn-success" style="padding:5px 10px;font-size:11.5px;" onclick="openInAdmin('${a.id}')">📄 Voir Acte & QR</button>

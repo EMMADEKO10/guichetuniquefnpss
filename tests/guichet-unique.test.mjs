@@ -1536,13 +1536,16 @@ test('21. Fiche d\'Instruction Instructeur & Filtrage des Demandes (ADM-04) & Vi
   assert.match(p6Doc.sha256Hash, /^0x[0-9a-f]{64}$/);
   assert.ok(p6Doc.sizeBytes > 0);
 
-  // 4. Intégration Front-End dans prototype/index.html (ADM-04 & ADM-05)
+  // 4. Intégration Front-End dans prototype/index.html (ADM-04, ADM-05 & REQ-11 PWA)
   const html = fs.readFileSync('prototype/index.html', 'utf8');
   assert.ok(html.includes('id="adminFilterService"'));
   assert.ok(html.includes('id="adminFilterStatus"'));
   assert.ok(html.includes('previewSubmittedDocument('));
   assert.ok(html.includes('INSPECTION DOCUMENTAIRE &bull; CONTROLE DE RECEVABILITE (ADM-05)'));
   assert.ok(html.includes('adminPreviewDoc'));
+  assert.ok(html.includes('flushOfflinePwaQueue('));
+  assert.ok(html.includes('fnpss_offline_queue'));
+  assert.ok(html.includes('idempotencyKey'));
 
   // Audit d'accessibilité WCAG AA
   const audit = auditPrototypeAccessibility(html);

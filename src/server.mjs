@@ -542,7 +542,8 @@ export function createGuichetServer({
           serviceCode: body.serviceCode || 'S6',
           projectTitle: body.projectTitle,
           goodsSummary: body.goodsSummary || '',
-          uploadedDocTypes: body.uploadedDocTypes || allDocs,
+          uploadedDocTypes: body.uploadedDocTypes || (body.attachedDocuments?.length ? [] : allDocs),
+          attachedDocuments: body.attachedDocuments || [],
           paymentReference: body.paymentReference,
           hasActiveS1Enrollment: Boolean(body.hasActiveS1Enrollment)
         }, { idempotencyKey: body.idempotencyKey || null });
