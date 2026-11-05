@@ -925,6 +925,37 @@
     </div>
   </div>
 
+  <!-- Modal de Modification de Dossier avant instruction (REQ-08) -->
+  <div id="editModalBackdrop" class="modal-backdrop" onclick="if(event.target===this)closeEditApplicationModal()">
+    <div class="auth-modal-card" onclick="event.stopPropagation()">
+      <div class="auth-modal-header">
+        <h3>Modifier mon dossier — <span id="editModalRef" class="mono">FNPSS/DEM/...</span></h3>
+        <button class="auth-modal-close" onclick="closeEditApplicationModal()" aria-label="Fermer la fenêtre de modification">&times;</button>
+      </div>
+      <div class="auth-modal-body">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+          Conformément à la règle <strong>REQ-08</strong>, vous pouvez modifier votre demande tant que l'agent FNPSS n'a pas validé la quittance et démarré l'instruction.
+        </p>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label style="font-size:12px;display:block;margin-bottom:2px;font-weight:600;" for="editProjectTitle">Intitulé du projet ou programme</label>
+          <input type="text" id="editProjectTitle" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" />
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label style="font-size:12px;display:block;margin-bottom:2px;font-weight:600;" for="editGoods">Description détaillée des biens / Colisage</label>
+          <textarea id="editGoods" rows="2" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="font-size:12px;display:block;margin-bottom:2px;font-weight:600;" for="editPaymentRef">Référence de quittance bancaire (20$ + 300$)</label>
+          <input type="text" id="editPaymentRef" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" />
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button class="btn btn-outline" style="padding:6px 12px;" onclick="closeEditApplicationModal()">Annuler</button>
+          <button class="btn btn-primary" style="padding:6px 14px;" onclick="submitEditApplication()">Enregistrer les modifications →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </main>
 
   <div id="toast" class="toast"></div>
@@ -1184,10 +1215,58 @@
       S6: ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE']
     };
 
+    const wizardAttachedDocs = {};
+
     function selectServiceForWizard(code) {
       document.getElementById('formServiceCode').value = code;
       updateWizardService();
       document.getElementById('submissionWizard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function handlePieceUpload(event, docCode) {
+      const file = event.target.files && event.target.files[0];
+      const badge = document.getElementById(`fileBadge_${docCode}`);
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        if (badge) {
+          badge.style.color = '#d93025';
+          badge.textContent = `❌ Rejet : fichier trop volumineux (${(file.size / 1024 / 1024).toFixed(1)} Mo > 10 Mo)`;
+        }
+        showToast(`Erreur : le fichier ${file.name} dépasse la limite autorisée de 10 Mo`);
+        event.target.value = '';
+        delete wizardAttachedDocs[docCode];
+        return;
+      }
+
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      const header = String.fromCharCode(...bytes.slice(0, 5));
+      if (header !== '%PDF-') {
+        if (badge) {
+          badge.style.color = '#d93025';
+          badge.textContent = '❌ Rejet : signature binaire invalide (seuls les PDF %PDF- sont acceptés)';
+        }
+        showToast(`Erreur : ${file.name} n'est pas un fichier PDF valide`);
+        event.target.value = '';
+        delete wizardAttachedDocs[docCode];
+        return;
+      }
+
+      const hashHex = await sha256Hex(buf);
+      wizardAttachedDocs[docCode] = {
+        docCode,
+        fileName: file.name,
+        sha256Hash: hashHex,
+        sizeBytes: file.size,
+        uploadedAt: new Date().toISOString()
+      };
+
+      if (badge) {
+        badge.style.color = 'var(--fnpss-green)';
+        badge.innerHTML = `✅ <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} Ko) &bull; <span class="mono" title="${hashHex}">SHA-256: ${hashHex.slice(0, 16)}...</span>`;
+      }
+      showToast(`Pièce ${docCode} analysée avec succès (SHA-256 : ${hashHex.slice(0, 10)}...)`);
     }
 
     async function updateWizardService() {
@@ -1236,7 +1315,7 @@
       docsListEl.innerHTML = docCodes.map(d => {
         if (d.isExemptedByOnceOnly) {
           return `
-            <div class="doc-check-row" style="background:#e6f4ea;border-left:4px solid var(--fnpss-green);padding:8px 10px;margin-bottom:6px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+            <div class="doc-check-row" style="background:#e6f4ea;border-left:4px solid var(--fnpss-green);padding:10px 12px;margin-bottom:8px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
               <div>
                 <span style="font-weight:700;color:#0d652d;">✓ [Once-Only] ${d.name}</span>
                 <span style="display:block;font-size:11.5px;color:#137333;">${d.onceOnlyNotice || 'Pièce réutilisée depuis le dossier actif'}</span>
@@ -1245,13 +1324,24 @@
             </div>
           `;
         }
+        const existing = wizardAttachedDocs[d.docCode];
         return `
-          <div class="doc-check-row" style="padding:8px 10px;margin-bottom:6px;background:#f8fafc;border:1px solid var(--border);border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <span style="font-weight:600;color:var(--fnpss-navy);">${d.name}</span>
-              <span style="display:block;font-size:11.5px;color:var(--text-muted);">${d.description || 'Format PDF/A (max 10 Mo)'}</span>
+          <div class="doc-check-row" style="padding:10px 12px;margin-bottom:8px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <span style="font-weight:600;color:var(--fnpss-navy);">${d.name}</span>
+                <span style="display:block;font-size:11.5px;color:var(--text-muted);">${d.description || 'Format PDF/A (max 10 Mo)'}</span>
+              </div>
+              <span class="mono" style="font-size:11px;color:var(--text-muted);">PDF requis</span>
             </div>
-            <span class="mono" style="font-size:11px;color:var(--text-muted);">PDF obligatoire</span>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;">
+              <input type="file" id="file_${d.docCode}" accept="application/pdf" style="font-size:11px;" onchange="handlePieceUpload(event, '${d.docCode}')" aria-label="Sélectionner le fichier PDF pour ${d.name}" />
+              <span id="fileBadge_${d.docCode}" class="mono" style="font-size:11px;color:${existing ? 'var(--fnpss-green)' : 'var(--text-muted)'};">
+                ${existing
+                  ? `✅ <strong>${existing.fileName}</strong> (${(existing.sizeBytes / 1024).toFixed(1)} Ko) &bull; SHA-256: ${existing.sha256Hash.slice(0, 16)}...`
+                  : '⏳ En attente de téléversement (calcul SHA-256 local)'}
+              </span>
+            </div>
           </div>
         `;
       }).join('');
@@ -1278,17 +1368,25 @@
         showToast('Veuillez renseigner l\'intitulé du projet et la référence de quittance.');
         return;
       }
+      const attachedDocsArray = Object.values(wizardAttachedDocs);
+      const hasActiveS1 = Boolean(
+        (currentAuthUser && currentAuthUser.enrollmentNumber) ||
+        state.applications.some(a => a.serviceCode === 'S1' && a.status === 'VALIDE_DELIVRE' && a.certStatus === 'ACTIVE')
+      );
+      const orgName = (currentAuthUser && currentAuthUser.organizationName) || 'ONG Espoir du Nord-Kivu';
+
       if (backendConnected && isOnline) {
         const res = await authFetch('/api/applications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            organizationName: 'ONG Espoir du Nord-Kivu',
+            organizationName: orgName,
             serviceCode,
             projectTitle,
             goodsSummary: goods || 'Conforme au descriptif P5 joint',
             paymentReference: paymentRef,
-            hasActiveS1Enrollment: true
+            hasActiveS1Enrollment: hasActiveS1,
+            attachedDocuments: attachedDocsArray.length ? attachedDocsArray : undefined
           })
         });
         if (res.ok) {
@@ -1304,7 +1402,7 @@
       const newApp = {
         id: 'DEM-00' + (state.applications.length + 1),
         ref: `FNPSS/DEM/2026/000${nextNum}`,
-        org: 'ONG Espoir du Nord-Kivu',
+        org: orgName,
         serviceCode,
         projectTitle,
         goods: goods || 'Conforme au descriptif P5 joint',
@@ -1318,7 +1416,8 @@
         certStatus: 'NONE',
         issuedAt: '',
         expiresAt: '',
-        revocationReason: ''
+        revocationReason: '',
+        attachedDocuments: attachedDocsArray
       };
       state.applications.unshift(newApp);
       selectedAppId = newApp.id;
@@ -1563,11 +1662,127 @@
               <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="downloadOfficialPdf('${a.id}')">⬇ PDF Officiel</button>
               <button class="btn btn-outline" style="padding:5px 10px;font-size:11.5px;" onclick="openInDgda('${a.id}')">📷 Tester en Douane</button>
             ` : `
-              <button class="btn btn-outline" style="padding:5px 10px;font-size:11.5px;" onclick="openInAdmin('${a.id}')">Instruire dans Back-Office →</button>
+              ${(!a.paymentValidated && a.status === 'SOUMIS') ? `
+                <button class="btn btn-outline" style="padding:4px 8px;font-size:11px;" onclick="openEditApplicationModal('${a.id}')" title="Modifier le dossier avant instruction (REQ-08)">✏️ Modifier</button>
+                <button class="btn btn-outline" style="padding:4px 8px;font-size:11px;color:#d93025;border-color:#d93025;" onclick="withdrawApplicationPrompt('${a.id}')" title="Retirer la demande avant instruction (REQ-08)">🗑️ Retirer</button>
+              ` : ''}
+              <button class="btn btn-outline" style="padding:4px 8px;font-size:11px;" onclick="openInAdmin('${a.id}')">Instruire dans Back-Office →</button>
             `}
           </td>
         </tr>
       `).join('');
+    }
+
+    let currentEditingAppId = null;
+
+    function openEditApplicationModal(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      currentEditingAppId = appId;
+      const refEl = document.getElementById('editModalRef');
+      const titleEl = document.getElementById('editProjectTitle');
+      const goodsEl = document.getElementById('editGoods');
+      const payEl = document.getElementById('editPaymentRef');
+      if (refEl) refEl.textContent = app.ref;
+      if (titleEl) titleEl.value = app.projectTitle || '';
+      if (goodsEl) goodsEl.value = app.goods || '';
+      if (payEl) payEl.value = app.paymentRef || '';
+      const modal = document.getElementById('editModalBackdrop');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeEditApplicationModal() {
+      const modal = document.getElementById('editModalBackdrop');
+      if (modal) modal.classList.remove('open');
+      currentEditingAppId = null;
+    }
+
+    async function submitEditApplication() {
+      if (!currentEditingAppId) return;
+      const app = state.applications.find(a => a.id === currentEditingAppId);
+      if (!app) return;
+
+      const projectTitle = document.getElementById('editProjectTitle').value.trim();
+      const goodsSummary = document.getElementById('editGoods').value.trim();
+      const paymentReference = document.getElementById('editPaymentRef').value.trim();
+
+      if (!projectTitle || !paymentReference) {
+        showToast('Veuillez renseigner l\'intitulé et la référence de paiement.');
+        return;
+      }
+
+      if (backendConnected && isOnline) {
+        const res = await authFetch('/api/applications', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceNumber: app.ref,
+            projectTitle,
+            goodsSummary,
+            paymentReference
+          })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          closeEditApplicationModal();
+          showToast(`Dossier ${app.ref} modifié avec succès (REQ-08).`);
+          return;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || 'Erreur lors de la modification');
+          return;
+        }
+      }
+
+      app.projectTitle = projectTitle;
+      app.goods = goodsSummary;
+      app.paymentRef = paymentReference;
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: `${app.org} (REQUERANT)`,
+        action: 'APPLICATION_UPDATED_BEFORE_INSTRUCTION',
+        target: app.ref,
+        detail: `Modification projet: "${projectTitle}" | Quittance: "${paymentReference}"`
+      });
+      closeEditApplicationModal();
+      renderAll();
+      showToast(`Dossier ${app.ref} modifié avec succès (mode local).`);
+    }
+
+    async function withdrawApplicationPrompt(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      if (!confirm(`Confirmez-vous le retrait de votre dossier ${app.ref} avant instruction (REQ-08) ?`)) {
+        return;
+      }
+
+      if (backendConnected && isOnline) {
+        const res = await authFetch('/api/applications/withdraw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referenceNumber: app.ref })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          showToast(`Dossier ${app.ref} retiré avec succès (REQ-08).`);
+          return;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || 'Erreur lors du retrait du dossier');
+          return;
+        }
+      }
+
+      state.applications = state.applications.filter(a => a.id !== appId);
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: `${app.org} (REQUERANT)`,
+        action: 'APPLICATION_WITHDRAWN_BEFORE_INSTRUCTION',
+        target: app.ref,
+        detail: 'Retrait volontaire de la demande avant validation des frais'
+      });
+      renderAll();
+      showToast(`Demande ${app.ref} retirée avec succès.`);
     }
 
     function renderAdminView() {

@@ -262,6 +262,14 @@ export function createGuichetServer({
       }
 
       if (req.method === 'GET' && url.pathname === '/api/applications') {
+        const refParam = url.searchParams.get('ref');
+        if (refParam) {
+          const app = engine.getApplication(refParam);
+          if (!demoOpen && requestActor.role === Roles.REQUERANT && app.ownerId !== requestActor.id) {
+            return sendJson(res, 403, { error: 'Accès refusé' });
+          }
+          return sendJson(res, 200, { application: app });
+        }
         const isApplicantView = !demoOpen && requestActor.role === Roles.REQUERANT;
         // Un requérant ne voit que ses propres dossiers et jamais le journal d'audit global (ADM-01).
         const applications = engine.listApplications()
@@ -278,7 +286,8 @@ export function createGuichetServer({
           serviceCode: body.serviceCode || 'S6',
           projectTitle: body.projectTitle,
           goodsSummary: body.goodsSummary || '',
-          uploadedDocTypes: body.uploadedDocTypes || allDocs,
+          uploadedDocTypes: body.uploadedDocTypes || (body.attachedDocuments?.length ? [] : allDocs),
+          attachedDocuments: body.attachedDocuments || [],
           paymentReference: body.paymentReference,
           hasActiveS1Enrollment: Boolean(body.hasActiveS1Enrollment)
         });
@@ -307,7 +316,8 @@ export function createGuichetServer({
         return sendJson(res, 200, { application: updated });
       }
 
-      if (req.method === 'DELETE' && url.pathname === '/api/applications') {
+      if ((req.method === 'DELETE' && url.pathname === '/api/applications') ||
+          (req.method === 'POST' && url.pathname === '/api/applications/withdraw')) {
         const body = await readJsonBody(req);
         const ref = body.referenceNumber || url.searchParams.get('ref') || '';
         const resWithdraw = engine.withdrawApplicationBeforeInstruction(actorFor('requerant'), ref);

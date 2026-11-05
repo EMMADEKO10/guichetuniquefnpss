@@ -1306,3 +1306,177 @@ test('19. Formulaire de Soumission Dynamique S1 à S6, Métadonnées des Pièces
   const audit = auditPrototypeAccessibility(html);
   assert.equal(audit.passed, true);
 });
+
+test('20. Téléversement Sécurisé des Pièces avec Métadonnées SHA-256 (REQ-07), Modification & Retrait avant Instruction (REQ-08)', async () => {
+  const PW = 'PasswordRDC#2026';
+  const server = createGuichetServer({ accessMode: 'ENFORCED', demoPassword: PW });
+
+  const headersFor = email => {
+    const session = server.auth.loginWithEmail({ email, password: PW });
+    return {
+      authorization: `Bearer ${session.sessionToken}`,
+      'content-type': 'application/json'
+    };
+  };
+
+  const espoirH = headersFor('contact@espoir-kivu.org');
+  const agentH = headersFor('agent@fnpss.cd');
+  const kasaiH = headersFor('direction@solidarite-kasai.org');
+
+  // 1. Dépôt initial avec pièces jointes attachées (attachedDocuments avec empreinte SHA-256 et nom de fichier)
+  const dummyPdf = Buffer.from('%PDF-1.4\n1 0 obj << /Title (Requete FNPSS) >> endobj\n%%EOF', 'utf8');
+  const inspected = validateAndInspectPdfUpload(dummyPdf, { fileName: 'requete_ministre.pdf' });
+
+  const submitRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications',
+    headers: espoirH,
+    body: {
+      organizationName: 'ONG Espoir du Nord-Kivu',
+      serviceCode: 'S3',
+      projectTitle: 'Kits humanitaires initiaux',
+      goodsSummary: '100 Kits chirurgicaux',
+      paymentReference: 'RAWBANK-DEP-2026-001',
+      attachedDocuments: [
+        {
+          docCode: 'P1_REQUETE',
+          fileName: inspected.fileName,
+          sha256Hash: inspected.sha256Hash,
+          sizeBytes: inspected.byteSize
+        },
+        { docCode: 'P2_ENROLEMENT', fileName: 'enrolement.pdf', sha256Hash: '0x2222', sizeBytes: 1000 },
+        { docCode: 'P3_PLAN_ACTION', fileName: 'plan.pdf', sha256Hash: '0x3333', sizeBytes: 1000 },
+        { docCode: 'P4_RAPPORT', fileName: 'rapport.pdf', sha256Hash: '0x4444', sizeBytes: 1000 },
+        { docCode: 'P5_PROJET', fileName: 'projet.pdf', sha256Hash: '0x5555', sizeBytes: 1000 },
+        { docCode: 'P6_QUITTANCE', fileName: 'quittance.pdf', sha256Hash: '0x6666', sizeBytes: 1000 }
+      ]
+    }
+  });
+
+  assert.equal(submitRes.status, 201);
+  const createdApp = submitRes.json().application;
+  const ref = createdApp.referenceNumber;
+  assert.equal(createdApp.status, 'SOUMIS');
+  assert.equal(createdApp.paymentValidated, false);
+  assert.equal(createdApp.attachedDocuments.length, 6);
+  assert.equal(createdApp.attachedDocuments[0].fileName, 'requete_ministre.pdf');
+
+  // 2. Consultation unitaire du dossier via GET /api/applications?ref=...
+  const getSingle = await server.dispatch({
+    method: 'GET',
+    url: `/api/applications?ref=${ref}`,
+    headers: espoirH
+  });
+  assert.equal(getSingle.status, 200);
+  assert.equal(getSingle.json().application.referenceNumber, ref);
+
+  // 3. Modification avant instruction (REQ-08) : mise à jour du projet et colisage
+  const updateRes = await server.dispatch({
+    method: 'PUT',
+    url: '/api/applications',
+    headers: espoirH,
+    body: {
+      referenceNumber: ref,
+      projectTitle: 'Kits humanitaires complétés — Rutshuru',
+      goodsSummary: '200 Kits chirurgicaux + 5 générateurs',
+      paymentReference: 'RAWBANK-DEP-2026-001-REV1'
+    }
+  });
+  assert.equal(updateRes.status, 200);
+  const updatedApp = updateRes.json().application;
+  assert.equal(updatedApp.projectTitle, 'Kits humanitaires complétés — Rutshuru');
+  assert.equal(updatedApp.goodsSummary, '200 Kits chirurgicaux + 5 générateurs');
+  assert.equal(updatedApp.paymentReference, 'RAWBANK-DEP-2026-001-REV1');
+
+  // 4. Anti-IDOR : un autre requérant (contact@kasai.cd) ne peut ni modifier ni retirer ce dossier
+  const intruderUpdate = await server.dispatch({
+    method: 'PUT',
+    url: '/api/applications',
+    headers: kasaiH,
+    body: { referenceNumber: ref, projectTitle: 'Piraté' }
+  });
+  assert.equal(intruderUpdate.status, 400);
+  assert.match(intruderUpdate.json().error, /propriétaire/);
+
+  const intruderWithdraw = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/withdraw',
+    headers: kasaiH,
+    body: { referenceNumber: ref }
+  });
+  assert.equal(intruderWithdraw.status, 400);
+  assert.match(intruderWithdraw.json().error, /propriétaire/);
+
+  // 5. Retrait avant instruction (REQ-08) via POST /api/applications/withdraw
+  const withdrawRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/withdraw',
+    headers: espoirH,
+    body: { referenceNumber: ref }
+  });
+  assert.equal(withdrawRes.status, 200);
+  assert.equal(withdrawRes.json().withdrawn, true);
+
+  // Le dossier retiré n'existe plus
+  const getAfterWithdraw = await server.dispatch({
+    method: 'GET',
+    url: `/api/applications?ref=${ref}`,
+    headers: espoirH
+  });
+  assert.equal(getAfterWithdraw.status, 400);
+
+  // 6. Anti-altération après démarrage de l'instruction (REQ-08)
+  // Soumission d'un nouveau dossier puis validation par l'agent
+  const app2Res = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications',
+    headers: espoirH,
+    body: {
+      organizationName: 'ONG Espoir du Nord-Kivu',
+      serviceCode: 'S1',
+      projectTitle: 'Dossier instruction active',
+      paymentReference: 'RAWBANK-2026-SLA-TEST',
+      uploadedDocTypes: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE']
+    }
+  });
+  const ref2 = app2Res.json().application.referenceNumber;
+  const valRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/validate-payment',
+    headers: agentH,
+    body: { referenceNumber: ref2 }
+  });
+  assert.equal(valRes.status, 200);
+
+  // Tentative de modification après démarrage de l'instruction -> REFUSÉE
+  const lateUpdate = await server.dispatch({
+    method: 'PUT',
+    url: '/api/applications',
+    headers: espoirH,
+    body: { referenceNumber: ref2, projectTitle: 'Changement tardif' }
+  });
+  assert.equal(lateUpdate.status, 400);
+  assert.match(lateUpdate.json().error, /REQ-08: Modification impossible/);
+
+  // Tentative de retrait après démarrage de l'instruction -> REFUSÉE
+  const lateWithdraw = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/withdraw',
+    headers: espoirH,
+    body: { referenceNumber: ref2 }
+  });
+  assert.equal(lateWithdraw.status, 400);
+  assert.match(lateWithdraw.json().error, /REQ-08: Suppression impossible/);
+
+  // 7. Intégration Front-End dans prototype/index.html (REQ-07 & REQ-08)
+  const html = fs.readFileSync('prototype/index.html', 'utf8');
+  assert.ok(html.includes('handlePieceUpload('));
+  assert.ok(html.includes('wizardAttachedDocs'));
+  assert.ok(html.includes('openEditApplicationModal('));
+  assert.ok(html.includes('withdrawApplicationPrompt('));
+  assert.ok(html.includes('id="editModalBackdrop"'));
+
+  // Audit d'accessibilité WCAG AA
+  const audit = auditPrototypeAccessibility(html);
+  assert.equal(audit.passed, true);
+});

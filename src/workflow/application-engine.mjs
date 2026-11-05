@@ -77,12 +77,17 @@ export class GuichetUniqueEngine {
     serviceCode,
     projectTitle,
     goodsSummary,
-    uploadedDocTypes,
+    uploadedDocTypes = [],
+    attachedDocuments = [],
     paymentReference,
     hasActiveS1Enrollment = false
   }) {
     assertPermission(actor, 'SUBMIT_APPLICATION');
-    const docCheck = validateRequiredDocuments(serviceCode, uploadedDocTypes, hasActiveS1Enrollment);
+    const effectiveDocTypes = Array.from(new Set([
+      ...(uploadedDocTypes || []),
+      ...(attachedDocuments || []).map(d => d.docCode)
+    ]));
+    const docCheck = validateRequiredDocuments(serviceCode, effectiveDocTypes, hasActiveS1Enrollment);
     if (!docCheck.isValid) {
       throw new Error(`Pièces justificatives manquantes : ${docCheck.missingDocs.join(', ')}`);
     }
@@ -99,7 +104,8 @@ export class GuichetUniqueEngine {
       serviceCode,
       projectTitle,
       goodsSummary: goodsSummary || '',
-      uploadedDocTypes: [...uploadedDocTypes],
+      uploadedDocTypes: effectiveDocTypes,
+      attachedDocuments: [...attachedDocuments],
       paymentReference,
       paymentValidated: false,
       status: 'SOUMIS',
@@ -150,6 +156,13 @@ export class GuichetUniqueEngine {
     if (updates.paymentReference) app.paymentReference = updates.paymentReference.trim();
     if (Array.isArray(updates.uploadedDocTypes)) {
       app.uploadedDocTypes = [...updates.uploadedDocTypes];
+    }
+    if (Array.isArray(updates.attachedDocuments)) {
+      app.attachedDocuments = [...updates.attachedDocuments];
+      app.uploadedDocTypes = Array.from(new Set([
+        ...app.uploadedDocTypes,
+        ...updates.attachedDocuments.map(d => d.docCode)
+      ]));
     }
 
     this._logAudit(actor, 'APPLICATION_UPDATED_BEFORE_INSTRUCTION', referenceNumber, {

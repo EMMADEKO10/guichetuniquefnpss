@@ -41,6 +41,7 @@ export const ROUTE_POLICY = Object.freeze([
   { method: 'POST', path: '/api/applications', access: [Roles.REQUERANT] },
   { method: 'PUT', path: '/api/applications', access: [Roles.REQUERANT] },
   { method: 'DELETE', path: '/api/applications', access: [Roles.REQUERANT] },
+  { method: 'POST', path: '/api/applications/withdraw', access: [Roles.REQUERANT] },
   { method: 'POST', path: '/api/applications/provide-complement', access: [Roles.REQUERANT] },
   { method: 'POST', path: '/api/pwa/sync', access: [Roles.REQUERANT] },
 
