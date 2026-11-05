@@ -481,15 +481,21 @@ export class GuichetUniqueEngine {
     return { ...app };
   }
 
-  listApplications() {
-    return Array.from(this.applications.values()).map(app => {
-      const clone = { ...app };
-      if (clone.certificate) {
-        const { pdfBuffer, ...certMeta } = clone.certificate;
-        clone.certificate = certMeta;
-      }
-      return clone;
-    });
+  listApplications({ serviceCode = null, status = null } = {}) {
+    return Array.from(this.applications.values())
+      .filter(app => {
+        if (serviceCode && app.serviceCode !== serviceCode) return false;
+        if (status && app.status !== status) return false;
+        return true;
+      })
+      .map(app => {
+        const clone = { ...app };
+        if (clone.certificate) {
+          const { pdfBuffer, ...certMeta } = clone.certificate;
+          clone.certificate = certMeta;
+        }
+        return clone;
+      });
   }
 
   getApplication(referenceNumber) {

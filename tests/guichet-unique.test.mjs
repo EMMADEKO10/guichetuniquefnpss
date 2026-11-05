@@ -1480,3 +1480,71 @@ test('20. Téléversement Sécurisé des Pièces avec Métadonnées SHA-256 (REQ
   const audit = auditPrototypeAccessibility(html);
   assert.equal(audit.passed, true);
 });
+
+test('21. Fiche d\'Instruction Instructeur & Filtrage des Demandes (ADM-04) & Visionneuse Intégrée des Pièces Justificatives P1-P6 (ADM-05)', async () => {
+  const PW = 'PasswordRDC#2026';
+  const server = createGuichetServer({ accessMode: 'ENFORCED', demoPassword: PW });
+
+  const headersFor = email => {
+    const session = server.auth.loginWithEmail({ email, password: PW });
+    return {
+      authorization: `Bearer ${session.sessionToken}`,
+      'content-type': 'application/json'
+    };
+  };
+
+  const agentH = headersFor('agent@fnpss.cd');
+  const dgH = headersFor('dg@fnpss.cd');
+  const adminH = headersFor('admin@fnpss.cd');
+
+  // 1. Filtrage multicritère des demandes par service (ADM-04)
+  const resAll = await server.dispatch({ method: 'GET', url: '/api/applications', headers: agentH });
+  assert.equal(resAll.status, 200);
+  assert.equal(resAll.json().applications.length, 3);
+
+  const resS6 = await server.dispatch({ method: 'GET', url: '/api/applications?service=S6', headers: agentH });
+  assert.equal(resS6.status, 200);
+  assert.equal(resS6.json().applications.length, 1);
+  assert.equal(resS6.json().applications[0].serviceCode, 'S6');
+
+  const resS4 = await server.dispatch({ method: 'GET', url: '/api/applications?service=S4', headers: agentH });
+  assert.equal(resS4.status, 200);
+  assert.equal(resS4.json().applications.length, 1);
+  assert.equal(resS4.json().applications[0].serviceCode, 'S4');
+
+  // Filtrage par statut
+  const resSoumis = await server.dispatch({ method: 'GET', url: '/api/applications?status=SOUMIS', headers: agentH });
+  assert.equal(resSoumis.status, 200);
+  assert.equal(resSoumis.json().applications.length, 1);
+  assert.equal(resSoumis.json().applications[0].status, 'SOUMIS');
+
+  // 2. Consultation d'une fiche de traitement détaillée (ADM-04)
+  const s4Ref = resS4.json().applications[0].referenceNumber;
+  const singleAppRes = await server.dispatch({ method: 'GET', url: `/api/applications?ref=${s4Ref}`, headers: agentH });
+  assert.equal(singleAppRes.status, 200);
+  const detailedApp = singleAppRes.json().application;
+  assert.equal(detailedApp.referenceNumber, s4Ref);
+  assert.equal(detailedApp.organizationName, 'Fondation Solidarité Kasaï');
+  assert.equal(detailedApp.serviceCode, 'S4');
+  assert.ok(Array.isArray(detailedApp.attachedDocuments));
+  assert.equal(detailedApp.attachedDocuments.length, 6);
+
+  // 3. Inspection des pièces justificatives rattachées P1 à P6 (ADM-05)
+  const p6Doc = detailedApp.attachedDocuments.find(d => d.docCode === 'P6_QUITTANCE');
+  assert.ok(p6Doc);
+  assert.match(p6Doc.fileName, /p6_quittance\.pdf$/);
+  assert.match(p6Doc.sha256Hash, /^0x[0-9a-f]{64}$/);
+  assert.ok(p6Doc.sizeBytes > 0);
+
+  // 4. Intégration Front-End dans prototype/index.html (ADM-04 & ADM-05)
+  const html = fs.readFileSync('prototype/index.html', 'utf8');
+  assert.ok(html.includes('id="adminFilterService"'));
+  assert.ok(html.includes('id="adminFilterStatus"'));
+  assert.ok(html.includes('previewSubmittedDocument('));
+  assert.ok(html.includes('INSPECTION DOCUMENTAIRE &bull; CONTROLE DE RECEVABILITE (ADM-05)'));
+  assert.ok(html.includes('adminPreviewDoc'));
+
+  // Audit d'accessibilité WCAG AA
+  const audit = auditPrototypeAccessibility(html);
+  assert.equal(audit.passed, true);
+});

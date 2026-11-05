@@ -684,9 +684,32 @@
       </div>
 
       <div class="card">
-        <div class="card-header">
-          <h2>File d'instruction des dossiers FNPSS (Contrôle de recevabilité, Enquête & Scellement Blockchain)</h2>
-          <span style="font-size:12px;color:var(--text-muted);">Cliquez sur « Ouvrir / Instruire » pour afficher le dossier dans le poste côte-à-côte</span>
+        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+          <div>
+            <h2>File d'instruction des dossiers FNPSS (Contrôle de recevabilité, Enquête & Scellement Blockchain)</h2>
+            <span style="font-size:12px;color:var(--text-muted);">Cliquez sur « Ouvrir / Instruire » pour afficher le dossier dans le poste côte-à-côte</span>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <label for="adminFilterService" style="font-size:12px;font-weight:600;">Service :</label>
+            <select id="adminFilterService" style="padding:4px 8px;font-size:11.5px;border:1px solid var(--border);border-radius:6px;" onchange="renderAdminView()">
+              <option value="">Tous les services (S1 à S6)</option>
+              <option value="S1">S1 — Enrôlement FNPSS</option>
+              <option value="S2">S2 — Convention Gouvernement</option>
+              <option value="S3">S3 — Biens à exonérer</option>
+              <option value="S4">S4 — Certificat d'exonérations</option>
+              <option value="S5">S5 — Philanthropie</option>
+              <option value="S6">S6 — Arrêté Ministériel</option>
+            </select>
+            <label for="adminFilterStatus" style="font-size:12px;font-weight:600;">Statut :</label>
+            <select id="adminFilterStatus" style="padding:4px 8px;font-size:11.5px;border:1px solid var(--border);border-radius:6px;" onchange="renderAdminView()">
+              <option value="">Tous les statuts</option>
+              <option value="SOUMIS">SOUMIS (Frais à vérifier)</option>
+              <option value="EN_COURS_INSTRUCTION">EN_COURS_INSTRUCTION (SLA actif)</option>
+              <option value="COMPLEMENT_REQUIS">COMPLEMENT_REQUIS</option>
+              <option value="VALIDE_DELIVRE">VALIDE_DELIVRE (Scellé)</option>
+              <option value="REVOQUE">REVOQUE (Annulé)</option>
+            </select>
+          </div>
         </div>
         <table>
           <thead>
@@ -1785,49 +1808,119 @@
       showToast(`Demande ${app.ref} retirée avec succès.`);
     }
 
-    function renderAdminView() {
-      const tbody = document.getElementById('adminApplicationsTable');
-      tbody.innerHTML = state.applications.map(a => `
-        <tr style="${a.id === selectedAppId ? 'background:#e8f0fe;' : ''}">
-          <td class="mono"><strong>${a.ref}</strong></td>
-          <td>${a.org}</td>
-          <td><strong>${a.serviceCode}</strong></td>
-          <td>${a.paymentValidated ? '✅ Validée' : '🟠 À vérifier'}</td>
-          <td>${a.paymentValidated ? `⏳ J+${a.slaDaysElapsed} / 10j` : 'En attente frais'}</td>
-          <td>${statusBadgeHtml(a.status, a.certStatus)}</td>
-          <td>
-            <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="selectedAppId='${a.id}';renderAdminView();">
-              👁 Ouvrir / Instruire
-            </button>
-          </td>
-        </tr>
-      `).join('');
+    let adminPreviewDoc = null;
 
-      const app = state.applications.find(a => a.id === selectedAppId) || state.applications[0];
+    function previewSubmittedDocument(appId, docCode) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      selectedAppId = appId;
+      const meta = DOCS_METADATA[docCode] || { name: docCode, desc: '' };
+      const attached = (app.attachedDocuments || []).find(d => d.docCode === docCode);
+      const isExempted = docCode === 'P2_ENROLEMENT' && (app.serviceCode !== 'S1');
+      adminPreviewDoc = {
+        appId,
+        docCode,
+        name: meta.name,
+        isOnceOnly: isExempted,
+        fileName: attached?.fileName || `${app.org.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${docCode.toLowerCase()}.pdf`,
+        sha256Hash: attached?.sha256Hash || (app.docHash ? `${app.docHash.slice(0, 24)}...` : '0x4b227777d4dd1fc61c6f884f48641d02e3b0c44298fc1c149afbf4c8996fb924'),
+        sizeBytes: attached?.sizeBytes || 172400,
+        uploadedAt: attached?.uploadedAt || (app.issuedAt || '28/10/2026')
+      };
+      renderAdminView();
+    }
+
+    function renderAdminView() {
+      const serviceFilter = document.getElementById('adminFilterService')?.value || '';
+      const statusFilter = document.getElementById('adminFilterStatus')?.value || '';
+      const filteredApps = state.applications.filter(a => {
+        if (serviceFilter && a.serviceCode !== serviceFilter) return false;
+        if (statusFilter && a.status !== statusFilter) return false;
+        return true;
+      });
+
+      const tbody = document.getElementById('adminApplicationsTable');
+      if (filteredApps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--text-muted);">Aucun dossier ne correspond aux filtres sélectionnés</td></tr>';
+      } else {
+        tbody.innerHTML = filteredApps.map(a => `
+          <tr style="${a.id === selectedAppId ? 'background:#e8f0fe;' : ''}">
+            <td class="mono"><strong>${a.ref}</strong></td>
+            <td>${a.org}</td>
+            <td><strong>${a.serviceCode}</strong></td>
+            <td>${a.paymentValidated ? '✅ Validée (320$)' : '🟠 À vérifier'}</td>
+            <td>${a.paymentValidated ? `⏳ J+${a.slaDaysElapsed} / 10j` : 'En attente frais'}</td>
+            <td>${statusBadgeHtml(a.status, a.certStatus)}</td>
+            <td>
+              <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="selectedAppId='${a.id}';adminPreviewDoc=null;renderAdminView();">
+                👁 Ouvrir / Instruire
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      const app = state.applications.find(a => a.id === selectedAppId) || filteredApps[0] || state.applications[0];
       if (!app) return;
 
       document.getElementById('adminSelectedTitle').textContent = `Dossier ${app.ref} (${app.serviceCode})`;
       document.getElementById('adminSelectedStatus').textContent = app.certStatus === 'REVOKED' ? 'RÉVOQUÉ' : app.status;
-      document.getElementById('previewHashBadge').textContent = app.docHash ? app.docHash.slice(0, 22) + '...' : 'Non scellé';
+      document.getElementById('previewHashBadge').textContent = adminPreviewDoc
+        ? `Pièce : ${adminPreviewDoc.docCode}`
+        : (app.docHash ? app.docHash.slice(0, 22) + '...' : 'Non scellé');
+
+      const requiredDocsList = SERVICE_DOCS[app.serviceCode] || SERVICE_DOCS.S1;
+      const attachedList = app.attachedDocuments || [];
+
+      const slaPercent = Math.min(100, Math.round((app.slaDaysElapsed / 10) * 100));
+      const slaBarColor = app.slaDaysElapsed >= 8 ? '#d93025' : (app.slaDaysElapsed >= 5 ? '#f59e0b' : '#0d652d');
 
       document.getElementById('adminDecisionPanel').innerHTML = `
         <div style="font-size:13px;margin-bottom:12px;">
           <p><strong>Organisation :</strong> ${app.org}</p>
           <p><strong>Objet / Projet :</strong> ${app.projectTitle}</p>
           <p><strong>Biens / Périmètre :</strong> ${app.goods}</p>
-          <p><strong>Référence Quittance (20$ + 300$) :</strong> <code>${app.paymentRef}</code> ${app.paymentValidated ? '✅' : '🟠'}</p>
-        </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 12px;border-radius:6px;margin-bottom:14px;font-size:12.5px;">
-          <strong>Check-list de recevabilité des 6 pièces (ADM-05) :</strong>
-          <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-            <span>☑ P1. Requête Ministre / DG</span>
-            <span>☑ P2. Attestation d'enrôlement S1</span>
-            <span>☑ P3. Plan d'action annuel</span>
-            <span>☑ P4. Rapport annuel d'activités</span>
-            <span>☑ P5. Projet détaillé & colisage</span>
-            <span>☑ P6. Preuve paiement 320 USD</span>
+          <p><strong>Référence Quittance (20$ + 300$) :</strong> <code>${app.paymentRef}</code> ${app.paymentValidated ? '✅ Validée' : '🟠 En attente contrôle'}</p>
+          
+          <div style="margin-top:8px;padding:8px 10px;background:#f1f5f9;border-radius:6px;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span><strong>⏱️ Compte à rebours réglementaire (SLA 10 jours) :</strong></span>
+              <span><strong>${app.paymentValidated ? `J+${app.slaDaysElapsed} / 10 jours ouvrés` : 'Non démarré'}</strong></span>
+            </div>
+            <div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;">
+              <div style="background:${slaBarColor};width:${app.paymentValidated ? slaPercent : 0}%;height:100%;"></div>
+            </div>
           </div>
         </div>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 12px;border-radius:6px;margin-bottom:14px;font-size:12.5px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>Pièces justificatives du dossier (ADM-05) :</strong>
+            <span style="font-size:11px;color:var(--text-muted);">${attachedList.length} pièce(s) transmise(s)</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${requiredDocsList.map(docCode => {
+              const meta = DOCS_METADATA[docCode] || { name: docCode };
+              const attached = attachedList.find(d => d.docCode === docCode);
+              const isOnceOnly = docCode === 'P2_ENROLEMENT' && (app.serviceCode !== 'S1');
+              return `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#ffffff;border:1px solid #e2e8f0;border-radius:4px;font-size:11.5px;">
+                  <div>
+                    <strong>${meta.name}</strong>
+                    ${isOnceOnly ? '<span class="badge badge-valide" style="font-size:10px;margin-left:4px;">Once-Only</span>' : ''}
+                    <span style="display:block;font-size:10.5px;color:var(--text-muted);">
+                      ${attached ? `${attached.fileName} (${(attached.sizeBytes/1024).toFixed(0)} Ko)` : 'Fichier déposé'}
+                    </span>
+                  </div>
+                  <button class="btn btn-outline" style="padding:3px 8px;font-size:11px;" onclick="previewSubmittedDocument('${app.id}', '${docCode}')">
+                    👁 Examiner
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${!app.paymentValidated ? `
             <button class="btn btn-accent" onclick="validatePayment('${app.id}')">
@@ -1852,6 +1945,46 @@
           ` : ''}
         </div>
       `;
+
+      if (adminPreviewDoc) {
+        document.getElementById('adminPdfPreview').innerHTML = `
+          <div class="pdf-seal-banner" style="background:var(--fnpss-navy);">
+            <h4>INSPECTION DOCUMENTAIRE &bull; CONTROLE DE RECEVABILITE (ADM-05)</h4>
+            <p>Pièce : <strong>${adminPreviewDoc.name}</strong> (${adminPreviewDoc.docCode})</p>
+          </div>
+          <div style="font-size:12px;margin:12px 0;">
+            <p><strong>Fichier :</strong> <code>${adminPreviewDoc.fileName}</code> (${(adminPreviewDoc.sizeBytes / 1024).toFixed(1)} Ko)</p>
+            <p class="mono" style="word-break:break-all;font-size:11px;"><strong>Empreinte SHA-256 :</strong> ${adminPreviewDoc.sha256Hash}</p>
+            <p><strong>Dossier associé :</strong> ${app.ref} &bull; ${app.org}</p>
+          </div>
+          <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;padding:14px;min-height:160px;font-size:12px;line-height:1.5;">
+            <div style="border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:8px;font-weight:700;color:var(--fnpss-navy);">
+              RÉPUBLIQUE DÉMOCRATIQUE DU CONGO &bull; ${adminPreviewDoc.name}
+            </div>
+            ${adminPreviewDoc.docCode === 'P6_QUITTANCE' ? `
+              <p><strong>Banque émettrice :</strong> RAWBANK / EQUITY BCDC (Compte FNPSS Opérations)</p>
+              <p><strong>Montant perçu :</strong> 320 USD (20$ dépôt + 300$ enquête terrain)</p>
+              <p><strong>Référence bordereau :</strong> <code>${app.paymentRef}</code></p>
+              <p><strong>Verdict de conformité :</strong> Empreinte intègre &bull; Montant conforme au tarif réglementaire FNPSS</p>
+            ` : adminPreviewDoc.docCode === 'P2_ENROLEMENT' ? `
+              <p><strong>Attestation d'enrôlement FNPSS :</strong> Certificat biennal N° FNPSS/ENR/2025/0112</p>
+              <p><strong>Bénéficiaire :</strong> ${app.org}</p>
+              <p><strong>Dispositif :</strong> Pièce certifiée conforme réutilisée via le principe « Once-Only »</p>
+            ` : `
+              <p><strong>Projet :</strong> ${app.projectTitle}</p>
+              <p><strong>Description / Biens :</strong> ${app.goods}</p>
+              <p><strong>Statut d'inspection :</strong> Document PDF conforme (%PDF-1.4), aucune macro ou script actif malveillant détecté.</p>
+            `}
+          </div>
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+            <span class="badge badge-valide">✓ Signature binaire %PDF-1.4 vérifiée</span>
+            <button class="btn btn-outline" style="font-size:11.5px;padding:5px 10px;" onclick="adminPreviewDoc=null;renderAdminView();">
+              ← Revenir à l'Acte Officiel Scellé
+            </button>
+          </div>
+        `;
+        return;
+      }
 
       const svc = SERVICES.find(s => s.code === app.serviceCode);
       document.getElementById('adminPdfPreview').innerHTML = `

@@ -161,13 +161,21 @@ export function createGuichetServer({
 
   // Pré-amorçage de 3 dossiers réalistes dans le moteur métier
   const allDocs = ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'];
+  const makeDemoDocs = (docTypes, orgSlug) => docTypes.map(docCode => ({
+    docCode,
+    fileName: `${orgSlug}_${docCode.toLowerCase()}.pdf`,
+    sha256Hash: `0x${Buffer.from(`${orgSlug}:${docCode}`).toString('hex').padEnd(64, '0')}`,
+    sizeBytes: 184500,
+    uploadedAt: '2026-10-28T09:15:00.000Z'
+  }));
 
   const app1 = engine.submitApplication(defaultActors.requerant, {
     organizationName: 'ONG Espoir du Nord-Kivu',
     serviceCode: 'S1',
     projectTitle: 'Enrôlement institutionnel biennal 2026-2028',
     goodsSummary: 'Sans objet (Enrôlement structurel)',
-    uploadedDocTypes: allDocs,
+    uploadedDocTypes: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+    attachedDocuments: makeDemoDocs(['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'], 'espoir_goma'),
     paymentReference: 'RAWBANK-CDF-2026-11204'
   });
   engine.validatePaymentAndStartSla(defaultActors.agent, app1.referenceNumber);
@@ -179,6 +187,7 @@ export function createGuichetServer({
     projectTitle: 'Importation de 2 ambulances 4x4 et 500 kits médicaux — Goma',
     goodsSummary: '2 Véhicules Ambulance 4x4 Toyota Land Cruiser, 500 Kits médicaux d\'urgence, 12 Générateurs solaires (148 000 USD)',
     uploadedDocTypes: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+    attachedDocuments: makeDemoDocs(['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'], 'espoir_goma'),
     paymentReference: 'BCDC-CDF-2026-99481',
     hasActiveS1Enrollment: true
   });
@@ -192,6 +201,7 @@ export function createGuichetServer({
     projectTitle: 'Équipements de forage d\'eau potable — Kananga (10 puits)',
     goodsSummary: '2 Camions foreuses hydrauliques, 40 Pompes solaires immergées, tuyauterie PVC (92 500 USD)',
     uploadedDocTypes: allDocs,
+    attachedDocuments: makeDemoDocs(allDocs, 'solidarite_kasai'),
     paymentReference: 'EQUITYBCDC-2026-77319'
   });
 
@@ -270,9 +280,11 @@ export function createGuichetServer({
           }
           return sendJson(res, 200, { application: app });
         }
+        const serviceCode = url.searchParams.get('service') || null;
+        const statusFilter = url.searchParams.get('status') || null;
         const isApplicantView = !demoOpen && requestActor.role === Roles.REQUERANT;
         // Un requérant ne voit que ses propres dossiers et jamais le journal d'audit global (ADM-01).
-        const applications = engine.listApplications()
+        const applications = engine.listApplications({ serviceCode, status: statusFilter })
           .filter(a => !isApplicantView || a.ownerId === requestActor.id)
           .reverse();
         const auditLogs = isApplicantView ? [] : engine.getAuditLogs();

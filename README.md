@@ -45,7 +45,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
   - Matrice d'Accès Rôle/Route (Fail-Closed), Anti-IDOR & Anti-Escalade Serveur (`ADM-01`, `SEC-04`) : [src/security/route-access-policy.mjs](src/security/route-access-policy.mjs)
   - Serveur HTTP, Modes d'Accès Sécurisé/Démo, API REST du moteur & Interopérabilité DGDA (`VER-05`, `ADM-01`) : [src/server.mjs](src/server.mjs)
-- **Suite de Tests Automatisés (20 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`, `REQ-01`..`08`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+- **Suite de Tests Automatisés (21 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`..`05`, `REQ-01`..`08`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
 - **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue & Déploiement Backlog GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/bootstrap-backlog.yml](.github/workflows/bootstrap-backlog.yml)
 
