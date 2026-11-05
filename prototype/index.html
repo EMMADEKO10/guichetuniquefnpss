@@ -387,6 +387,88 @@
       display: none;
       z-index: 999;
     }
+
+    /* Modal Authentification & Gestion Session (REQ-01, REQ-02, REQ-04, REQ-05) */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 37, 64, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .auth-modal-card {
+      background: #ffffff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .auth-modal-header {
+      background: var(--fnpss-navy);
+      color: #ffffff;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .auth-modal-header h3 { font-size: 15px; color: #ffffff; margin: 0; font-weight: 700; }
+    .auth-modal-close {
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .auth-modal-body { padding: 18px; }
+    .auth-tabs {
+      display: flex;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .auth-tab-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12.5px;
+    }
+    .auth-tab-btn.active {
+      color: var(--fnpss-blue);
+      border-bottom: 3px solid var(--fnpss-blue);
+    }
+    .quick-account-btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 9px 12px;
+      margin-bottom: 7px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .quick-account-btn:hover { background: #e8f0fe; border-color: var(--fnpss-accent); }
+    .session-indicator {
+      background: #e6f4ea;
+      border: 1px solid var(--fnpss-green);
+      color: #0d652d;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
@@ -412,6 +494,9 @@
         🟢 Réseau En Ligne (Polygon Amoy)
       </button>
       <span class="wallet-pill" id="walletBadge">Web3Auth: 0x71C...9A4B</span>
+      <button id="authBtn" class="net-pill" style="background:#1a73e8;color:#ffffff;border:none;" onclick="openAuthModal()" title="Gestion de session et authentification (REQ-01, REQ-04)">
+        👤 <span id="authBtnLabel">Connexion</span>
+      </button>
     </div>
   </header>
 
@@ -423,8 +508,8 @@
       <div class="kpi-grid">
         <div class="kpi-box">
           <div class="lbl">ORGANISATION CONNECTÉE</div>
-          <div class="val" style="font-size:16px;margin-top:6px;">ONG Espoir du Nord-Kivu</div>
-          <div class="sub">N° Enrôlement : FNPSS/ENR/2025/0112 • Goma</div>
+          <div class="val" id="kpi-req-org" style="font-size:16px;margin-top:6px;">ONG Espoir du Nord-Kivu</div>
+          <div class="sub" id="kpi-req-sub">N° Enrôlement : FNPSS/ENR/2025/0112 • Goma</div>
         </div>
         <div class="kpi-box">
           <div class="lbl">DEMANDES SOUMISES</div>
@@ -766,6 +851,80 @@
         </table>
       </div>
     </section>
+  
+  <!-- Modal d'Authentification & Gestion de Session (REQ-01, REQ-02, REQ-04) -->
+  <div id="authModalBackdrop" class="modal-backdrop" onclick="handleBackdropClick(event)">
+    <div class="auth-modal-card" onclick="event.stopPropagation()">
+      <div class="auth-modal-header">
+        <h3>Espace Authentification & Profil FNPSS</h3>
+        <button class="auth-modal-close" onclick="closeAuthModal()" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="auth-modal-body">
+        <div id="activeSessionBox" class="session-indicator" style="display:none;">
+          <div style="font-weight:700;" id="activeSessionName">Utilisateur connecté</div>
+          <div style="font-size:11px;" id="activeSessionDetails">Rôle : REQUERANT</div>
+          <div style="margin-top:8px;">
+            <button class="btn btn-outline" style="padding:4px 10px;font-size:11.5px;color:#d93025;border-color:#d93025;" onclick="performLogout()">
+              🚪 Se déconnecter (REQ-04)
+            </button>
+          </div>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab-btn active" id="tabQuickBtn" onclick="switchAuthTab('quick')">1. Comptes Démo (1-Clic)</button>
+          <button class="auth-tab-btn" id="tabLoginBtn" onclick="switchAuthTab('login')">2. Email & Mot de Passe</button>
+          <button class="auth-tab-btn" id="tabRegisterBtn" onclick="switchAuthTab('register')">3. Inscription ONG</button>
+        </div>
+
+        <!-- Onglet 1 : Sélection rapide des profils démo -->
+        <div id="authTabQuick">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+            Sélectionnez un rôle pour vous connecter instantanément avec un jeton sécurisé :
+          </p>
+          <div id="quickAccountsList"></div>
+        </div>
+
+        <!-- Onglet 2 : Connexion par mot de passe -->
+        <div id="authTabLogin" style="display:none;">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;">Adresse Email</label>
+            <input type="email" id="loginEmail" class="form-control" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;" placeholder="contact@espoir-kivu.org" />
+          </div>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;">Mot de Passe</label>
+            <input type="password" id="loginPassword" class="form-control" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;" placeholder="PasswordRDC#2026" />
+          </div>
+          <button class="btn btn-primary" style="width:100%;" onclick="submitLoginPassword()">
+            Se connecter →
+          </button>
+        </div>
+
+        <!-- Onglet 3 : Inscription ONG -->
+        <div id="authTabRegister" style="display:none;">
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;display:block;margin-bottom:2px;font-weight:600;">Nom de l'ONG / Fondation</label>
+            <input type="text" id="regOrgName" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="Ex: Solidarité Kasaï" />
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;display:block;margin-bottom:2px;font-weight:600;">Province d'action</label>
+            <input type="text" id="regProvince" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="Ex: Kasaï-Central (Kananga)" />
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;display:block;margin-bottom:2px;font-weight:600;">Email professionnel</label>
+            <input type="email" id="regEmail" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="direction@ong.cd" />
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12px;display:block;margin-bottom:2px;font-weight:600;">Mot de passe (≥ 8 caractères)</label>
+            <input type="password" id="regPassword" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="PasswordRDC#2026" />
+          </div>
+          <button class="btn btn-primary" style="width:100%;" onclick="submitRegisterOng()">
+            Créer le compte requérant (Web3Auth auto) →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </main>
 
   <div id="toast" class="toast"></div>
@@ -899,7 +1058,7 @@
     async function syncWithBackendApi() {
       if (!isOnline || window.location.protocol === 'file:') return false;
       try {
-        const res = await fetch('/api/applications');
+        const res = await authFetch('/api/applications');
         if (!res.ok) return false;
         const data = await res.json();
         backendConnected = true;
@@ -916,8 +1075,8 @@
         }
         try {
           const [newsRes, notifRes] = await Promise.all([
-            fetch('/api/news'),
-            fetch('/api/notifications?userId=ong-espoir-goma')
+            authFetch('/api/news'),
+            authFetch('/api/notifications?userId=ong-espoir-goma')
           ]);
           if (newsRes.ok) {
             const newsData = await newsRes.json();
@@ -1038,7 +1197,7 @@
         return;
       }
       if (backendConnected && isOnline) {
-        const res = await fetch('/api/applications', {
+        const res = await authFetch('/api/applications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1276,7 +1435,12 @@
 
     function renderServicesCatalog() {
       const grid = document.getElementById('servicesGrid');
-      grid.innerHTML = SERVICES.map(s => `
+      grid.innerHTML = SERVICES.map(s => {
+        const serviceApps = state.applications.filter(a => a.serviceCode === s.code);
+        const totalCount = serviceApps.length;
+        const validCount = serviceApps.filter(a => a.status === 'VALIDE_DELIVRE' && a.certStatus === 'ACTIVE').length;
+        const pendingCount = serviceApps.filter(a => a.status !== 'VALIDE_DELIVRE' && a.status !== 'REJETE').length;
+        return `
         <div class="service-card">
           <div>
             <span class="service-badge">Service ${s.code} ${s.ministry ? '• Contre-seing Ministériel' : '• Acte Direct FNPSS'}</span>
@@ -1284,15 +1448,19 @@
             <p>${s.desc}</p>
           </div>
           <div>
-            <div class="service-meta">
+            <div class="service-meta" style="margin-bottom:6px;">
               💰 <strong>Frais :</strong> 20 USD (dépôt) + 300 USD (enquête) &nbsp;|&nbsp; ⏱️ <strong>Délai :</strong> 10 jours ouvrables
+            </div>
+            <div class="service-meta" style="background:#f0f4f9;border-left:3px solid var(--fnpss-accent);padding:5px 8px;margin-bottom:10px;font-size:11.5px;color:var(--text-main);">
+              📊 <strong>Mes démarches (REQ-05) :</strong> ${totalCount} soumise(s) &nbsp;•&nbsp; <strong style="color:var(--fnpss-green);">${validCount} validée(s)</strong> &nbsp;•&nbsp; ${pendingCount} en instruction
             </div>
             <button class="btn btn-primary" style="width:100%;" onclick="selectServiceForWizard('${s.code}')">
               Commencer par ici (${s.code}) →
             </button>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     function renderRequerantTable() {
@@ -1708,6 +1876,216 @@
         }
       } else {
         showToast(`Inspection locale de ${file.name} (${file.size} octets) effectuée.`);
+      }
+    }
+
+    
+    // =========================================================================
+    // GESTIONNAIRE D'AUTHENTIFICATION & SESSIONS JWT/BEARER (REQ-01..05, ADM-01)
+    // =========================================================================
+    const DEMO_ACCOUNTS = [
+      { role: 'REQUERANT', label: 'ONG Espoir du Nord-Kivu (Requérant)', email: 'contact@espoir-kivu.org', pass: 'PasswordRDC#2026', org: 'ONG Espoir du Nord-Kivu', enr: 'FNPSS/ENR/2025/0112 • Goma', view: 'requerant' },
+      { role: 'AGENT', label: 'Patrick K. (Agent Instructeur FNPSS)', email: 'agent@fnpss.cd', pass: 'PasswordRDC#2026', org: 'FNPSS / Direction des Opérations', enr: 'Agent Matricule AG-012', view: 'admin' },
+      { role: 'CHEF_DIVISION', label: 'Marie M. (Chef de Division FNPSS)', email: 'chef.division@fnpss.cd', pass: 'PasswordRDC#2026', org: 'FNPSS / Division Agréments', enr: 'Chef Div CD-004', view: 'admin' },
+      { role: 'DG', label: 'Jean-Pierre L. (Directeur Général FNPSS)', email: 'dg@fnpss.cd', pass: 'PasswordRDC#2026', org: 'FNPSS / Direction Générale', enr: 'Scellement officiel & Révocation', view: 'admin' },
+      { role: 'MINISTERE', label: 'Point Focal (Ministère Tutelle)', email: 'ministere@tutelle.cd', pass: 'PasswordRDC#2026', org: 'Ministère des Affaires Sociales', enr: 'Contre-seing S2 / S6', view: 'admin' },
+      { role: 'DOUANE', label: 'Inspecteur Douanier (DGDA Frontière)', email: 'douane@dgda.cd', pass: 'PasswordRDC#2026', org: 'DGDA / Sydonia World', enr: 'Inspection QR & PDF', view: 'dgda' },
+      { role: 'ADMIN', label: 'Administrateur FNPSS (Admin Système)', email: 'admin@fnpss.cd', pass: 'PasswordRDC#2026', org: 'FNPSS / DSI & Sécurité', enr: 'Audit, Comptes & Sauvegarde', view: 'blockchain' }
+    ];
+
+    let currentAuthUser = null;
+    let currentAuthToken = null;
+
+    try {
+      currentAuthToken = sessionStorage.getItem('fnpss_session_token');
+      currentAuthUser = JSON.parse(sessionStorage.getItem('fnpss_session_user') || 'null');
+    } catch (_) {}
+
+    function openAuthModal() {
+      renderQuickAccounts();
+      updateAuthUi();
+      document.getElementById('authModalBackdrop').classList.add('open');
+    }
+
+    function closeAuthModal() {
+      document.getElementById('authModalBackdrop').classList.remove('open');
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target.id === 'authModalBackdrop') closeAuthModal();
+    }
+
+    function switchAuthTab(tab) {
+      document.getElementById('tabQuickBtn').classList.toggle('active', tab === 'quick');
+      document.getElementById('tabLoginBtn').classList.toggle('active', tab === 'login');
+      document.getElementById('tabRegisterBtn').classList.toggle('active', tab === 'register');
+      document.getElementById('authTabQuick').style.display = tab === 'quick' ? 'block' : 'none';
+      document.getElementById('authTabLogin').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('authTabRegister').style.display = tab === 'register' ? 'block' : 'none';
+    }
+
+    function renderQuickAccounts() {
+      const container = document.getElementById('quickAccountsList');
+      container.innerHTML = DEMO_ACCOUNTS.map((acc, idx) => `
+        <button class="quick-account-btn" onclick="loginAsDemoAccount(${idx})">
+          <div style="font-weight:700;color:var(--fnpss-navy);">${acc.label}</div>
+          <div style="font-size:11px;color:var(--text-muted);">Email : ${acc.email} • Rôle : ${acc.role}</div>
+        </button>
+      `).join('');
+    }
+
+    async function authFetch(url, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (currentAuthToken && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${currentAuthToken}`;
+      }
+      return fetch(url, { ...options, headers });
+    }
+
+    async function loginAsDemoAccount(index) {
+      const acc = DEMO_ACCOUNTS[index];
+      if (!acc) return;
+      if (backendConnected && isOnline) {
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: acc.email, password: acc.pass })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            currentAuthToken = data.sessionToken;
+            currentAuthUser = data.user;
+            sessionStorage.setItem('fnpss_session_token', currentAuthToken);
+            sessionStorage.setItem('fnpss_session_user', JSON.stringify(currentAuthUser));
+            showToast(`Authentifié en tant que ${acc.label} (Jeton actif)`);
+          } else {
+            // Repli autonome hors ligne
+            currentAuthUser = { email: acc.email, role: acc.role, organizationName: acc.org, enrollmentNumber: acc.enr };
+            showToast(`Mode simulation : session active pour ${acc.label}`);
+          }
+        } catch (_) {
+          currentAuthUser = { email: acc.email, role: acc.role, organizationName: acc.org, enrollmentNumber: acc.enr };
+        }
+      } else {
+        currentAuthUser = { email: acc.email, role: acc.role, organizationName: acc.org, enrollmentNumber: acc.enr };
+        showToast(`Session locale : ${acc.label}`);
+      }
+      updateAuthUi();
+      closeAuthModal();
+      switchView(acc.view);
+      syncWithBackendApi();
+    }
+
+    async function submitLoginPassword() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value.trim();
+      if (!email || !password) {
+        showToast('Veuillez renseigner votre email et mot de passe');
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentAuthToken = data.sessionToken;
+          currentAuthUser = data.user;
+          sessionStorage.setItem('fnpss_session_token', currentAuthToken);
+          sessionStorage.setItem('fnpss_session_user', JSON.stringify(currentAuthUser));
+          showToast(`Bienvenue ${currentAuthUser.firstName || ''} (${currentAuthUser.organizationName || currentAuthUser.email})`);
+          updateAuthUi();
+          closeAuthModal();
+          syncWithBackendApi();
+        } else {
+          showToast(data.error || 'Identifiants invalides');
+        }
+      } catch (err) {
+        showToast('Erreur réseau lors de la connexion');
+      }
+    }
+
+    async function submitRegisterOng() {
+      const organizationName = document.getElementById('regOrgName').value.trim();
+      const province = document.getElementById('regProvince').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const password = document.getElementById('regPassword').value.trim();
+      if (!organizationName || !email || !password || password.length < 8) {
+        showToast('Veuillez remplir tous les champs (mot de passe min 8 caractères)');
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ organizationName, province, email, password, firstName: 'Représentant', lastName: 'Légal' })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Compte créé avec succès ! Connexion en cours...');
+          document.getElementById('loginEmail').value = email;
+          document.getElementById('loginPassword').value = password;
+          switchAuthTab('login');
+          submitLoginPassword();
+        } else {
+          showToast(data.error || 'Erreur lors de la création du compte');
+        }
+      } catch (err) {
+        showToast('Erreur réseau lors de l\'inscription');
+      }
+    }
+
+    async function performLogout() {
+      if (currentAuthToken && backendConnected && isOnline) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentAuthToken}` },
+            body: JSON.stringify({ sessionToken: currentAuthToken })
+          });
+        } catch (_) {}
+      }
+      currentAuthToken = null;
+      currentAuthUser = null;
+      try {
+        sessionStorage.removeItem('fnpss_session_token');
+        sessionStorage.removeItem('fnpss_session_user');
+      } catch (_) {}
+      updateAuthUi();
+      closeAuthModal();
+      showToast('Vous êtes déconnecté(e) du Guichet Unique FNPSS');
+      syncWithBackendApi();
+    }
+
+    function updateAuthUi() {
+      const btn = document.getElementById('authBtnLabel');
+      const box = document.getElementById('activeSessionBox');
+      const nameEl = document.getElementById('activeSessionName');
+      const detailsEl = document.getElementById('activeSessionDetails');
+      const orgEl = document.getElementById('kpi-req-org');
+      const subEl = document.getElementById('kpi-req-sub');
+      const walletBadge = document.getElementById('walletBadge');
+
+      if (currentAuthUser) {
+        if (btn) btn.textContent = currentAuthUser.organizationName ? currentAuthUser.organizationName.slice(0, 18) + '...' : currentAuthUser.email.slice(0, 14);
+        if (box) box.style.display = 'block';
+        if (nameEl) nameEl.textContent = `${currentAuthUser.organizationName || currentAuthUser.email} (${currentAuthUser.role || 'REQUERANT'})`;
+        if (detailsEl) detailsEl.textContent = `Connecté : ${currentAuthUser.email} • ID : ${currentAuthUser.id || 'usr-live'}`;
+        if (orgEl && currentAuthUser.organizationName) orgEl.textContent = currentAuthUser.organizationName;
+        if (subEl) subEl.textContent = currentAuthUser.enrollmentNumber || `Province : ${currentAuthUser.province || 'Kinshasa'}`;
+        if (walletBadge && currentAuthUser.walletAddress) {
+          const w = currentAuthUser.walletAddress;
+          walletBadge.textContent = `Web3Auth: ${w.slice(0, 5)}...${w.slice(-4)}`;
+        }
+      } else {
+        if (btn) btn.textContent = 'Connexion';
+        if (box) box.style.display = 'none';
+        if (orgEl) orgEl.textContent = 'ONG Espoir du Nord-Kivu';
+        if (subEl) subEl.textContent = 'N° Enrôlement : FNPSS/ENR/2025/0112 • Goma';
+        if (walletBadge) walletBadge.textContent = 'Web3Auth: 0x71C...9A4B';
       }
     }
 

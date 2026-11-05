@@ -8,6 +8,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   FNPSS_SERVICES,
@@ -1213,4 +1214,34 @@ test('17. Contrôle d\'accès serveur par rôle et par route, anti-escalade, ant
   assert.ok(autoServer.generatedDemoPassword.length >= 16);
   assert.doesNotThrow(() => autoServer.auth.loginWithEmail({ email: 'dg@fnpss.cd', password: autoServer.generatedDemoPassword }));
   assert.throws(() => autoServer.auth.loginWithEmail({ email: 'dg@fnpss.cd', password: 'PasswordRDC#2026' }), /Identifiants invalides/);
+});
+
+test('18. Raccordement Front-End au Moteur Sécurisé, Modal d\'Authentification & Compteurs Dynamiques S1-S6 (REQ-01, REQ-04, REQ-05)', () => {
+  const html = fs.readFileSync('prototype/index.html', 'utf8');
+
+  // Vérification de la présence des composants HTML du modal d'authentification (REQ-01, REQ-04)
+  assert.ok(html.includes('id="authModalBackdrop"'));
+  assert.ok(html.includes('id="quickAccountsList"'));
+  assert.ok(html.includes('id="tabQuickBtn"'));
+  assert.ok(html.includes('id="tabLoginBtn"'));
+  assert.ok(html.includes('id="tabRegisterBtn"'));
+  assert.ok(html.includes('performLogout()'));
+
+  // Vérification des 7 profils pré-configurés pour la démo
+  for (const role of ['REQUERANT', 'AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'DOUANE', 'ADMIN']) {
+    assert.ok(html.includes(`role: '${role}'`), `Rôle ${role} présent dans la liste démo`);
+  }
+
+  // Vérification du calcul des compteurs par service dans le catalogue (REQ-05)
+  assert.ok(html.includes('Mes démarches (REQ-05) :'));
+  assert.ok(html.includes('serviceApps.length'));
+  assert.ok(html.includes('validCount'));
+
+  // Vérification que les appels fetch utilisent le jeton Authorization Bearer
+  assert.ok(html.includes('authFetch('));
+  assert.ok(html.includes("headers['Authorization'] = `Bearer ${currentAuthToken}`;"));
+
+  // Audit d'accessibilité du prototype enrichi (WCAG AA)
+  const audit = auditPrototypeAccessibility(html);
+  assert.equal(audit.passed, true);
 });
