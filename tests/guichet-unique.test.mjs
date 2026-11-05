@@ -14,7 +14,9 @@ import {
   FNPSS_SERVICES,
   calculateServiceFees,
   validateRequiredDocuments,
-  computeSlaDueDate
+  computeSlaDueDate,
+  REQUIRED_DOCUMENTS_METADATA,
+  getServiceSubmissionConfig
 } from '../src/domain/services-catalog.mjs';
 
 import {
@@ -1242,6 +1244,65 @@ test('18. Raccordement Front-End au Moteur Sécurisé, Modal d\'Authentification
   assert.ok(html.includes("headers['Authorization'] = `Bearer ${currentAuthToken}`;"));
 
   // Audit d'accessibilité du prototype enrichi (WCAG AA)
+  const audit = auditPrototypeAccessibility(html);
+  assert.equal(audit.passed, true);
+});
+
+test('19. Formulaire de Soumission Dynamique S1 à S6, Métadonnées des Pièces P1-P6 & Once-Only (REQ-06)', async () => {
+  // 1. Référentiel des pièces P1 à P6
+  assert.equal(Object.keys(REQUIRED_DOCUMENTS_METADATA).length, 6);
+  assert.equal(REQUIRED_DOCUMENTS_METADATA.P1_REQUETE.code, 'P1_REQUETE');
+  assert.equal(REQUIRED_DOCUMENTS_METADATA.P2_ENROLEMENT.isOnceOnlyEligible, true);
+  assert.equal(REQUIRED_DOCUMENTS_METADATA.P6_QUITTANCE.isOnceOnlyEligible, false);
+
+  // 2. Configuration dynamique pour S6 sans enrôlement préalable S1 (les 6 pièces obligatoires)
+  const configS6Standard = getServiceSubmissionConfig('S6', { hasActiveS1Enrollment: false });
+  assert.equal(configS6Standard.serviceCode, 'S6');
+  assert.equal(configS6Standard.requiresMinistrySignoff, true);
+  assert.equal(configS6Standard.slaBusinessDays, 10);
+  assert.equal(configS6Standard.fees.totalUsd, 320);
+  assert.equal(configS6Standard.documentsChecklist.length, 6);
+  assert.equal(configS6Standard.mandatoryDocsCount, 6);
+  assert.equal(configS6Standard.exemptedDocsCount, 0);
+
+  // 3. Configuration dynamique pour S6 avec principe Once-Only (P2_ENROLEMENT pré-attaché)
+  const configS6OnceOnly = getServiceSubmissionConfig('S6', { hasActiveS1Enrollment: true });
+  assert.equal(configS6OnceOnly.mandatoryDocsCount, 5);
+  assert.equal(configS6OnceOnly.exemptedDocsCount, 1);
+  const p2Item = configS6OnceOnly.documentsChecklist.find(d => d.docCode === 'P2_ENROLEMENT');
+  assert.equal(p2Item.isMandatory, false);
+  assert.equal(p2Item.isExemptedByOnceOnly, true);
+  assert.ok(p2Item.onceOnlyNotice.includes('Once-Only'));
+
+  // 4. Service S1 : ne demande pas P2 (c'est l'enrôlement initial)
+  const configS1 = getServiceSubmissionConfig('S1');
+  assert.equal(configS1.serviceCode, 'S1');
+  assert.equal(configS1.requiresMinistrySignoff, false);
+  assert.equal(configS1.documentsChecklist.length, 5);
+  assert.equal(configS1.documentsChecklist.some(d => d.docCode === 'P2_ENROLEMENT'), false);
+
+  // 5. Route REST GET /api/services/config (Public)
+  const server = createGuichetServer({ accessMode: 'ENFORCED' });
+  const resS6 = await server.dispatch({ method: 'GET', url: '/api/services/config?code=S6&hasActiveS1Enrollment=true' });
+  assert.equal(resS6.status, 200);
+  assert.equal(resS6.json().config.serviceCode, 'S6');
+  assert.equal(resS6.json().config.mandatoryDocsCount, 5);
+  assert.equal(resS6.json().config.fees.totalUsd, 320);
+
+  const resS4 = await server.dispatch({ method: 'GET', url: '/api/services/config?code=S4' });
+  assert.equal(resS4.status, 200);
+  assert.equal(resS4.json().config.serviceCode, 'S4');
+  assert.equal(resS4.json().config.mandatoryDocsCount, 6);
+
+  // 6. Intégration Front-End du formulaire dynamique dans prototype/index.html
+  const html = fs.readFileSync('prototype/index.html', 'utf8');
+  assert.ok(html.includes('DOCS_METADATA'));
+  assert.ok(html.includes('SERVICE_DOCS'));
+  assert.ok(html.includes('/api/services/config'));
+  assert.ok(html.includes('P2_ENROLEMENT'));
+  assert.ok(html.includes('isExemptedByOnceOnly'));
+
+  // Audit d'accessibilité WCAG AA
   const audit = auditPrototypeAccessibility(html);
   assert.equal(audit.passed, true);
 });

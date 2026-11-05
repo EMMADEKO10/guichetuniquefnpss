@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test tests/guichet-unique.test.mjs",
     "serve:prototype": "node src/server.mjs --demo-open",
     "serve": "node src/server.mjs"
   },

@@ -1163,16 +1163,98 @@
       }
     }
 
+    // =========================================================================
+    // REFERENTIEL DES PIECES & CONFIGURATION DYNAMIQUE DES SERVICES (REQ-06)
+    // =========================================================================
+    const DOCS_METADATA = {
+      P1_REQUETE: { name: 'P1. Lettre de requête officielle au Ministre', desc: 'Requête motivée adressée au Ministre de tutelle', onceOnly: false },
+      P2_ENROLEMENT: { name: "P2. Attestation d'enrôlement FNPSS (Service S1)", desc: "Attestation officielle délivrée par le FNPSS en cours de validité (éligible Once-Only)", onceOnly: true },
+      P3_PLAN_ACTION: { name: "P3. Plan d'action annuel ou triennal", desc: "Plan opérationnel précisant objectifs et zones d'intervention", onceOnly: false },
+      P4_RAPPORT: { name: "P4. Rapport annuel d'activités certifié", desc: "Bilan technique et financier de l'exercice précédent", onceOnly: false },
+      P5_PROJET: { name: "P5. Descriptif du projet & Liste des biens / Proforma", desc: "Détail des matériels, intrants humanitaires, ambulances ou colisage", onceOnly: false },
+      P6_QUITTANCE: { name: "P6. Bordereau ou quittance bancaire des frais", desc: "Preuve de versement des 320 USD (20$ dépôt + 300$ enquête)", onceOnly: false }
+    };
+
+    const SERVICE_DOCS = {
+      S1: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+      S2: ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+      S3: ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+      S4: ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+      S5: ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'],
+      S6: ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE']
+    };
+
     function selectServiceForWizard(code) {
       document.getElementById('formServiceCode').value = code;
       updateWizardService();
       document.getElementById('submissionWizard').scrollIntoView({ behavior: 'smooth' });
     }
 
-    function updateWizardService() {
+    async function updateWizardService() {
       const code = document.getElementById('formServiceCode').value;
-      const svc = SERVICES.find(s => s.code === code);
-      document.getElementById('wizardTitle').textContent = `Déposer une nouvelle demande — ${svc.code} : ${svc.title}`;
+      const svc = SERVICES.find(s => s.code === code) || SERVICES[0];
+      const titleEl = document.getElementById('wizardTitle');
+      if (titleEl) {
+        titleEl.textContent = `Déposer une nouvelle demande — ${svc.code} : ${svc.title}`;
+      }
+
+      const hasActiveS1 = Boolean(
+        (currentAuthUser && currentAuthUser.enrollmentNumber) ||
+        state.applications.some(a => a.serviceCode === 'S1' && a.status === 'VALIDE_DELIVRE' && a.certStatus === 'ACTIVE')
+      );
+
+      let config = null;
+      if (backendConnected && isOnline) {
+        try {
+          const res = await authFetch(`/api/services/config?code=${code}&hasActiveS1Enrollment=${hasActiveS1}`);
+          if (res.ok) {
+            const data = await res.json();
+            config = data.config;
+          }
+        } catch (_) {}
+      }
+
+      const docsListEl = document.getElementById('requiredDocsList');
+      if (!docsListEl) return;
+
+      const docCodes = (config && config.documentsChecklist)
+        ? config.documentsChecklist
+        : (SERVICE_DOCS[code] || SERVICE_DOCS.S1).map(docCode => {
+            const meta = DOCS_METADATA[docCode] || { name: docCode, desc: '', onceOnly: false };
+            const isExempted = docCode === 'P2_ENROLEMENT' && hasActiveS1;
+            return {
+              docCode,
+              name: meta.name,
+              description: meta.desc,
+              isMandatory: !isExempted,
+              isExemptedByOnceOnly: isExempted,
+              onceOnlyNotice: isExempted ? 'Pièce attachée automatiquement depuis votre dossier S1 actif (Once-Only)' : null,
+              acceptedFormats: ['application/pdf']
+            };
+          });
+
+      docsListEl.innerHTML = docCodes.map(d => {
+        if (d.isExemptedByOnceOnly) {
+          return `
+            <div class="doc-check-row" style="background:#e6f4ea;border-left:4px solid var(--fnpss-green);padding:8px 10px;margin-bottom:6px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <span style="font-weight:700;color:#0d652d;">✓ [Once-Only] ${d.name}</span>
+                <span style="display:block;font-size:11.5px;color:#137333;">${d.onceOnlyNotice || 'Pièce réutilisée depuis le dossier actif'}</span>
+              </div>
+              <span class="badge badge-valide" style="font-size:11px;">Pré-attaché</span>
+            </div>
+          `;
+        }
+        return `
+          <div class="doc-check-row" style="padding:8px 10px;margin-bottom:6px;background:#f8fafc;border:1px solid var(--border);border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <span style="font-weight:600;color:var(--fnpss-navy);">${d.name}</span>
+              <span style="display:block;font-size:11.5px;color:var(--text-muted);">${d.description || 'Format PDF/A (max 10 Mo)'}</span>
+            </div>
+            <span class="mono" style="font-size:11px;color:var(--text-muted);">PDF obligatoire</span>
+          </div>
+        `;
+      }).join('');
     }
 
     function saveDraftPWA() {
@@ -2096,6 +2178,7 @@
       renderAdminView();
       renderDgdaTable();
       renderBlockchainAndAudit();
+      updateWizardService();
     }
 
     // Initialisation au chargement (synchronisation automatique avec l'API REST si disponible)

@@ -21,6 +21,7 @@ export const ROUTE_POLICY = Object.freeze([
   // Public
   { method: 'GET', path: '/api/health', access: AccessLevel.PUBLIC },
   { method: 'GET', path: '/api/services', access: AccessLevel.PUBLIC },
+  { method: 'GET', path: '/api/services/config', access: AccessLevel.PUBLIC },
   { method: 'GET', path: '/api/news', access: AccessLevel.PUBLIC },
   { method: 'GET', path: '/api/verify', access: AccessLevel.PUBLIC },
   { method: 'POST', path: '/api/verify-pdf', access: AccessLevel.PUBLIC },

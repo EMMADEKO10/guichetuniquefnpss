@@ -28,7 +28,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
 - **Spécification OpenAPI 3.1 d'Interopérabilité DGDA / DGRAD / DGI (`VER-05`) :** [openapi/fnpss-dgda-api.yaml](openapi/fnpss-dgda-api.yaml)
 - **Schéma Base de Données PostgreSQL, Référentiel S1–S6 & Migrations SQL (`OPS-03`) :** [database/schema.sql](database/schema.sql) · [database/seed.sql](database/seed.sql) · [src/database/migration-runner.mjs](src/database/migration-runner.mjs)
 - **Moteur Métier, Authentification, Réconciliation Financière, Notifications, CMS, Cryptographie & Registre On-Chain (`REQ`, `ADM`, `NOT`, `BLK`, `VER`, `GOV`) :**
-  - Catalogue des 6 services, calcul des frais (`20$ + 300$`) et SLA 10 jours ouvrables : [src/domain/services-catalog.mjs](src/domain/services-catalog.mjs)
+  - Catalogue des 6 services, métadonnées des pièces P1-P6, formulaire dynamique & principe Once-Only (`REQ-05`, `REQ-06`, `REQ-10`) : [src/domain/services-catalog.mjs](src/domain/services-catalog.mjs)
   - Moteur de Réconciliation Comptable & Anti-Doublon des Quittances (`GOV-11`, `REQ-10`) : [src/finance/payment-reconciliation.mjs](src/finance/payment-reconciliation.mjs)
   - Revue du Jalon G1, Registre des Décisions D1–D4 & Audit d'Accessibilité WCAG AA du Prototype (`GOV-09`, `UX-05`) : [src/ops/g1-gate-reviewer.mjs](src/ops/g1-gate-reviewer.mjs)
   - Authentification Hybride Web2/Web3Auth, Google OAuth 2.0 & Gestion Profils ONG (`REQ-01`..`04`, `BLK-02`/`03`, `ADM-03`) : [src/auth/auth-service.mjs](src/auth/auth-service.mjs)
@@ -45,7 +45,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
   - Matrice d'Accès Rôle/Route (Fail-Closed), Anti-IDOR & Anti-Escalade Serveur (`ADM-01`, `SEC-04`) : [src/security/route-access-policy.mjs](src/security/route-access-policy.mjs)
   - Serveur HTTP, Modes d'Accès Sécurisé/Démo, API REST du moteur & Interopérabilité DGDA (`VER-05`, `ADM-01`) : [src/server.mjs](src/server.mjs)
-- **Suite de Tests Automatisés (18 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`, `REQ-01`..`05`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+- **Suite de Tests Automatisés (19 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`, `REQ-01`..`06`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
 - **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue & Déploiement Backlog GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/bootstrap-backlog.yml](.github/workflows/bootstrap-backlog.yml)
 

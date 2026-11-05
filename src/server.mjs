@@ -10,7 +10,7 @@ import { Readable } from 'node:stream';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FNPSS_SERVICES, calculateServiceFees } from './domain/services-catalog.mjs';
+import { FNPSS_SERVICES, calculateServiceFees, getServiceSubmissionConfig } from './domain/services-catalog.mjs';
 import { FNPSSRegistryContract } from './blockchain/registry-simulator.mjs';
 import { GuichetUniqueEngine, Roles } from './workflow/application-engine.mjs';
 import { AuthService } from './auth/auth-service.mjs';
@@ -252,6 +252,13 @@ export function createGuichetServer({
             fees: calculateServiceFees(s.code)
           }))
         });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/services/config') {
+        const code = (url.searchParams.get('code') || 'S6').toUpperCase();
+        const hasEnrollment = url.searchParams.get('hasActiveS1Enrollment') === 'true';
+        const config = getServiceSubmissionConfig(code, { hasActiveS1Enrollment: hasEnrollment });
+        return sendJson(res, 200, { config });
       }
 
       if (req.method === 'GET' && url.pathname === '/api/applications') {

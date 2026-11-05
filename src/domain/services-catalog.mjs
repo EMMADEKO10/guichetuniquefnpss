@@ -4,6 +4,57 @@
  * Références Backlog : REQ-05, REQ-06, REQ-10, GOV-04, GOV-11.
  */
 
+export const REQUIRED_DOCUMENTS_METADATA = Object.freeze({
+  P1_REQUETE: {
+    code: 'P1_REQUETE',
+    name: 'Lettre de requête officielle au Ministre',
+    description: 'Requête motivée adressée à Son Excellence Madame/Monsieur le Ministre des Affaires Sociales, Actions Humanitaires & Solidarité Nationale.',
+    acceptedFormats: ['application/pdf'],
+    isOnceOnlyEligible: false,
+    maxSizeBytes: 10 * 1024 * 1024
+  },
+  P2_ENROLEMENT: {
+    code: 'P2_ENROLEMENT',
+    name: "Attestation d'enrôlement FNPSS (Service S1)",
+    description: "Attestation officielle délivrée par le FNPSS en cours de validité. Éligible au principe « Once-Only ».",
+    acceptedFormats: ['application/pdf'],
+    isOnceOnlyEligible: true,
+    maxSizeBytes: 10 * 1024 * 1024
+  },
+  P3_PLAN_ACTION: {
+    code: 'P3_PLAN_ACTION',
+    name: "Plan d'action annuel ou triennal",
+    description: "Document opérationnel précisant les objectifs, zones géographiques d'intervention et budget d'exécution.",
+    acceptedFormats: ['application/pdf'],
+    isOnceOnlyEligible: false,
+    maxSizeBytes: 10 * 1024 * 1024
+  },
+  P4_RAPPORT: {
+    code: 'P4_RAPPORT',
+    name: "Rapport annuel d'activités certifié",
+    description: "Bilan des réalisations techniques et financières de l'exercice précédent signé par les instances dirigeantes.",
+    acceptedFormats: ['application/pdf'],
+    isOnceOnlyEligible: false,
+    maxSizeBytes: 10 * 1024 * 1024
+  },
+  P5_PROJET: {
+    code: 'P5_PROJET',
+    name: "Descriptif du projet & Liste des biens / Facture proforma",
+    description: "Détail des matériels, intrants humanitaires, véhicules ou équipements avec devis estimatif ou proforma.",
+    acceptedFormats: ['application/pdf'],
+    isOnceOnlyEligible: false,
+    maxSizeBytes: 10 * 1024 * 1024
+  },
+  P6_QUITTANCE: {
+    code: 'P6_QUITTANCE',
+    name: 'Bordereau ou quittance bancaire des frais',
+    description: 'Preuve de versement des 320 USD (20 USD frais de dépôt + 300 USD frais d\'enquête) sur les comptes agréés FNPSS.',
+    acceptedFormats: ['application/pdf'],
+    isOnceOnlyEligible: false,
+    maxSizeBytes: 10 * 1024 * 1024
+  }
+});
+
 export const FNPSS_SERVICES = Object.freeze({
   S1: {
     code: 'S1',
@@ -135,3 +186,43 @@ export function computeSlaDueDate(paymentValidatedDate, businessDays = 10, holid
   return current;
 }
 
+/**
+ * Génère la configuration dynamique d'un formulaire de soumission par service (REQ-06).
+ */
+export function getServiceSubmissionConfig(serviceCode, {
+  hasActiveS1Enrollment = false,
+  exchangeRateCdfPerUsd = 2850
+} = {}) {
+  const service = FNPSS_SERVICES[serviceCode];
+  if (!service) {
+    throw new Error(`Service FNPSS inconnu : ${serviceCode}`);
+  }
+
+  const fees = calculateServiceFees(serviceCode, exchangeRateCdfPerUsd);
+  const checklist = service.requiredDocs.map(docCode => {
+    const meta = REQUIRED_DOCUMENTS_METADATA[docCode];
+    const isExemptedByOnceOnly = docCode === 'P2_ENROLEMENT' && hasActiveS1Enrollment;
+    return {
+      docCode,
+      name: meta ? meta.name : docCode,
+      description: meta ? meta.description : '',
+      isMandatory: !isExemptedByOnceOnly,
+      isExemptedByOnceOnly,
+      onceOnlyNotice: isExemptedByOnceOnly ? 'Pièce attachée automatiquement depuis votre dossier S1 actif (Once-Only)' : null,
+      acceptedFormats: meta ? meta.acceptedFormats : ['application/pdf']
+    };
+  });
+
+  return {
+    serviceCode: service.code,
+    prefix: service.prefix,
+    title: service.title,
+    requiresMinistrySignoff: service.requiresMinistrySignoff,
+    slaBusinessDays: service.slaBusinessDays,
+    slaNotice: `Délai réglementaire de traitement : ${service.slaBusinessDays} jours ouvrables après validation de la quittance.`,
+    fees,
+    documentsChecklist: checklist,
+    mandatoryDocsCount: checklist.filter(d => d.isMandatory).length,
+    exemptedDocsCount: checklist.filter(d => d.isExemptedByOnceOnly).length
+  };
+}
