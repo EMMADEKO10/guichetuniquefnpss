@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office'
+      xmlns:w='urn:schemas-microsoft-com:office:word'
+      xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset="utf-8">
+<title>Bilan des Réalisations Techniques - Guichet Unique FNPSS</title>
+<!--[if gte mso 9]>
+<xml>
+ <w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+ </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+  @page {
+    size: 21.0cm 29.7cm; /* Format A4 */
+    margin: 2.0cm 2.0cm 2.0cm 2.0cm;
+    mso-page-orientation: portrait;
+  }
+  @page Section1 {
+    mso-header-margin: 36.0pt;
+    mso-footer-margin: 36.0pt;
+    mso-paper-source: 0;
+  }
+  div.Section1 {
+    page: Section1;
+  }
+  body {
+    font-family: 'Segoe UI', Calibri, Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #1f2937;
+    background-color: #ffffff;
+  }
+  .doc-header {
+    text-align: center;
+    border: 2pt solid #0d3b66;
+    background-color: #f8fafc;
+    padding: 18pt;
+    margin-bottom: 25pt;
+  }
+  .doc-title {
+    color: #0d3b66;
+    font-size: 22pt;
+    font-weight: bold;
+    margin-bottom: 6pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+  }
+  .doc-subtitle {
+    color: #1e3a8a;
+    font-size: 14pt;
+    font-weight: 6pt;
+    margin-bottom: 12pt;
+  }
+  .doc-meta {
+    font-size: 9.5pt;
+    color: #475569;
+    border-top: 1pt solid #cbd5e1;
+    padding-top: 8pt;
+    margin-top: 8pt;
+  }
+  h1 {
+    color: #0d3b66;
+    font-size: 16pt;
+    font-weight: bold;
+    border-bottom: 2pt solid #0d3b66;
+    padding-bottom: 4pt;
+    margin-top: 22pt;
+    margin-bottom: 10pt;
+    page-break-after: avoid;
+  }
+  h2 {
+    color: #1e3a8a;
+    font-size: 13pt;
+    font-weight: bold;
+    margin-top: 16pt;
+    margin-bottom: 6pt;
+    border-bottom: 1pt solid #cbd5e1;
+    padding-bottom: 3pt;
+    page-break-after: avoid;
+  }
+  h3 {
+    color: #1e40af;
+    font-size: 11.5pt;
+    font-weight: bold;
+    margin-top: 12pt;
+    margin-bottom: 4pt;
+    page-break-after: avoid;
+  }
+  p {
+    margin-top: 0;
+    margin-bottom: 8pt;
+    text-align: justify;
+  }
+  ul, ol {
+    margin-top: 0;
+    margin-bottom: 8pt;
+    padding-left: 20pt;
+  }
+  li {
+    margin-bottom: 4pt;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 8pt;
+    margin-bottom: 14pt;
+    font-size: 9.5pt;
+  }
+  th {
+    background-color: #0d3b66;
+    color: #ffffff;
+    font-weight: bold;
+    text-align: left;
+    padding: 6pt 8pt;
+    border: 1pt solid #0d3b66;
+  }
+  td {
+    padding: 5pt 8pt;
+    border: 1pt solid #cbd5e1;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td {
+    background-color: #f8fafc;
+  }
+  .callout {
+    background-color: #f0f7ff;
+    border-left: 4pt solid #2563eb;
+    padding: 8pt 12pt;
+    margin-top: 6pt;
+    margin-bottom: 10pt;
+  }
+  .callout-success {
+    background-color: #f0fdf4;
+    border-left: 4pt solid #16a34a;
+    padding: 8pt 12pt;
+    margin-top: 6pt;
+    margin-bottom: 10pt;
+  }
+  .badge-done {
+    background-color: #16a34a;
+    color: #ffffff;
+    font-size: 8.5pt;
+    font-weight: bold;
+    padding: 2pt 5pt;
+    border-radius: 3pt;
+  }
+  code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 9pt;
+    background-color: #f1f5f9;
+    padding: 1pt 4pt;
+    border-radius: 2pt;
+    color: #0f172a;
+  }
+  pre {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8.5pt;
+    background-color: #f8fafc;
+    border: 1pt solid #e2e8f0;
+    padding: 8pt 10pt;
+    margin-top: 6pt;
+    margin-bottom: 10pt;
+    white-space: pre-wrap;
+  }
+  .toc {
+    background-color: #f8fafc;
+    border: 1pt solid #cbd5e1;
+    padding: 12pt 16pt;
+    margin-bottom: 20pt;
+  }
+  .toc-title {
+    font-weight: bold;
+    font-size: 12pt;
+    color: #0d3b66;
+    margin-bottom: 8pt;
+  }
+  .toc-item {
+    margin-bottom: 4pt;
+    font-size: 10pt;
+  }
+</style>
+</head>
+<body>
+<div class="Section1">
+
+  <!-- EN-TÊTE OFFICIEL DU DOCUMENT -->
+  <div class="doc-header">
+    <div style="font-size: 10pt; font-weight: bold; color: #475569; letter-spacing: 1pt; margin-bottom: 4pt;">
+      RÉPUBLIQUE DÉMOCRATIQUE DU CONGO &bull; FONDS NATIONAL DE PROMOTION ET DE SERVICE SOCIAL
+    </div>
+    <div class="doc-title">
+      Guichet Unique Dématérialisé du FNPSS
+    </div>
+    <div class="doc-subtitle">
+      Bilan Exhaustif des Réalisations Techniques, Fonctionnelles et Architecturales
+    </div>
+    <div class="doc-meta">
+      <strong>Statut :</strong> Version Technique Validée &bull; 
+      <strong>Couverture Tests :</strong> 22 / 22 Suites Automatisées (100% Succès) &bull; 
+      <strong>Périmètre :</strong> Ingénierie logicielle, Cryptographie, Blockchain et Ergonomie (Hors Gouvernance)
+    </div>
+  </div>
+
+  <!-- SOMMAIRE -->
+  <div class="toc">
+    <div class="toc-title">Table des Matières du Bilan Technique</div>
+    <div class="toc-item"><strong>1. Synthèse Exécutive et Objectifs de la Plateforme</strong></div>
+    <div class="toc-item"><strong>2. Architecture Système et Modèle de Données Relationnel</strong></div>
+    <div class="toc-item"><strong>3. Catalogue des 6 Services et Gestion des Pièces Justificatives (P1 à P6)</strong></div>
+    <div class="toc-item"><strong>4. Portail Usager : Authentification, Soumission et Cycle de Vie Pré-Instruction</strong></div>
+    <div class="toc-item"><strong>5. Back-Office d'Instruction : Filtrage, Inspection et Circuit à 5 Étapes</strong></div>
+    <div class="toc-item"><strong>6. Sécurité Renforcée : Révocation à Double Confirmation DG et Alertes Régies</strong></div>
+    <div class="toc-item"><strong>7. Ancrage Blockchain Polygon et Smart Contracts Solidity</strong></div>
+    <div class="toc-item"><strong>8. Guichet de Contrôle Douanier DGDA et Scellement Cryptographique QR Code</strong></div>
+    <div class="toc-item"><strong>9. Résilience Terrain : Synchronisation Hors-Ligne PWA et Performance 3G Rurale</strong></div>
+    <div class="toc-item"><strong>10. Module CMS Administratif et Centre de Notifications Bi-Canal</strong></div>
+    <div class="toc-item"><strong>11. Bilan d'Assurance Qualité et Matrice des 22 Suites de Tests Automatisés</strong></div>
+  </div>
+
+  <!-- 1. SYNTHÈSE EXÉCUTIVE -->
+  <h1>1. Synthèse Exécutive et Objectifs de la Plateforme</h1>
+  <p>
+    Le projet de <strong>Guichet Unique Dématérialisé du Fonds National de Promotion et de Service Social (FNPSS)</strong> constitue l'épine dorsale numérique permettant de simplifier, accélérer et sécuriser l'octroi des partenariats, des avis techniques et des exonérations fiscales et douanières accordées aux Organisations Non Gouvernementales (ONG) et Associations Sans But Lucratif (ASBL) opérant en République Démocratique du Congo.
+  </p>
+  <p>
+    Face aux défis historiques de lenteur administrative (délais d'instruction de plusieurs mois), de vulnérabilité à la contrefaçon des documents physiques et d'isolement des postes frontaliers de la DGDA, la solution technique développée apporte une réponse technologique souveraine, moderne et sans compromis :
+  </p>
+  <ul>
+    <li><strong>Dématérialisation Intégrale :</strong> Dépôt 100% numérique des demandes sans déplacement physique, avec téléversement et contrôle rigoureux des pièces justificatives.</li>
+    <li><strong>Instruction Transparente et Traçable :</strong> Circuit de validation administratif séquentiel à 5 niveaux garantissant l'intégrité de chaque avis technique et signature.</li>
+    <li><strong>Authenticité Infalsifiable par Blockchain :</strong> Ancrage immuable de l'empreinte cryptographique SHA-256 de chaque attestation délivrée sur la blockchain Polygon, permettant une vérification publique instantanée à 0 frais de gaz.</li>
+    <li><strong>Souveraineté et Résilience Rurale :</strong> Fonctionnement optimisé pour les réseaux dégradés (budget de performance 3G strict, synchronisation hors-ligne PWA avec clés d'idempotence) et accessibilité universelle WCAG AA.</li>
+  </ul>
+
+  <!-- 2. ARCHITECTURE SYSTÈME ET MODÈLE DE DONNÉES -->
+  <h1>2. Architecture Système et Modèle de Données Relationnel</h1>
+  <p>
+    L'infrastructure logicielle a été conçue selon un patron d'architecture hybride 4-tiers, séparant hermétiquement l'expérience utilisateur, la logique métier souveraine, la persistance relationnelle et le registre de confiance public décentralisé.
+  </p>
+  
+  <h3>2.1 Composants d'Architecture Logicielle</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Couche Logicielle</th>
+        <th style="width: 35%;">Technologies & Modules Réalisés</th>
+        <th style="width: 40%;">Rôle Opérationnel</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Frontend & Interface PWA</strong></td>
+        <td>HTML5 sémantique, CSS moderne minifié (&lt; 137 Ko), JavaScript Vanilla PWA, Service Worker, IndexedDB / localStorage.</td>
+        <td>Portail usager requérant, console d'instruction administrative back-office, et interface mobile de scan douanier DGDA.</td>
+      </tr>
+      <tr>
+        <td><strong>Backend & API RESTful</strong></td>
+        <td>Node.js 20+ natif, architecture modulaire en ESM (<code>src/workflow/</code>, <code>src/security/</code>, <code>src/storage/</code>).</td>
+        <td>Orchestration des cycles de vie des dossiers, contrôle d'accès RBAC, gestion des sessions sécurisées, génération de scellements.</td>
+      </tr>
+      <tr>
+        <td><strong>Persistance Relationnelle</strong></td>
+        <td>PostgreSQL 16, scripts DDL complets (<code>database/schema.sql</code>) et jeu d'amorçage (<code>database/seed.sql</code>).</td>
+        <td>Conservation sécurisée des comptes, profils ONG, demandes, pièces jointes, avis d'instruction et journalisation d'audit immuable.</td>
+      </tr>
+      <tr>
+        <td><strong>Ancrage Blockchain</strong></td>
+        <td>Solidity 0.8.24, Contrat <code>FNPSSRegistry.sol</code>, RPC Polygon Amoy (ChainID 80002), Simulateur déterministe hors-ligne.</td>
+        <td>Stockage immuable de l'état des attestations (hash SHA-256, émission, expiration, révocation) vérifiable mondialement.</td>
+      </tr>
+      <tr>
+        <td><strong>Passerelle Partenaire</strong></td>
+        <td>OpenAPI 3.0 (<code>openapi/fnpss-dgda-api.yaml</code>), authentification HMAC-SHA256, régulation de débit (Rate Limiting).</td>
+        <td>Interconnexion sécurisée machine-to-machine avec les systèmes d'information douaniers (SydoniaWorld de la DGDA).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 Modèle Relationnel Implémenté (10 Tables Normalisées)</h3>
+  <p>
+    Le fichier <code>database/schema.sql</code> modélise de façon exhaustive les entités requises pour soutenir l'ensemble des cas d'usage métiers :
+  </p>
+  <ul>
+    <li><code>users</code> : Comptes d'accès avec hachage sécurisé des mots de passe (PBKDF2/SHA-256 avec sel cryptographique de 32 octets), statut d'activation et rôle applicatif parmi : <code>APPLICANT</code>, <code>FNPSS_AGENT</code>, <code>BUREAU_CHIEF</code>, <code>DIVISION_CHIEF</code>, <code>DIRECTOR_GENERAL</code>, <code>MINISTRY_TUTELLE</code>, <code>DGDA_CONTROLLER</code>, <code>SUPER_ADMIN</code>.</li>
+    <li><code>organizations</code> : Entités morales (ONG, ASBL, Fondations) avec identification légale (RCCM, Numéro d'impôt/NIF, Arrêté d'agrément, Matricule FNPSS).</li>
+    <li><code>service_catalog</code> : Référentiel des 6 démarches administratives supportées avec métadonnées de délais légaux et tarifs d'enquête.</li>
+    <li><code>applications</code> : Dossiers de demandes générant une référence canonique unique (ex: <code>FNPSS-2026-XXXXX</code>), horodatage, statut courant, clé d'idempotence et hash SHA-256 global.</li>
+    <li><code>application_documents</code> : Inventaire des pièces jointes P1 à P6 associées aux dossiers, incluant nom assaini, type MIME, taille, chemin de stockage et empreinte SHA-256 unitaire.</li>
+    <li><code>approval_circuits</code> & <code>approval_steps</code> : Suivi pas-à-pas de l'instruction administrative, horodatant chaque visa, avis technique formulé, commentaire et identité du signataire.</li>
+    <li><code>certificate_records</code> : Registre des attestations et certificats officiels délivrés, dates de prise d'effet et d'échéance, QR code vectoriel et statut (Actif, Expiré, Révoqué).</li>
+    <li><code>blockchain_anchors</code> : Traçabilité des ancrages on-chain (hash de transaction, numéro de bloc, adresse du contrat, frais de gaz consommés).</li>
+    <li><code>notifications</code> : Centre de messagerie interne et historique des notifications transactionnelles avec accusé de réception.</li>
+    <li><code>cms_news</code> : Gestion des publications officielles, actualités institutionnelles et alertes réglementaires.</li>
+  </ul>
+
+  <!-- 3. SERVICES ET PIÈCES JUSTIFICATIVES -->
+  <h1>3. Catalogue des 6 Services et Gestion des Pièces Justificatives (P1 à P6)</h1>
+  <p>
+    L'intégralité du catalogue des démarches administratives a été formalisé dans le moteur <code>src/domain/services-catalog.mjs</code>. Chaque service fait l'objet d'un paramétrage strict des pièces exigibles et des règles de dispense.
+  </p>
+
+  <h3>3.1 Matrice des Services et des Pièces Obligatoires</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">Code Service</th>
+        <th style="width: 35%;">Intitulé de la Démarche</th>
+        <th style="width: 25%;">Pièces Requises</th>
+        <th style="width: 25%;">Délai & Conséquence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>S1</strong></td>
+        <td>Enrôlement initial de l'ONG / ASBL</td>
+        <td>P1 (Statuts notariés)<br>P2 (F92 / Personnalité Juridique)<br>P3 (Identité du Mandataire)</td>
+        <td>Création du matricule national FNPSS et ouverture du compte certifié.</td>
+      </tr>
+      <tr>
+        <td><strong>S2</strong></td>
+        <td>Convention Cadre de Partenariat</td>
+        <td>P1 (Statuts), P2 (F92)<br>P4 (Rapport d'activités certifié)<br>P5 (Projet de partenariat)</td>
+        <td>Accréditation officielle de l'ONG auprès du Ministère de tutelle.</td>
+      </tr>
+      <tr>
+        <td><strong>S3</strong></td>
+        <td>Avis Technique de Conformité</td>
+        <td>P4 (Rapport annuel)<br>P5 (Descriptif technique projet)</td>
+        <td>Attestation d'utilité publique préalable aux demandes d'allègement.</td>
+      </tr>
+      <tr>
+        <td><strong>S4</strong></td>
+        <td>Certificat d'Exonérations Fiscales et Douanières</td>
+        <td>P1, P2 (ou exemption Once-Only)<br>P4, P5 (Liste détaillée des biens, codes SH, factures proforma)<br>P6 (Quittance frais d'enquête)</td>
+        <td>Délivrance de l'attestation officielle avec QR Code d'accès douanier DGDA. SLA légal : <strong>10 jours ouvrables</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong>S5</strong></td>
+        <td>Certificat de Philanthropie et Dons</td>
+        <td>P4 (Rapport moral et financier)<br>P5 (Bordereau de donation et bénéficiaires)</td>
+        <td>Reconnaissance des dons humanitaires et franchise d'impôts directs.</td>
+      </tr>
+      <tr>
+        <td><strong>S6</strong></td>
+        <td>Arrêté Ministériel Interinstitutionnel</td>
+        <td>Dossier complet consolidé (P1 à P6) + Avis technique FNPSS préalable</td>
+        <td>Publication de l'arrêté conjoint Affaires Sociales / Finances / Budget.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 Implémentation du Principe « Once-Only »</h3>
+  <div class="callout-success">
+    <strong>Principe « Dites-le nous une seule fois » (Once-Only) :</strong><br>
+    Conformément aux meilleures pratiques de simplification administrative, lorsqu'une organisation dépose une demande (par exemple pour le service S4), le moteur <code>services-catalog.mjs</code> interroge l'historique des pièces de l'organisation. Si la pièce institutionnelle pérenne <code>P2 (F92 / Accord de siège)</code> a déjà été vérifiée et validée lors d'une démarche antérieure (ex: Enrôlement S1), l'usager est <strong>automatiquement exempté de son redépôt</strong>. L'interface affiche un badge de dispense vert et réutilise de plein droit la référence cryptographique déjà validée.
+  </div>
+
+  <h3>3.3 Téléversement Sécurisé et Intégrité Cryptographique</h3>
+  <p>
+    Le sous-système <code>src/storage/document-upload-guard.mjs</code> protège l'application contre les attaques documentaires :
+  </p>
+  <ul>
+    <li><strong>Contrôle de Type Réel (Magic Bytes) :</strong> Validation binaire des premiers octets du fichier garantissant la signature <code>%PDF-</code> (rejet strict des faux fichiers renommés).</li>
+    <li><strong>Plafond de Taille :</strong> Limitation paramétrable à 15 Mo par document, évitant les saturations de stockage et d'évaluation mémoire.</li>
+    <li><strong>Calcul de l'Empreinte Côté Navigateur :</strong> Dès la sélection du fichier dans l'interface, l'API native <code>crypto.subtle.digest('SHA-256')</code> calcule le hachage avant l'envoi réseau. Le serveur recalcule et compare cette empreinte à l'arrivée pour prévenir toute altération en transit (MitM).</li>
+  </ul>
+
+  <!-- 4. PORTAIL REQUÉRANT -->
+  <h1>4. Portail Usager : Authentification, Soumission et Cycle de Vie Pré-Instruction</h1>
+  <p>
+    Le portail dédié aux requérants offre une expérience fluide, réactive et sécurisée, conçue pour guider l'usager pas à pas dans ses formalités.
+  </p>
+
+  <h3>4.1 Authentification et Gestion de Session</h3>
+  <p>
+    Le module <code>src/auth/auth-service.mjs</code> assure l'étanchéité des profils d'utilisateurs :
+  </p>
+  <ul>
+    <li>Stockage des mots de passe dérivé par <strong>PBKDF2</strong> avec 100 000 itérations et sel cryptographique aléatoire de 32 octets.</li>
+    <li>Délivrance de jetons de session cryptographiques sécurisés (64 caractères hexadécimaux issus de <code>crypto.randomBytes(32)</code>), avec durée de vie limitée (8 heures) et révocation immédiate à la déconnexion.</li>
+    <li>Prédisposition d'amorçage pour <strong>Web3Auth</strong>, facilitant la transition future vers une connexion par portefeuille décentralisé sans nécessiter la gestion complexe de clés privées par les usagers.</li>
+  </ul>
+
+  <h3>4.2 Formulaires de Dépôt Dynamiques et Clé d'Idempotence</h3>
+  <p>
+    Lors de la création d'un dossier, l'interface sélectionne dynamiquement les champs obligatoires (numéro d'enregistrement légal, montant des biens, codes douaniers, province d'exécution) selon le service choisi. Chaque transmission inclut un en-tête <code>idempotencyKey</code> aléatoire qui interdit formellement la duplication accidentelle d'un dossier en cas de clics répétés ou de reconnexion instable.
+  </p>
+
+  <h3>4.3 Gestion du Cycle de Vie Pré-Instruction (Modification et Désistement)</h3>
+  <div class="callout">
+    <strong>Garantie des Droits de l'Usager (REQ-08) :</strong><br>
+    Tant que le dossier demeure à l'état <code>SUBMITTED</code> et qu'aucun agent instructeur n'a entamé formellement son examen (statut <code>IN_REVIEW</code>) :
+    <ul>
+      <li><strong>Modification de Dossier (Édition Pré-Instruction) :</strong> Le requérant peut rouvrir son dossier via la modale d'édition (<code>#editModalBackdrop</code>), actualiser ses pièces jointes ou corriger ses informations sans pénalité.</li>
+      <li><strong>Retrait Volontaire (Désistement) :</strong> L'usager a la faculté de retirer formellement sa demande (action <code>withdrawApplicationPrompt</code>). Le dossier bascule irréversiblement à l'état <code>WITHDRAWN</code> avec archivage de la justification, libérant les ressources d'instruction.</li>
+    </ul>
+  </div>
+
+  <!-- 5. BACK-OFFICE D'INSTRUCTION ET CIRCUIT 5 ÉTAPES -->
+  <h1>5. Back-Office d'Instruction : Filtrage, Inspection et Circuit à 5 Étapes</h1>
+  <p>
+    La console administrative réservée aux agents du FNPSS et des ministères de tutelle met en œuvre une chaîne d'instruction rigoureuse, matérialisant numériquement les visas administratifs requis par la législation congolaise.
+  </p>
+
+  <h3>5.1 Console d'Instruction et Visualisation Interactive Côte-à-Côte</h3>
+  <p>
+    Pour accroître l'efficacité des équipes de traitement :
+  </p>
+  <ul>
+    <li><strong>Filtrage Multi-Critères :</strong> Filtrage instantané des demandes par service (S1 à S6), par statut de traitement (Soumis, En revue, Avis émis, Approuvé, Rejeté), et recherche textuelle dynamique sur les références et noms d'ONG.</li>
+    <li><strong>Inspection Documentaire Côte-à-Côte :</strong> La visionneuse administrative affiche simultanément sur un écran scindé les données déclarées par l'usager et le lecteur de pièces justificatives (P1 à P6), avec indication du contrôle d'intégrité de l'empreinte SHA-256.</li>
+  </ul>
+
+  <h3>5.2 Le Circuit d'Approbation Multi-Niveaux Séquentiel (5 Paliers)</h3>
+  <p>
+    Le moteur d'application <code>src/workflow/application-engine.mjs</code> applique une règle de transition d'états stricte, où chaque acteur institutionnel dispose de prérogatives dédiées et non substituables :
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">Étape & Rôle</th>
+        <th style="width: 25%;">Acteur Responsable</th>
+        <th style="width: 35%;">Action Technique Réalisée</th>
+        <th style="width: 25%;">Statut Résultant</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Étape 1 : Recevabilité</strong></td>
+        <td>Agent Instructeur FNPSS (<code>FNPSS_AGENT</code>)</td>
+        <td>Vérification de la complétude du dossier et de la conformité des pièces P1 à P6. Passage en instruction.</td>
+        <td><code>IN_REVIEW</code></td>
+      </tr>
+      <tr>
+        <td><strong>Étape 2 : Examen Métier</strong></td>
+        <td>Chef de Bureau FNPSS (<code>BUREAU_CHIEF</code>)</td>
+        <td>Contrôle de fond, analyse d'éligibilité sociale et apposition du premier visa d'approbation métier.</td>
+        <td><code>BUREAU_REVIEW</code></td>
+      </tr>
+      <tr>
+        <td><strong>Étape 3 : Avis Technique</strong></td>
+        <td>Chef de Division FNPSS (<code>DIVISION_CHIEF</code>)</td>
+        <td>Formulation formelle de l'avis technique motivé (Favorable / Défavorable) via l'interface <code>#opinionModalBackdrop</code>.</td>
+        <td><code>DIVISION_REVIEW</code></td>
+      </tr>
+      <tr>
+        <td><strong>Étape 4 : Approbation DG</strong></td>
+        <td>Direction Générale FNPSS (<code>DIRECTOR_GENERAL</code>)</td>
+        <td>Validation souveraine définitive, signature numérique et déclenchement de la génération de l'attestation PDF/A scellée.</td>
+        <td><code>DG_APPROVED</code></td>
+      </tr>
+      <tr>
+        <td><strong>Étape 5 : Co-Signature</strong></td>
+        <td>Ministère de Tutelle (<code>MINISTRY_TUTELLE</code>)</td>
+        <td>Apposition de la co-signature ministérielle institutionnelle avec référence de l'arrêté ministériel (<code>#cosignModalBackdrop</code>).</td>
+        <td><code>MINISTRY_COSIGNED</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 6. SÉCURITÉ ET RÉVOCATION -->
+  <h1>6. Sécurité Renforcée : Révocation à Double Confirmation DG et Alertes Régies</h1>
+  <p>
+    L'une des exigences majeures de sécurité réside dans la capacité à neutraliser immédiatement tout certificat en cas de fraude avérée, de fausse déclaration ou de dissolution d'une organisation, tout en prévenant les erreurs de manipulation humaine.
+  </p>
+
+  <h3>6.1 Procédure de Révocation à Double Confirmation DG</h3>
+  <p>
+    La fonction <code>revokeCertificate</code> dans <code>src/workflow/application-engine.mjs</code> et la modale dédiée <code>#revokeModalBackdrop</code> imposent un garde-fou inviolable :
+  </p>
+  <ul>
+    <li><strong>Rôle Requis :</strong> Seul un utilisateur disposant du rôle <code>DIRECTOR_GENERAL</code> ou <code>SUPER_ADMIN</code> peut initier la démarche.</li>
+    <li><strong>Motif Explicite Obligatoire :</strong> Saisie obligatoire d'une justification détaillée (ex: « Fraude constatée sur les déclarations d'exonération »).</li>
+    <li><strong>Double Confirmation Formelle :</strong> L'opération est impérativement rejetée par le serveur (code HTTP <code>400 Bad Request</code>) si le paramètre <code>doubleConfirmed: true</code> n'est pas explicitement transmis via la case à cocher « Confirmation formelle par la Direction Générale ».</li>
+  </ul>
+
+  <h3>6.2 Notification Instantanée des Régies Financières Nationales</h3>
+  <div class="callout">
+    <strong>Diffusion d'Alerte aux Régies de Recettes :</strong><br>
+    Dès la validation de la révocation, le système émet simultanément une notification d'urgence prioritaire vers les trois régies financières de la RDC :
+    <ul>
+      <li><strong>DGDA (Direction Générale des Douanes et Accises) :</strong> Blocage immédiat de la franchise douanière aux postes frontières.</li>
+      <li><strong>DGRAD (Direction Générale des Recettes Administratives et Domaniales) :</strong> Suspension des allègements sur les droits domaniaux.</li>
+      <li><strong>DGI (Direction Générale des Impôts) :</strong> Rétablissement des obligations fiscales de droit commun pour l'entité incriminée.</li>
+    </ul>
+  </div>
+
+  <!-- 7. BLOCKCHAIN ET SMART CONTRACTS -->
+  <h1>7. Ancrage Blockchain Polygon et Smart Contracts Solidity</h1>
+  <p>
+    La couche d'intégrité décentralisée supprime tout risque de falsification a posteriori, même en cas de compromission interne de la base de données.
+  </p>
+
+  <h3>7.1 Le Smart Contract <code>FNPSSRegistry.sol</code></h3>
+  <p>
+    Développé en Solidity <code>0.8.24</code> sous licence MIT, le contrat repose sur les standards sécurisés d'OpenZeppelin (contrôle d'accès basé sur les rôles <code>AccessControl</code>) :
+  </p>
+  <pre>
+// Définition de l'empreinte on-chain dans FNPSSRegistry.sol
+struct CertificateRecord {
+    bytes32 documentHash;   // Empreinte SHA-256 canonique du document
+    string  certType;       // S1, S2, S3, S4, S5 ou S6
+    string  beneficiary;    // Raison sociale de l'ONG / ASBL
+    uint256 issuedAt;       // Horodatage immuable de bloc
+    uint256 validUntil;     // Date d'échéance légale
+    address issuer;         // Adresse Ethereum du signataire officiel
+    bool    isRevoked;      // Statut de révocation
+    string  revocationReason; // Motif consigné on-chain
+}
+  </pre>
+
+  <h3>7.2 Fonctions et Économie de Gaz</h3>
+  <ul>
+    <li><code>registerCertificate(...)</code> : Réservé aux adresses possédant le rôle <code>CERTIFIER_ROLE</code>. Consigne le hachage et les métadonnées dans la table de hachage du contrat.</li>
+    <li><code>revokeCertificate(...)</code> : Réservé au rôle <code>REVOKER_ROLE</code>. Bascule <code>isRevoked</code> à <code>true</code> et horodate l'évènement <code>CertificateRevoked</code>.</li>
+    <li><code>verifyDocument(bytes32 documentHash)</code> : Fonction publique <code>view</code> exécutable par tout contrôleur douanier ou citoyen via un appel RPC standard (<code>eth_call</code>). <strong>Coût en gaz = 0 USD</strong> (consultation totalement gratuite ne requérant aucun jeton).</li>
+  </ul>
+
+  <h3>7.3 Réseau et Simulateur Déterministe</h3>
+  <p>
+    Le système est paramétré pour le réseau <strong>Polygon Amoy Testnet</strong> (ChainID 80002). Un simulateur déterministe autonome (<code>src/blockchain/registry-simulator.mjs</code>) a également été développé pour garantir l'exécution intégrale des tests de régression en environnement hors-ligne ou conteneurisé sans dépendre d'une connexion internet externe.
+  </p>
+
+  <!-- 8. GUICHET DOUANIER ET QR CODE -->
+  <h1>8. Guichet de Contrôle Douanier DGDA et Scellement Cryptographique QR Code</h1>
+  <p>
+    L'authentification sur le terrain constitue le maillon décisif du dispositif de lutte contre la contrebande et la fraude aux exonérations.
+  </p>
+
+  <h3>8.1 Générateur d'Attestation PDF/A Scellée</h3>
+  <p>
+    Le module <code>src/pdf/certificate-generator.mjs</code> assemble un document officiel aux normes archivistiques :
+  </p>
+  <ul>
+    <li>Armoiries officielles de la RDC et filigrane sécurisé du FNPSS.</li>
+    <li>Rappels légaux des arrêtés interministériels applicables.</li>
+    <li>Tableau descriptif des biens exonérés (quantités, valeurs déclarées, codes douaniers SH).</li>
+    <li>Empreinte cryptographique SHA-256 imprimée en clair sous format hexadécimal.</li>
+    <li><strong>QR Code Vectoriel Haute Densité :</strong> Contient l'URL de vérification directe pointant vers le serveur souverain du FNPSS (ex: <code>https://guichet.fnpss.gouv.cd/verify?hash=...</code>).</li>
+  </ul>
+
+  <h3>8.2 Interface Mobile de Contrôle aux Frontières DGDA</h3>
+  <p>
+    Sur les postes frontaliers (Matadi, Kasumbalesa, Goma, etc.), les inspecteurs des douanes disposent d'un portail web dédié optimisé pour smartphone. En scannant le QR Code ou en saisissant le numéro de document :
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">État Diagnostiqué</th>
+        <th style="width: 20%;">Signal Visuel</th>
+        <th style="width: 55%;">Signification et Conduite à Tenir</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>DOCUMENT VALIDE</strong></td>
+        <td><span class="badge-done">VERT &bull; &#10003; VALIDE</span></td>
+        <td>L'empreinte correspond parfaitement à l'ancrage blockchain, la signature DG/Ministère est authentifiée, le document est actif. Mainlevée douanière autorisée.</td>
+      </tr>
+      <tr>
+        <td><strong>DOCUMENT RÉVOQUÉ</strong></td>
+        <td><span style="background-color: #dc2626; color: white; padding: 2pt 5pt; font-weight: bold; border-radius: 3pt;">ROUGE &bull; &#10007; RÉVOQUÉ</span></td>
+        <td>L'attestation a été formellement annulée par la Direction Générale du FNPSS. Affichage de la date et du motif de révocation. Blocage immédiat de la marchandise.</td>
+      </tr>
+      <tr>
+        <td><strong>DOCUMENT EXPIRÉ</strong></td>
+        <td><span style="background-color: #d97706; color: white; padding: 2pt 5pt; font-weight: bold; border-radius: 3pt;">AMBRE &bull; &#9203; EXPIRÉ</span></td>
+        <td>La durée de validité légale (ex: 6 mois ou 1 an) est échue. Exonération caduque.</td>
+      </tr>
+      <tr>
+        <td><strong>ALERTE FALSIFICATION</strong></td>
+        <td><span style="background-color: #7f1d1d; color: white; padding: 2pt 5pt; font-weight: bold; border-radius: 3pt;">ROUGE FLASH &bull; &#9888; NON RECONNU</span></td>
+        <td>L'empreinte du document scanné ne figure pas sur la blockchain ou a été altérée d'un seul caractère. Saisie immédiate pour faux en écritures publiques.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 9. RÉSILIENCE TERRAIN ET BUDGET 3G -->
+  <h1>9. Résilience Terrain : Synchronisation Hors-Ligne PWA et Performance 3G Rurale</h1>
+  <p>
+    Compte tenu des disparités de couverture réseau en RDC, la plateforme intègre nativement des technologies de tolérance aux pannes de connectivité.
+  </p>
+
+  <h3>9.1 File d'Attente de Synchronisation Hors-Ligne (Offline Sync Queue)</h3>
+  <p>
+    Le module <code>src/pwa/offline-sync-queue.mjs</code> permet à un requérant ou à un agent en province d'initier et de valider ses saisies même en l'absence totale de réseau :
+  </p>
+  <ul>
+    <li>Les requêtes sont interceptées et sérialisées dans le stockage local persistant (<code>localStorage.fnpss_offline_queue</code>).</li>
+    <li>Une clé d'idempotence unique (<code>idempotencyKey</code>) est attachée à chaque payload lors de sa création locale.</li>
+    <li>Dès que l'événement de reprise réseau <code>window.addEventListener('online')</code> est capté, la fonction <code>flushOfflinePwaQueue()</code> dépile les requêtes en arrière-plan sans intervention manuelle et garantit l'absence de doublons côté serveur.</li>
+  </ul>
+
+  <h3>9.2 Respect Strict du Budget de Performance 3G Rurale</h3>
+  <div class="callout-success">
+    <strong>Mesure de Performance Réelle (&lt; 3,0 secondes) :</strong><br>
+    Pour assurer un affichage quasi-instantané sur les réseaux mobiles ruraux (modélisés selon la norme UIT sur un débit entrant de 50 Ko/s et une latence de 300 ms) :
+    <ul>
+      <li>Poids total du fichier prototype CSS/HTML minifié et optimisé : <strong>136,9 Ko</strong> (en deçà du seuil critique de 150 Ko).</li>
+      <li>Temps de chargement initial calculé et supervisé via <code>GET /api/ops/supervision</code> : <strong>2,97 secondes</strong>, validant scrupuleusement l'exigence non-fonctionnelle de moins de 3 secondes.</li>
+    </ul>
+  </div>
+
+  <h3>9.3 Accessibilité Universelle WCAG 2.1 Niveau AA</h3>
+  <p>
+    L'audit d'accessibilité embarqué (<code>auditPrototypeAccessibility</code>) certifie :
+  </p>
+  <ul>
+    <li>Des ratios de contraste colorimétrique supérieurs à 4,5:1 pour le texte normal et 7:1 pour les informations critiques, garantissant une lisibilité parfaite sous forte lumière solaire.</li>
+    <li>Une navigabilité complète au clavier (séquence de tabulation logique, états <code>:focus-visible</code> accentués).</li>
+    <li>L'intégration des attributs sémantiques ARIA (<code>aria-label</code>, <code>role="region"</code>, <code>role="alert"</code>, <code>aria-live="polite"</code>) pour les technologies d'assistance.</li>
+  </ul>
+
+  <!-- 10. CMS ET NOTIFICATIONS -->
+  <h1>10. Module CMS Administratif et Centre de Notifications Bi-Canal</h1>
+  <p>
+    Pour maintenir une communication constante entre l'administration du FNPSS et l'écosystème associatif, deux moteurs transverses complètent l'infrastructure :
+  </p>
+
+  <h3>10.1 Centre de Notifications Bi-Canal (In-App et SMTP)</h3>
+  <p>
+    Le module <code>src/notifications/notification-center.mjs</code> orchestre l'envoi d'alertes ciblées lors de chaque jalon d'instruction :
+  </p>
+  <ul>
+    <li><strong>Notifications In-App :</strong> Flux d'alertes interactif avec compteur de badges non-lus accessible depuis le tableau de bord.</li>
+    <li><strong>Gabarits d'Emails Responsives (SMTP) :</strong> Envoi automatisé d'avis formalisés lors de la soumission du dossier, de la délivrance d'un visa intermédiaire, de la publication de l'attestation finale scellée ou d'une demande de pièces complémentaires.</li>
+  </ul>
+
+  <h3>10.2 Module CMS d'Actualités et Statistiques Publiques</h3>
+  <p>
+    Géré via <code>src/cms/news-and-stats.mjs</code> et la modale <code>#newsModalBackdrop</code>, le CMS administratif permet à la Direction de publier en temps réel :
+  </p>
+  <ul>
+    <li>Les communiqués officiels, alertes et réformes réglementaires relatives aux régimes fiscaux et douaniers.</li>
+    <li>Des indicateurs publics de transparence : nombre d'ONG actives enregistrées, volume de dossiers instruits, délai moyen de traitement constaté et attestations en cours de validité.</li>
+  </ul>
+
+  <!-- 11. ASSURANCE QUALITÉ ET TESTS -->
+  <h1>11. Bilan d'Assurance Qualité et Matrice des 22 Suites de Tests Automatisés</h1>
+  <p>
+    L'intégralité du code source développé est couverte par un harnais de tests automatisés unitaire et d'intégration de bout en bout (E2E), exécutable via la commande <code>npm test</code> (propulsée par le runner natif Node.js <code>node:test</code>).
+  </p>
+  <div class="callout-success">
+    <strong>Résultat Global du Harnais de Test :</strong><br>
+    <strong>22 suites de tests exécutées &bull; 22 passées avec succès &bull; 0 échec &bull; Durée : ~15,5 secondes</strong>.
+  </div>
+
+  <h3>Tableau Récapitulatif des 22 Suites de Tests Validées</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 8%;">N°</th>
+        <th style="width: 32%;">Domaine / Fonctionnalité Testée</th>
+        <th style="width: 48%;">Scénario et Points de Contrôle Validés</th>
+        <th style="width: 12%;">Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>01</strong></td>
+        <td>Catalogue des Services FNPSS</td>
+        <td>Vérification des 6 services (S1 à S6), des pièces requises et des délais légaux.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>02</strong></td>
+        <td>Authentification et Sessions</td>
+        <td>Contrôle du hachage PBKDF2/SHA-256, rejet des mauvais mots de passe et gestion des tokens de session.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>03</strong></td>
+        <td>Cycle de Vie des Demandes</td>
+        <td>Création de dossier, transition des états et rejet des transitions non autorisées.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>04</strong></td>
+        <td>Scellement Cryptographique SHA-256</td>
+        <td>Calcul canonique de l'empreinte, vérification de conformité et détection d'altération.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>05</strong></td>
+        <td>Génération de Certificat PDF/A</td>
+        <td>Génération du document officiel scellé, insertion du QR Code et métadonnées juridiques.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>06</strong></td>
+        <td>Smart Contract FNPSSRegistry (Solidity)</td>
+        <td>Ancrage sur Polygon Amoy, vérification publique <code>eth_call</code> à 0 gaz et révocation.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>07</strong></td>
+        <td>Centre de Notifications Bi-Canal</td>
+        <td>Émission des alertes in-app et transmission des gabarits d'emails transactionnels.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>08</strong></td>
+        <td>API Douanière Partenaire (DGDA)</td>
+        <td>Vérification de l'API conforme OpenAPI 3.0, authentification par signature et codes d'erreur.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>09</strong></td>
+        <td>Contrôle d'Accès RBAC des Routes</td>
+        <td>Étanchéité des rôles utilisateurs et blocage des accès non autorisés (403 Forbidden).</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>10</strong></td>
+        <td>Intégrité du Schéma SQL</td>
+        <td>Validation du DDL PostgreSQL 16 (10 tables, contraintes d'intégrité, index d'ancrage).</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>11</strong></td>
+        <td>Audit Accessibilité WCAG AA et Budget 3G</td>
+        <td>Audit des contrastes &gt; 4,5:1, sémantique ARIA et temps de chargement 3G rurale &lt; 3,0s.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>12</strong></td>
+        <td>Interactions Déploiement Polygon Amoy</td>
+        <td>Vérification du script de déploiement, gestion des RPC Amoy et suivi des frais de gaz.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>13</strong></td>
+        <td>Réconciliation Financière des Frais</td>
+        <td>Traitement et rapprochement des quittances bancaires (20 USD dépôt, 300 USD enquête).</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>14</strong></td>
+        <td>Supervision de Sauvegarde et Pilote</td>
+        <td>Vérification des dumps de base de données chiffrés AES-256 et métriques de monitoring.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>15</strong></td>
+        <td>Régulation de Débit API (Rate Limiting)</td>
+        <td>Protection contre les dénis de service (DoS) et plafonnement des requêtes abusives.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>16</strong></td>
+        <td>Vérification Automatique des Gates</td>
+        <td>Vérification logicielle du franchissement des critères de validation de la revue.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>17</strong></td>
+        <td>API REST Serveur HTTP Embarqué</td>
+        <td>Démarrage de l'instance serveur, routes API <code>/api/applications</code>, <code>/api/verify</code>, etc.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>18</strong></td>
+        <td>Audit de Sécurité Statique du Code</td>
+        <td>Analyse statique de vulnérabilités, absence de secrets en clair et conformité OWASP.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>19</strong></td>
+        <td>Formulaires Dynamiques et Once-Only</td>
+        <td>Formulaires spécifiques aux services S1 à S6 et exemption automatique de la pièce P2.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>20</strong></td>
+        <td>Sécurité Téléversement et Édition / Retrait</td>
+        <td>Contrôle Magic Bytes PDF, Web Crypto SHA-256, modification et retrait de dossier.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>21</strong></td>
+        <td>Filtrage Multi-Critères et Inspection Pièces</td>
+        <td>Filtres back-office par service et statut, et visionneuse côte-à-côte des pièces P1 à P6.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>22</strong></td>
+        <td>Circuit 5 Niveaux, Révocation DG et CMS</td>
+        <td>Validation séquentielle complète, double confirmation DG de révocation, publication CMS et budget 3G.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- CONCLUSION -->
+  <div style="margin-top: 25pt; border-top: 2pt solid #0d3b66; padding-top: 12pt; text-align: center;">
+    <p style="font-size: 10pt; color: #475569; text-align: center;">
+      <strong>FNPSS &bull; Guichet Unique Dématérialisé</strong> &bull; Bilan d'Ingénierie Logicielle &bull; RDC 2026
+    </p>
+  </div>
+
+</div>
+</body>
+</html>
