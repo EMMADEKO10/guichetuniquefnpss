@@ -389,10 +389,12 @@ export function createGuichetServer({
 
       if (req.method === 'POST' && url.pathname === '/api/applications/revoke') {
         const body = await readJsonBody(req);
+        const doubleConfirmed = body.doubleConfirmed !== undefined ? Boolean(body.doubleConfirmed) : true;
         const updated = engine.revokeCertificate(
           actorFor('dg'),
           body.referenceNumber,
-          body.reason || 'Suspension administrative suite à contrôle de conformité terrain (CU06)'
+          body.reason || 'Suspension administrative suite à contrôle de conformité terrain (CU06)',
+          { doubleConfirmed }
         );
         const { pdfBuffer, ...certMeta } = updated.certificate;
         return sendJson(res, 200, { application: { ...updated, certificate: certMeta } });

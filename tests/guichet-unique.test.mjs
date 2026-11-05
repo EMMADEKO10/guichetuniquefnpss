@@ -1551,3 +1551,189 @@ test('21. Fiche d\'Instruction Instructeur & Filtrage des Demandes (ADM-04) & Vi
   const audit = auditPrototypeAccessibility(html);
   assert.equal(audit.passed, true);
 });
+
+test('22. Circuit d\'Approbation Multi-Niveaux Chef de Division & Ministère (ADM-08, ADM-06), Double Confirmation de Révocation (VER-06) & Publication CMS (REQ-13, ADM-10)', async () => {
+  const PW = 'PasswordRDC#2026';
+  const server = createGuichetServer({ accessMode: 'ENFORCED', demoPassword: PW });
+
+  // 1. Authentification des acteurs par rôle
+  const loginAs = async (email, password = PW) => {
+    const res = await server.dispatch({
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { email, password }
+    });
+    assert.equal(res.status, 200);
+    return {
+      authorization: `Bearer ${res.json().sessionToken}`,
+      'content-type': 'application/json'
+    };
+  };
+
+  const requerantH = await loginAs('contact@espoir-kivu.org');
+  const agentH = await loginAs('agent@fnpss.cd');
+  const divChiefH = await loginAs('chef.division@fnpss.cd');
+  const dgH = await loginAs('dg@fnpss.cd');
+  const minH = await loginAs('ministere@tutelle.cd');
+  const adminH = await loginAs('admin@fnpss.cd');
+
+  // 2. Dépôt d'un dossier S6 par le requérant
+  const submitRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications',
+    headers: requerantH,
+    body: {
+      serviceCode: 'S6',
+      projectTitle: 'Cliniques mobiles Bukavu 2026',
+      goodsSummary: '2 Ambulances tout-terrain et consommables médicaux',
+      paymentReference: 'RAWBANK-BUKAVU-2026-004',
+      attachedDocuments: [
+        { docCode: 'P1_REQUETE', fileName: 'p1_requete.pdf', sha256Hash: '0x' + '11'.repeat(32), sizeBytes: 15400 },
+        { docCode: 'P2_ENROLEMENT', fileName: 'p2_enrolement.pdf', sha256Hash: '0x' + '22'.repeat(32), sizeBytes: 25400 },
+        { docCode: 'P3_PLAN_ACTION', fileName: 'p3_plan.pdf', sha256Hash: '0x' + '33'.repeat(32), sizeBytes: 35400 },
+        { docCode: 'P4_RAPPORT', fileName: 'p4_rapport.pdf', sha256Hash: '0x' + '44'.repeat(32), sizeBytes: 45400 },
+        { docCode: 'P5_PROJET', fileName: 'p5_projet.pdf', sha256Hash: '0x' + '55'.repeat(32), sizeBytes: 55400 },
+        { docCode: 'P6_QUITTANCE', fileName: 'p6_quittance.pdf', sha256Hash: '0x' + '66'.repeat(32), sizeBytes: 65400 }
+      ]
+    }
+  });
+  assert.equal(submitRes.status, 201);
+  const ref = submitRes.json().application.referenceNumber;
+
+  // 3. Validation de la quittance par l'Agent FNPSS (démarrage du SLA 10 jours)
+  const valPayRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/validate-payment',
+    headers: agentH,
+    body: { referenceNumber: ref }
+  });
+  assert.equal(valPayRes.status, 200);
+  assert.equal(valPayRes.json().application.paymentValidated, true);
+  assert.equal(valPayRes.json().application.status, 'EN_COURS_INSTRUCTION');
+
+  // 4. Circuit multi-niveaux : Émission de l'avis technique favorable par le Chef de Division (ADM-08)
+  const divOpinionRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/division-opinion',
+    headers: divChiefH,
+    body: {
+      referenceNumber: ref,
+      favorable: true,
+      opinionNote: 'Conformité totale aux exigences d\'exonération humanitaire 2026'
+    }
+  });
+  assert.equal(divOpinionRes.status, 200);
+  assert.equal(divOpinionRes.json().application.divisionOpinion.favorable, true);
+  assert.equal(divOpinionRes.json().application.divisionOpinion.opinionNote, 'Conformité totale aux exigences d\'exonération humanitaire 2026');
+
+  // 5. Approbation finale et scellement Blockchain par la Direction Générale (DG)
+  const sealRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/approve-seal',
+    headers: dgH,
+    body: { referenceNumber: ref }
+  });
+  assert.equal(sealRes.status, 200);
+  assert.equal(sealRes.json().application.status, 'VALIDE_DELIVRE');
+  assert.ok(sealRes.json().application.certificate.docHash);
+
+  // 6. Contre-seing / Co-signature par le Ministère de Tutelle (ADM-06 / D1)
+  const cosignRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/cosign-ministry',
+    headers: minH,
+    body: {
+      referenceNumber: ref,
+      ministryReference: 'CAB/MIN-AS/2026/089'
+    }
+  });
+  assert.equal(cosignRes.status, 200);
+  const cosignedApp = cosignRes.json().application;
+  assert.equal(cosignedApp.ministryCoSigned, true);
+  assert.equal(cosignedApp.ministryReference, 'CAB/MIN-AS/2026/089');
+  assert.equal(cosignedApp.approvalSteps.length, 5); // Dépôt -> Paiement -> Chef Division -> DG -> Ministère
+
+  // 7. Double confirmation de révocation (VER-06)
+  // Rejet si doubleConfirmed est false
+  const unconfirmedRevoke = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/revoke',
+    headers: dgH,
+    body: {
+      referenceNumber: ref,
+      reason: 'Suspension administrative',
+      doubleConfirmed: false
+    }
+  });
+  assert.equal(unconfirmedRevoke.status, 400);
+  assert.match(unconfirmedRevoke.json().error, /double confirmation/i);
+
+  // Révocation effective avec doubleConfirmed = true
+  const confirmedRevoke = await server.dispatch({
+    method: 'POST',
+    url: '/api/applications/revoke',
+    headers: dgH,
+    body: {
+      referenceNumber: ref,
+      reason: 'Irrégularité documentaire constatée sur le terrain par la commission conjointe',
+      doubleConfirmed: true
+    }
+  });
+  assert.equal(confirmedRevoke.status, 200);
+  const revokedApp = confirmedRevoke.json().application;
+  assert.equal(revokedApp.status, 'REVOQUE');
+  assert.equal(revokedApp.certificate.status, 'REVOKED');
+  assert.deepEqual(revokedApp.certificate.regiesNotified, ['DGDA', 'DGRAD', 'DGI']);
+
+  // 8. Gestion et diffusion des communiqués officiels CMS (REQ-13, ADM-10)
+  const createNewsRes = await server.dispatch({
+    method: 'POST',
+    url: '/api/news',
+    headers: adminH,
+    body: {
+      title: 'Permanence numérique frontière de Kasumbalesa activée',
+      category: 'INTEROPERABILITE_DOUANE',
+      summary: 'Les inspecteurs douaniers disposent du contrôle cryptographique instantané 24h/24.'
+    }
+  });
+  assert.equal(createNewsRes.status, 201);
+  assert.equal(createNewsRes.json().article.category, 'INTEROPERABILITE_DOUANE');
+
+  // Consultation publique des actualités (accessible sans authentification)
+  const publicNewsRes = await server.dispatch({ method: 'GET', url: '/api/news' });
+  assert.equal(publicNewsRes.status, 200);
+  const articles = publicNewsRes.json().articles;
+  assert.ok(articles.some(a => a.title.includes('Kasumbalesa')));
+
+  // 9. Supervision et Budget 3G (< 3.0s, bundle optimisé) (REQ-12, OPS-06)
+  const supervisionRes = await server.dispatch({
+    method: 'GET',
+    url: '/api/ops/supervision',
+    headers: adminH
+  });
+  assert.equal(supervisionRes.status, 200);
+  const supervision = supervisionRes.json();
+  assert.equal(supervision.req12PerformanceBudget.withinBudget, true);
+  assert.ok(supervision.req12PerformanceBudget.estimated3gLoadSeconds < 3.0);
+
+  // 10. Intégration Front-End dans prototype/index.html (ADM-08, ADM-06, VER-06, REQ-13, REQ-12)
+  const html = fs.readFileSync('prototype/index.html', 'utf8');
+  assert.ok(html.includes('id="opinionModalBackdrop"'));
+  assert.ok(html.includes('id="opinionFavorableSelect"'));
+  assert.ok(html.includes('submitDivisionOpinion('));
+  assert.ok(html.includes('id="cosignModalBackdrop"'));
+  assert.ok(html.includes('id="cosignMinistryRef"'));
+  assert.ok(html.includes('submitMinistryCoSign('));
+  assert.ok(html.includes('id="revokeModalBackdrop"'));
+  assert.ok(html.includes('id="revokeReasonInput"'));
+  assert.ok(html.includes('id="revokeDoubleConfirmCheck"'));
+  assert.ok(html.includes('submitRevokeApplication('));
+  assert.ok(html.includes('id="newsModalBackdrop"'));
+  assert.ok(html.includes('id="newsTitleInput"'));
+  assert.ok(html.includes('submitNewsArticle('));
+  assert.ok(html.includes('3G Optimisé'));
+
+  // Audit d'accessibilité WCAG AA
+  const audit = auditPrototypeAccessibility(html);
+  assert.equal(audit.passed, true);
+});

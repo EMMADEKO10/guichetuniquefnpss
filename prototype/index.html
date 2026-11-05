@@ -19,456 +19,7 @@
       --border: #dadce0;
       --purple-web3: #5e35b1;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg-page);
-      color: var(--text-main);
-      line-height: 1.45;
-    }
-    /* Top DRC Flag Ribbon */
-    .drc-ribbon {
-      height: 5px;
-      background: linear-gradient(90deg, #007fff 0%, #007fff 70%, #f7d618 70%, #f7d618 82%, #ce1021 82%, #ce1021 100%);
-    }
-    header {
-      background: var(--fnpss-navy);
-      color: #fff;
-      padding: 12px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .brand-crest {
-      width: 42px;
-      height: 42px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #007fff, #065a82);
-      border: 2px solid #f7d618;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 14px;
-      letter-spacing: 0.5px;
-    }
-    .brand-title h1 {
-      font-size: 17px;
-      font-weight: 700;
-    }
-    .brand-title p {
-      font-size: 11.5px;
-      color: #b0c4de;
-    }
-    .role-tabs {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .role-tab {
-      background: rgba(255,255,255,0.1);
-      color: #e2e8f0;
-      border: 1px solid rgba(255,255,255,0.2);
-      padding: 7px 13px;
-      border-radius: 6px;
-      font-size: 12.5px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .role-tab:hover { background: rgba(255,255,255,0.2); }
-    .role-tab.active {
-      background: #ffffff;
-      color: var(--fnpss-navy);
-      border-color: #ffffff;
-    }
-    .status-controls {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-    }
-    .net-pill {
-      padding: 5px 10px;
-      border-radius: 999px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      font-size: 11.5px;
-    }
-    .net-online { background: #e6f4ea; color: #137333; }
-    .net-offline { background: #fef7e0; color: #b06000; }
-    .wallet-pill {
-      background: rgba(94,53,177,0.35);
-      border: 1px solid #9575cd;
-      color: #ede7f6;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-family: Consolas, monospace;
-      font-size: 11.5px;
-    }
-
-    main {
-      max-width: 1360px;
-      margin: 20px auto;
-      padding: 0 20px 40px;
-    }
-    .view-section { display: none; }
-    .view-section.active { display: block; }
-
-    /* Cards & Grids */
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 18px 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    }
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #eef0f3;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .card-header h2 {
-      font-size: 16px;
-      color: var(--fnpss-navy);
-    }
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-    .kpi-box {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--fnpss-blue);
-      border-radius: 8px;
-      padding: 13px 16px;
-    }
-    .kpi-box .lbl { font-size: 12px; color: var(--text-muted); font-weight: 600; }
-    .kpi-box .val { font-size: 24px; font-weight: 800; color: var(--fnpss-navy); margin-top: 3px; }
-    .kpi-box .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-    .services-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-      gap: 14px;
-    }
-    .service-card {
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      padding: 16px;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      transition: transform 0.12s, box-shadow 0.12s;
-    }
-    .service-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(6,90,130,0.1);
-      border-color: var(--fnpss-blue);
-    }
-    .service-badge {
-      display: inline-block;
-      background: #e1f5fe;
-      color: var(--fnpss-blue);
-      font-weight: 700;
-      font-size: 11.5px;
-      padding: 3px 8px;
-      border-radius: 4px;
-      margin-bottom: 8px;
-    }
-    .service-card h3 { font-size: 15px; color: var(--fnpss-navy); margin-bottom: 6px; }
-    .service-card p { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; }
-    .service-meta {
-      font-size: 11.5px;
-      background: #f8fafc;
-      padding: 8px 10px;
-      border-radius: 6px;
-      margin-bottom: 12px;
-      border: 1px solid #eef2f6;
-    }
-
-    /* Buttons & Badges */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: opacity 0.15s;
-    }
-    .btn:hover { opacity: 0.92; }
-    .btn-primary { background: var(--fnpss-blue); color: #fff; }
-    .btn-accent { background: var(--fnpss-accent); color: #fff; }
-    .btn-success { background: var(--fnpss-green); color: #fff; }
-    .btn-purple { background: var(--purple-web3); color: #fff; }
-    .btn-danger { background: var(--fnpss-red); color: #fff; }
-    .btn-outline { background: #fff; border-color: var(--border); color: var(--text-main); }
-
-    .badge {
-      display: inline-block;
-      padding: 3px 9px;
-      border-radius: 999px;
-      font-size: 11.5px;
-      font-weight: 700;
-    }
-    .badge-soumis { background: #e8f0fe; color: #1a73e8; }
-    .badge-instruction { background: #fff8e1; color: #e65100; }
-    .badge-complement { background: #fce8e6; color: #d93025; }
-    .badge-valide { background: #e6f4ea; color: #137333; }
-    .badge-revoque { background: #202124; color: #ffffff; }
-
-    /* Tables */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th, td {
-      text-align: left;
-      padding: 10px 12px;
-      border-bottom: 1px solid #eef0f3;
-    }
-    th {
-      background: #f8fafc;
-      color: var(--fnpss-navy);
-      font-weight: 700;
-      font-size: 12px;
-    }
-    tr:hover td { background: #fafbfc; }
-
-    /* Forms */
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 14px;
-      margin-bottom: 14px;
-    }
-    .form-group label {
-      display: block;
-      font-size: 12.5px;
-      font-weight: 600;
-      margin-bottom: 5px;
-      color: var(--fnpss-navy);
-    }
-    .form-group input, .form-group select, .form-group textarea {
-      width: 100%;
-      padding: 8px 11px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 13px;
-      font-family: inherit;
-    }
-    .doc-check-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 9px 12px;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      margin-bottom: 7px;
-      background: #fafbfc;
-      font-size: 12.5px;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .mono {
-      font-family: Consolas, Monaco, monospace;
-      font-size: 11.5px;
-    }
-
-    /* Two-column Admin Split */
-    .admin-split {
-      display: grid;
-      grid-template-columns: 1.05fr 1fr;
-      gap: 16px;
-    }
-    @media (max-width: 960px) {
-      .admin-split { grid-template-columns: 1fr; }
-    }
-    .pdf-preview {
-      border: 2px solid #cbd5e1;
-      border-radius: 8px;
-      background: #fff;
-      padding: 20px;
-      position: relative;
-    }
-    .pdf-seal-banner {
-      text-align: center;
-      border-bottom: 2px double var(--fnpss-navy);
-      padding-bottom: 10px;
-      margin-bottom: 12px;
-    }
-    .pdf-seal-banner h4 { font-size: 13px; letter-spacing: 0.4px; color: var(--fnpss-navy); }
-    .pdf-seal-banner p { font-size: 11px; color: var(--text-muted); }
-
-    /* DGDA Customs Verifier Mobile Frame */
-    .dgda-layout {
-      display: grid;
-      grid-template-columns: 420px 1fr;
-      gap: 22px;
-      align-items: start;
-    }
-    @media (max-width: 920px) {
-      .dgda-layout { grid-template-columns: 1fr; }
-    }
-    .phone-frame {
-      background: #111827;
-      border-radius: 26px;
-      padding: 14px;
-      color: #fff;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.22);
-    }
-    .phone-screen {
-      background: #ffffff;
-      color: #111827;
-      border-radius: 16px;
-      padding: 16px;
-      min-height: 540px;
-    }
-    .verdict-banner {
-      border-radius: 12px;
-      padding: 18px 14px;
-      text-align: center;
-      margin: 12px 0;
-      border: 3px solid transparent;
-    }
-    .verdict-green {
-      background: #e6f4ea;
-      border-color: #137333;
-      color: #0d652d;
-    }
-    .verdict-red {
-      background: #fce8e6;
-      border-color: #d93025;
-      color: #b31412;
-    }
-    .verdict-gray {
-      background: #f1f3f4;
-      border-color: #5f6368;
-      color: #3c4043;
-    }
-    .verdict-banner .v-icon { font-size: 36px; display: block; margin-bottom: 4px; }
-    .verdict-banner .v-title { font-size: 18px; font-weight: 900; letter-spacing: 0.3px; }
-    .verdict-banner .v-sub { font-size: 12.5px; font-weight: 600; margin-top: 4px; }
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: var(--fnpss-navy);
-      color: #fff;
-      padding: 12px 18px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-      display: none;
-      z-index: 999;
-    }
-
-    /* Modal Authentification & Gestion Session (REQ-01, REQ-02, REQ-04, REQ-05) */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(10, 37, 64, 0.72);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 16px;
-    }
-    .modal-backdrop.open { display: flex; }
-    .auth-modal-card {
-      background: #ffffff;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 520px;
-      box-shadow: 0 16px 36px rgba(0,0,0,0.3);
-      border: 1px solid var(--border);
-      overflow: hidden;
-    }
-    .auth-modal-header {
-      background: var(--fnpss-navy);
-      color: #ffffff;
-      padding: 14px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .auth-modal-header h3 { font-size: 15px; color: #ffffff; margin: 0; font-weight: 700; }
-    .auth-modal-close {
-      background: none;
-      border: none;
-      color: #ffffff;
-      font-size: 22px;
-      cursor: pointer;
-      line-height: 1;
-    }
-    .auth-modal-body { padding: 18px; }
-    .auth-tabs {
-      display: flex;
-      border-bottom: 2px solid var(--border);
-      margin-bottom: 16px;
-    }
-    .auth-tab-btn {
-      flex: 1;
-      padding: 8px 12px;
-      background: none;
-      border: none;
-      font-weight: 600;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 12.5px;
-    }
-    .auth-tab-btn.active {
-      color: var(--fnpss-blue);
-      border-bottom: 3px solid var(--fnpss-blue);
-    }
-    .quick-account-btn {
-      display: block;
-      width: 100%;
-      text-align: left;
-      padding: 9px 12px;
-      margin-bottom: 7px;
-      background: #f8fafc;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .quick-account-btn:hover { background: #e8f0fe; border-color: var(--fnpss-accent); }
-    .session-indicator {
-      background: #e6f4ea;
-      border: 1px solid var(--fnpss-green);
-      color: #0d652d;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      margin-bottom: 12px;
-    }
+     *box-sizingborder-boxmargin0padding0bodyfont-family'Segoe UI'Roboto-apple-systemBlinkMacSystemFontsans-serifbackgroundvar(--bg-page)colorvar(--text-main)line-height1.45.drc-ribbonheight5pxbackgroundlinear-gradient(90deg#007fff 0%#007fff 70%#f7d618 70%#f7d618 82%#ce1021 82%#ce1021 100%)headerbackgroundvar(--fnpss-navy)color#fffpadding12px 24pxdisplayflexalign-itemscenterjustify-contentspace-betweenflex-wrapwrapgap12pxbox-shadow0 2px 8px rgba(0000.18).branddisplayflexalign-itemscentergap12px.brand-crestwidth42pxheight42pxborder-radius8pxbackgroundlinear-gradient(135deg#007fff#065a82)border2px solid #f7d618displayflexalign-itemscenterjustify-contentcenterfont-weight800font-size14pxletter-spacing0.5px.brand-title h1font-size17pxfont-weight700.brand-title pfont-size11.5pxcolor#b0c4de.role-tabsdisplayflexgap6pxflex-wrapwrap.role-tabbackgroundrgba(2552552550.1)color#e2e8f0border1px solid rgba(2552552550.2)padding7px 13pxborder-radius6pxfont-size12.5pxfont-weight600cursorpointertransitionall 0.15s.role-tabhoverbackgroundrgba(2552552550.2).role-tab.activebackground#ffffffcolorvar(--fnpss-navy)border-color#ffffff.status-controlsdisplayflexalign-itemscentergap10pxfont-size12px.net-pillpadding5px 10pxborder-radius999pxfont-weight600cursorpointerbordernonefont-size11.5px.net-onlinebackground#e6f4eacolor#137333.net-offlinebackground#fef7e0color#b06000.wallet-pillbackgroundrgba(94531770.35)border1px solid #9575cdcolor#ede7f6padding4px 10pxborder-radius6pxfont-familyConsolasmonospacefont-size11.5pxmainmax-width1360pxmargin20px autopadding0 20px 40px.view-sectiondisplaynone.view-section.activedisplayblock.cardbackgroundvar(--bg-card)border1px solid var(--border)border-radius10pxpadding18px 20pxmargin-bottom16pxbox-shadow0 1px 3px rgba(0000.04).card-headerdisplayflexalign-itemscenterjustify-contentspace-betweenmargin-bottom14pxpadding-bottom10pxborder-bottom1px solid #eef0f3flex-wrapwrapgap8px.card-header h2font-size16pxcolorvar(--fnpss-navy).kpi-griddisplaygridgrid-template-columnsrepeat(auto-fitminmax(210px1fr))gap12pxmargin-bottom18px.kpi-boxbackground#fffborder1px solid var(--border)border-left4px solid var(--fnpss-blue)border-radius8pxpadding13px 16px.kpi-box .lblfont-size12pxcolorvar(--text-muted)font-weight600.kpi-box .valfont-size24pxfont-weight800colorvar(--fnpss-navy)margin-top3px.kpi-box .subfont-size11pxcolorvar(--text-muted)margin-top2px.services-griddisplaygridgrid-template-columnsrepeat(auto-fitminmax(360px1fr))gap14px.service-cardborder1px solid var(--border)border-radius9pxpadding16pxbackground#fffdisplayflexflex-directioncolumnjustify-contentspace-betweentransitiontransform 0.12sbox-shadow 0.12s.service-cardhovertransformtranslateY(-2px)box-shadow0 4px 12px rgba(6901300.1)border-colorvar(--fnpss-blue).service-badgedisplayinline-blockbackground#e1f5fecolorvar(--fnpss-blue)font-weight700font-size11.5pxpadding3px 8pxborder-radius4pxmargin-bottom8px.service-card h3font-size15pxcolorvar(--fnpss-navy)margin-bottom6px.service-card pfont-size12.5pxcolorvar(--text-muted)margin-bottom12px.service-metafont-size11.5pxbackground#f8fafcpadding8px 10pxborder-radius6pxmargin-bottom12pxborder1px solid #eef2f6.btndisplayinline-flexalign-itemscenterjustify-contentcentergap6pxpadding8px 14pxborder-radius6pxfont-size13pxfont-weight600cursorpointerborder1px solid transparenttransitionopacity 0.15s.btnhoveropacity0.92.btn-primarybackgroundvar(--fnpss-blue)color#fff.btn-accentbackgroundvar(--fnpss-accent)color#fff.btn-successbackgroundvar(--fnpss-green)color#fff.btn-purplebackgroundvar(--purple-web3)color#fff.btn-dangerbackgroundvar(--fnpss-red)color#fff.btn-outlinebackground#fffborder-colorvar(--border)colorvar(--text-main).badgedisplayinline-blockpadding3px 9pxborder-radius999pxfont-size11.5pxfont-weight700.badge-soumisbackground#e8f0fecolor#1a73e8.badge-instructionbackground#fff8e1color#e65100.badge-complementbackground#fce8e6color#d93025.badge-validebackground#e6f4eacolor#137333.badge-revoquebackground#202124color#fffffftablewidth100%border-collapsecollapsefont-size13pxthtdtext-alignleftpadding10px 12pxborder-bottom1px solid #eef0f3thbackground#f8fafccolorvar(--fnpss-navy)font-weight700font-size12pxtrhover tdbackground#fafbfc.form-griddisplaygridgrid-template-columnsrepeat(auto-fitminmax(280px1fr))gap14pxmargin-bottom14px.form-group labeldisplayblockfont-size12.5pxfont-weight600margin-bottom5pxcolorvar(--fnpss-navy).form-group input.form-group select.form-group textareawidth100%padding8px 11pxborder1px solid var(--border)border-radius6pxfont-size13pxfont-familyinherit.doc-check-rowdisplayflexalign-itemscenterjustify-contentspace-betweenpadding9px 12pxborder1px solid #e5e7ebborder-radius6pxmargin-bottom7pxbackground#fafbfcfont-size12.5pxgap10pxflex-wrapwrap.monofont-familyConsolasMonacomonospacefont-size11.5px.admin-splitdisplaygridgrid-template-columns1.05fr 1frgap16px@media (max-width960px).admin-splitgrid-template-columns1fr.pdf-previewborder2px solid #cbd5e1border-radius8pxbackground#fffpadding20pxpositionrelative.pdf-seal-bannertext-aligncenterborder-bottom2px double var(--fnpss-navy)padding-bottom10pxmargin-bottom12px.pdf-seal-banner h4font-size13pxletter-spacing0.4pxcolorvar(--fnpss-navy).pdf-seal-banner pfont-size11pxcolorvar(--text-muted).dgda-layoutdisplaygridgrid-template-columns420px 1frgap22pxalign-itemsstart@media (max-width920px).dgda-layoutgrid-template-columns1fr.phone-framebackground#111827border-radius26pxpadding14pxcolor#fffbox-shadow0 12px 28px rgba(0000.22).phone-screenbackground#ffffffcolor#111827border-radius16pxpadding16pxmin-height540px.verdict-bannerborder-radius12pxpadding18px 14pxtext-aligncentermargin12px 0border3px solid transparent.verdict-greenbackground#e6f4eaborder-color#137333color#0d652d.verdict-redbackground#fce8e6border-color#d93025color#b31412.verdict-graybackground#f1f3f4border-color#5f6368color#3c4043.verdict-banner .v-iconfont-size36pxdisplayblockmargin-bottom4px.verdict-banner .v-titlefont-size18pxfont-weight900letter-spacing0.3px.verdict-banner .v-subfont-size12.5pxfont-weight600margin-top4px.toastpositionfixedbottom20pxright20pxbackgroundvar(--fnpss-navy)color#fffpadding12px 18pxborder-radius8pxfont-size13pxfont-weight600box-shadow0 6px 20px rgba(0000.25)displaynonez-index999.modal-backdroppositionfixedinset0backgroundrgba(1037640.72)displaynonealign-itemscenterjustify-contentcenterz-index1000padding16px.modal-backdrop.opendisplayflex.auth-modal-cardbackground#ffffffborder-radius12pxwidth100%max-width520pxbox-shadow0 16px 36px rgba(0000.3)border1px solid var(--border)overflowhidden.auth-modal-headerbackgroundvar(--fnpss-navy)color#ffffffpadding14px 18pxdisplayflexjustify-contentspace-betweenalign-itemscenter.auth-modal-header h3font-size15pxcolor#ffffffmargin0font-weight700.auth-modal-closebackgroundnonebordernonecolor#fffffffont-size22pxcursorpointerline-height1.auth-modal-bodypadding18px.auth-tabsdisplayflexborder-bottom2px solid var(--border)margin-bottom16px.auth-tab-btnflex1padding8px 12pxbackgroundnonebordernonefont-weight600colorvar(--text-muted)cursorpointerfont-size12.5px.auth-tab-btn.activecolorvar(--fnpss-blue)border-bottom3px solid var(--fnpss-blue).quick-account-btndisplayblockwidth100%text-alignleftpadding9px 12pxmargin-bottom7pxbackground#f8fafcborder1px solid var(--border)border-radius6pxfont-size12pxcursorpointertransitionbackground 0.15s.quick-account-btnhoverbackground#e8f0feborder-colorvar(--fnpss-accent).session-indicatorbackground#e6f4eaborder1px solid var(--fnpss-green)color#0d652dpadding8px 12pxborder-radius6pxfont-size12pxmargin-bottom12px
   </style>
 </head>
 <body>
@@ -490,6 +41,9 @@
     </div>
 
     <div class="status-controls">
+      <span class="net-pill" style="background:#e8f0fe;color:#1a73e8;border:1px solid #c2e7ff;font-size:11px;" title="Budget de performance 3G optimisé & chargement rapide < 2.5s (REQ-12, OPS-06)">
+        ⚡ 3G Optimisé (&lt; 2.5s)
+      </span>
       <button id="netBtn" class="net-pill net-online" onclick="toggleNetwork()" title="Simuler une coupure 3G en province (SC-04)">
         🟢 Réseau En Ligne (Polygon Amoy)
       </button>
@@ -574,30 +128,7 @@
             Pièces justificatives exigées (Format PDF/A — Calcul d'empreinte locale SHA-256 à l'ajout) :
           </label>
           <div id="requiredDocsList">
-            <div class="doc-check-row">
-              <span>✅ <strong>P1.</strong> Requête adressée au Ministre de tutelle avec copie au DG FNPSS (<code>requete_ministre_dg.pdf</code>)</span>
-              <span class="mono">SHA-256: 4b227777d4dd1fc61c6f884f48641d02...</span>
-            </div>
-            <div class="doc-check-row">
-              <span>✅ <strong>P2.</strong> Copie de l'attestation d'enrôlement au FNPSS (<code>FNPSS/ENR/2025/0112.pdf</code> — <em>Pré-rempli Once-Only</em>)</span>
-              <span class="mono">SHA-256: e3b0c44298fc1c149afbf4c8996fb924...</span>
-            </div>
-            <div class="doc-check-row">
-              <span>✅ <strong>P3.</strong> Copie du plan d'action pour l'année en cours 2026 (<code>plan_action_2026.pdf</code>)</span>
-              <span class="mono">SHA-256: 8f434346648f6b96df89dda901c5176b...</span>
-            </div>
-            <div class="doc-check-row">
-              <span>✅ <strong>P4.</strong> Copie du rapport annuel d'activités écoulé 2025 (<code>rapport_annuel_2025.pdf</code>)</span>
-              <span class="mono">SHA-256: 2c26b46b68ffc68ff99b453c1d304134...</span>
-            </div>
-            <div class="doc-check-row">
-              <span>✅ <strong>P5.</strong> Projet social/humanitaire détaillé & colisage (<code>descriptif_projet_biens.pdf</code>)</span>
-              <span class="mono">SHA-256: 7f83b1657ff1fc53b92dc18148a1d65d...</span>
-            </div>
-            <div class="doc-check-row">
-              <span>✅ <strong>P6.</strong> Preuve de paiement des frais : 20 USD dépôt + 300 USD enquête (<code>quittance_320usd.pdf</code>)</span>
-              <span class="mono">SHA-256: 9f86d081884c7d659a2feaa0c55ad015...</span>
-            </div>
+            <div class="doc-check-row"><span>⏳ <strong>Chargement du référentiel des pièces justificatives P1 à P6...</strong></span></div>
           </div>
         </div>
 
@@ -675,7 +206,7 @@
         <div class="kpi-box" style="border-left-color: var(--fnpss-gold);">
           <div class="lbl">COMMUNICATION INSTITUTIONNELLE</div>
           <div style="margin-top:6px;">
-            <button class="btn btn-primary" style="font-size:11.5px;padding:6px 10px;" onclick="publishDemoNews()">
+            <button class="btn btn-primary" style="font-size:11.5px;padding:6px 10px;" onclick="openNewsPublishModal()">
               📢 Publier un communiqué FNPSS (ADM-10)
             </button>
           </div>
@@ -979,6 +510,123 @@
     </div>
   </div>
 
+  <!-- Modal d'Avis Technique Chef de Division (ADM-08) -->
+  <div id="opinionModalBackdrop" class="modal-backdrop" onclick="if(event.target===this)closeDivisionOpinionModal()">
+    <div class="auth-modal-card" onclick="event.stopPropagation()">
+      <div class="auth-modal-header">
+        <h3>Avis Technique Chef de Division — <span id="opinionModalRef" class="mono">FNPSS/DEM/...</span></h3>
+        <button class="auth-modal-close" onclick="closeDivisionOpinionModal()" aria-label="Fermer la fenêtre d'avis technique">&times;</button>
+      </div>
+      <div class="auth-modal-body">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+          Circuit d'approbation multi-niveaux (<strong>ADM-08</strong>) : Le Chef de Division émet un avis motivé après examen de conformité des pièces P1 à P6 avant transmission au Directeur Général.
+        </p>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;" for="opinionFavorableSelect">Verdict technique</label>
+          <select id="opinionFavorableSelect" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;">
+            <option value="true">✅ Avis Favorable (Recommandé pour scellement DG)</option>
+            <option value="false">⚠️ Avis Réservé (Réserves techniques à lever)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;" for="opinionNoteText">Note d'instruction technique</label>
+          <textarea id="opinionNoteText" rows="3" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="Ex: Dossier complet et conforme au programme annuel 2026. Avis favorable pour délivrance de l'acte officiel."></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button class="btn btn-outline" style="padding:6px 12px;" onclick="closeDivisionOpinionModal()">Annuler</button>
+          <button class="btn btn-primary" style="padding:6px 14px;" onclick="submitDivisionOpinion()">Signer l'Avis Technique (ADM-08) →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Co-signature Ministérielle (ADM-06 / D1) -->
+  <div id="cosignModalBackdrop" class="modal-backdrop" onclick="if(event.target===this)closeMinistryCoSignModal()">
+    <div class="auth-modal-card" onclick="event.stopPropagation()">
+      <div class="auth-modal-header">
+        <h3>Co-signature Ministère de Tutelle — <span id="cosignModalRef" class="mono">FNPSS/DEM/...</span></h3>
+        <button class="auth-modal-close" onclick="closeMinistryCoSignModal()" aria-label="Fermer la fenêtre de co-signature">&times;</button>
+      </div>
+      <div class="auth-modal-body">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+          Décision <strong>D1</strong> & Règle <strong>ADM-06</strong> : Co-signature par le Point Focal du Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale avec ancrage de la preuve sur le Smart Contract Polygon.
+        </p>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;" for="cosignMinistryRef">Référence Cabinet Ministériel (Arrêté ou Note conjointe)</label>
+          <input type="text" id="cosignMinistryRef" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="CAB/MIN-AS/2026/044" />
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button class="btn btn-outline" style="padding:6px 12px;" onclick="closeMinistryCoSignModal()">Annuler</button>
+          <button class="btn btn-purple" style="padding:6px 14px;" onclick="submitMinistryCoSign()">Apposer le Contre-seing On-Chain (D1) →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Double Confirmation de Révocation (VER-06 / CU06) -->
+  <div id="revokeModalBackdrop" class="modal-backdrop" onclick="if(event.target===this)closeRevokeModal()">
+    <div class="auth-modal-card" onclick="event.stopPropagation()">
+      <div class="auth-modal-header" style="background:#fef2f2;border-bottom-color:#fecaca;">
+        <h3 style="color:#991b1b;">Double Confirmation de Révocation — <span id="revokeModalRef" class="mono">FNPSS/DEM/...</span></h3>
+        <button class="auth-modal-close" onclick="closeRevokeModal()" aria-label="Fermer la fenêtre de confirmation de révocation">&times;</button>
+      </div>
+      <div class="auth-modal-body">
+        <div style="background:#fff1f2;border-left:4px solid #e11d48;padding:10px 12px;margin-bottom:12px;border-radius:4px;font-size:11.5px;color:#881337;">
+          <strong>ATTENTION (VER-06) :</strong> La révocation d'un acte officiel sur la Blockchain Polygon est <strong>irréversible</strong>. Les régies financières (<strong>DGDA, DGRAD, DGI</strong>) et les postes frontaliers recevront l'alerte d'invalidation en temps réel.
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;" for="revokeReasonInput">Motif légal de suspension ou révocation (Obligatoire)</label>
+          <textarea id="revokeReasonInput" rows="3" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="Ex: Irrégularité constatée lors du contrôle de destination en province par la commission conjointe."></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label style="font-size:12px;display:flex;align-items:flex-start;gap:8px;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="revokeDoubleConfirmCheck" style="margin-top:2px;" />
+            <span>Je confirme en qualité de Directeur Général l'invalidation définitive de cet acte administratif et l'alerte immédiate des régies financières (VER-06).</span>
+          </label>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button class="btn btn-outline" style="padding:6px 12px;" onclick="closeRevokeModal()">Annuler</button>
+          <button class="btn btn-danger" style="padding:6px 14px;" onclick="submitRevokeApplication()">⛔ Révoquer Définitivement sur Polygon →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Publication d'Actualités FNPSS (REQ-13 / ADM-10) -->
+  <div id="newsModalBackdrop" class="modal-backdrop" onclick="if(event.target===this)closeNewsPublishModal()">
+    <div class="auth-modal-card" onclick="event.stopPropagation()">
+      <div class="auth-modal-header">
+        <h3>Publier un Communiqué Officiel FNPSS (ADM-10)</h3>
+        <button class="auth-modal-close" onclick="closeNewsPublishModal()" aria-label="Fermer la fenêtre de publication">&times;</button>
+      </div>
+      <div class="auth-modal-body">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+          Diffusez des actualités institutionnelles et avis réglementaires (<strong>REQ-13</strong>) visibles instantanément par les requérants sur le portail et les postes frontaliers.
+        </p>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;" for="newsTitleInput">Titre du communiqué</label>
+          <input type="text" id="newsTitleInput" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="Ex: Permanence douanière numérique 24h/24 activée" />
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;" for="newsCategorySelect">Catégorie</label>
+          <select id="newsCategorySelect" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;">
+            <option value="COMMUNIQUE_OFFICIEL">Communiqué Officiel</option>
+            <option value="INSTRUCTION_ADMINISTRATIVE">Instruction Administrative</option>
+            <option value="INTEROPERABILITE_DOUANE">Interopérabilité Douane (DGDA/DGRAD/DGI)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="font-size:12px;display:block;margin-bottom:4px;font-weight:600;" for="newsSummaryInput">Résumé / Message de diffusion</label>
+          <textarea id="newsSummaryInput" rows="3" class="form-control" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" placeholder="Ex: Les postes frontaliers de Kasumbalesa, Matadi et Goma disposent désormais du vérificateur d'intégrité PDF VER-04 en temps réel."></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button class="btn btn-outline" style="padding:6px 12px;" onclick="closeNewsPublishModal()">Annuler</button>
+          <button class="btn btn-primary" style="padding:6px 14px;" onclick="submitNewsArticle()">Diffuser le Communiqué (ADM-10) →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </main>
 
   <div id="toast" class="toast"></div>
@@ -1037,7 +685,10 @@
           certStatus: 'ACTIVE',
           issuedAt: '02/11/2026',
           expiresAt: '02/11/2027',
-          revocationReason: ''
+          revocationReason: '',
+          divisionOpinion: { favorable: true, opinionNote: "Dossier complet et conforme au programme annuel 2026. Avis favorable pour délivrance.", signedAt: "02/11/2026" },
+          ministryCoSigned: true,
+          ministryReference: 'CAB/MIN-AS/2026/044'
         },
         {
           id: 'DEM-003',
@@ -1056,7 +707,10 @@
           certStatus: 'NONE',
           issuedAt: '',
           expiresAt: '',
-          revocationReason: ''
+          revocationReason: '',
+          divisionOpinion: null,
+          ministryCoSigned: false,
+          ministryReference: ''
         }
       ],
       auditLogs: [
@@ -1105,7 +759,12 @@
         certStatus: cert.status || (cert.docHash ? 'ACTIVE' : 'NONE'),
         issuedAt: cert.issuedAtIso ? new Date(cert.issuedAtIso).toLocaleDateString('fr-FR') : '',
         expiresAt: cert.expiresAtIso ? new Date(cert.expiresAtIso).toLocaleDateString('fr-FR') : 'Illimitée',
-        revocationReason: cert.revocationReason || ''
+        revocationReason: cert.revocationReason || '',
+        divisionOpinion: bApp.divisionOpinion || null,
+        ministryCoSigned: Boolean(bApp.ministryCoSigned),
+        ministryReference: bApp.ministryReference || '',
+        approvalSteps: bApp.approvalSteps || [],
+        attachedDocuments: bApp.attachedDocuments || []
       };
     }
 
@@ -1638,35 +1297,268 @@
       showToast(`Acte ${app.certNumber} généré, scellé sur Polygon et publié avec son QR Code dynamique !`);
     }
 
-    async function revokeCertificate(appId) {
+    let currentOpinionAppId = null;
+    function openDivisionOpinionModal(appId) {
       const app = state.applications.find(a => a.id === appId);
-      if (!app || !app.docHash) return;
+      if (!app) return;
+      currentOpinionAppId = appId;
+      const refEl = document.getElementById('opinionModalRef');
+      if (refEl) refEl.textContent = app.ref;
+      const favEl = document.getElementById('opinionFavorableSelect');
+      if (favEl) favEl.value = app.divisionOpinion ? String(app.divisionOpinion.favorable) : 'true';
+      const noteEl = document.getElementById('opinionNoteText');
+      if (noteEl) noteEl.value = app.divisionOpinion?.opinionNote || 'Dossier complet et conforme aux critères réglementaires. Avis favorable pour délivrance.';
+      const modal = document.getElementById('opinionModalBackdrop');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeDivisionOpinionModal() {
+      const modal = document.getElementById('opinionModalBackdrop');
+      if (modal) modal.classList.remove('open');
+      currentOpinionAppId = null;
+    }
+
+    async function submitDivisionOpinion() {
+      if (!currentOpinionAppId) return;
+      const app = state.applications.find(a => a.id === currentOpinionAppId);
+      if (!app) return;
+      const favorable = document.getElementById('opinionFavorableSelect').value === 'true';
+      const opinionNote = (document.getElementById('opinionNoteText').value || '').trim() || 'Avis technique rendu';
+
       if (backendConnected && isOnline) {
-        const res = await fetch('/api/applications/revoke', {
+        const res = await authFetch('/api/applications/division-opinion', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             referenceNumber: app.ref,
-            reason: 'Suspension administrative suite à contrôle de conformité terrain (CU06)'
+            favorable,
+            opinionNote
           })
         });
         if (res.ok) {
           await syncWithBackendApi();
-          showToast(`Acte ${app.certNumber} RÉVOQUÉ sur le Smart Contract Polygon !`);
+          closeDivisionOpinionModal();
+          showToast(`Avis technique ${favorable ? 'favorable' : 'réservé'} du Chef de Division enregistré pour ${app.ref} (ADM-08) !`);
+          return;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || 'Erreur lors de l\'enregistrement de l\'avis technique');
           return;
         }
       }
+
+      app.divisionOpinion = {
+        favorable,
+        opinionNote,
+        signedAt: new Date().toISOString()
+      };
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'Chef de Division FNPSS (CHEF_DIVISION)',
+        action: favorable ? 'AVIS_FAVORABLE_CHEF_DIVISION' : 'AVIS_RESERVE_CHEF_DIVISION',
+        target: app.ref,
+        detail: `Avis ${favorable ? 'FAVORABLE' : 'RÉSERVÉ'} : ${opinionNote}`
+      });
+      closeDivisionOpinionModal();
+      renderAll();
+      showToast(`Avis Chef de Division enregistré (${favorable ? 'FAVORABLE' : 'RÉSERVÉ'}) pour ${app.ref}.`);
+    }
+
+    let currentCosignAppId = null;
+    function openMinistryCoSignModal(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      currentCosignAppId = appId;
+      const refEl = document.getElementById('cosignModalRef');
+      if (refEl) refEl.textContent = app.ref;
+      const minRefEl = document.getElementById('cosignMinistryRef');
+      if (minRefEl) minRefEl.value = app.ministryReference || 'CAB/MIN-AS/2026/044';
+      const modal = document.getElementById('cosignModalBackdrop');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeMinistryCoSignModal() {
+      const modal = document.getElementById('cosignModalBackdrop');
+      if (modal) modal.classList.remove('open');
+      currentCosignAppId = null;
+    }
+
+    async function submitMinistryCoSign() {
+      if (!currentCosignAppId) return;
+      const app = state.applications.find(a => a.id === currentCosignAppId);
+      if (!app) return;
+      const ministryReference = (document.getElementById('cosignMinistryRef').value || '').trim() || 'CAB/MIN-AS/2026/001';
+
+      if (backendConnected && isOnline) {
+        const res = await authFetch('/api/applications/cosign-ministry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceNumber: app.ref,
+            ministryReference
+          })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          closeMinistryCoSignModal();
+          showToast(`Co-signature ministérielle ${ministryReference} ancrée sur Polygon (ADM-06 / D1) !`);
+          return;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || 'Erreur lors de la co-signature ministérielle');
+          return;
+        }
+      }
+
+      app.ministryCoSigned = true;
+      app.ministryReference = ministryReference;
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'Point Focal Ministère de Tutelle (MINISTERE)',
+        action: 'MINISTRY_COSIGNED_ONCHAIN',
+        target: app.ref,
+        detail: `Co-signature ministérielle D1 enregistrée (Réf: ${ministryReference})`
+      });
+      closeMinistryCoSignModal();
+      renderAll();
+      showToast(`Co-signature ministérielle ${ministryReference} enregistrée.`);
+    }
+
+    let currentRevokeAppId = null;
+    function openRevokeModal(appId) {
+      const app = state.applications.find(a => a.id === appId);
+      if (!app) return;
+      currentRevokeAppId = appId;
+      const refEl = document.getElementById('revokeModalRef');
+      if (refEl) refEl.textContent = app.ref;
+      const reasonEl = document.getElementById('revokeReasonInput');
+      if (reasonEl) reasonEl.value = 'Suspension administrative suite à contrôle de conformité terrain conjointe (CU06)';
+      const checkEl = document.getElementById('revokeDoubleConfirmCheck');
+      if (checkEl) checkEl.checked = false;
+      const modal = document.getElementById('revokeModalBackdrop');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeRevokeModal() {
+      const modal = document.getElementById('revokeModalBackdrop');
+      if (modal) modal.classList.remove('open');
+      currentRevokeAppId = null;
+    }
+
+    async function submitRevokeApplication() {
+      if (!currentRevokeAppId) return;
+      const app = state.applications.find(a => a.id === currentRevokeAppId);
+      if (!app) return;
+      const reason = (document.getElementById('revokeReasonInput').value || '').trim();
+      const confirmed = document.getElementById('revokeDoubleConfirmCheck').checked;
+
+      if (!reason) {
+        showToast('Le motif légal de révocation est obligatoire (VER-06).');
+        return;
+      }
+      if (!confirmed) {
+        showToast('Veuillez cocher la confirmation explicite du Directeur Général (VER-06).');
+        return;
+      }
+
+      if (backendConnected && isOnline) {
+        const res = await authFetch('/api/applications/revoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceNumber: app.ref,
+            reason,
+            doubleConfirmed: true
+          })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          closeRevokeModal();
+          showToast(`Acte ${app.certNumber || app.ref} RÉVOQUÉ sur Polygon. Régies DGDA/DGRAD/DGI alertées (VER-06) !`);
+          return;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || 'Erreur lors de la révocation de l\'acte');
+          return;
+        }
+      }
+
       app.certStatus = 'REVOKED';
-      app.revocationReason = 'Suspension administrative suite à contrôle de conformité terrain (CU06)';
+      app.status = 'REVOQUE';
+      app.revocationReason = reason;
       state.auditLogs.unshift({
         ts: new Date().toLocaleString('fr-FR'),
         actor: 'Jean-Pierre L. (DG FNPSS)',
         action: 'CERTIFICATE_REVOKED_ONCHAIN',
-        target: app.certNumber,
-        detail: `revokeDocument(${app.docHash.slice(0, 18)}...) -> État on-chain passé à REVOKED`
+        target: app.certNumber || app.ref,
+        detail: `revokeDocument(${app.docHash?.slice(0, 18) || ''}...) -> Révocation confirmée. Alertes DGDA, DGRAD, DGI générées.`
       });
+      closeRevokeModal();
       renderAll();
-      showToast(`Acte ${app.certNumber} RÉVOQUÉ sur la blockchain ! Tout scan DGDA affichera désormais la Pastille Rouge.`);
+      showToast(`Acte ${app.certNumber || app.ref} RÉVOQUÉ sur la blockchain ! Tout scan DGDA affichera désormais la Pastille Rouge.`);
+    }
+
+    function revokeCertificate(appId) {
+      openRevokeModal(appId);
+    }
+
+    function openNewsPublishModal() {
+      const modal = document.getElementById('newsModalBackdrop');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeNewsPublishModal() {
+      const modal = document.getElementById('newsModalBackdrop');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function submitNewsArticle() {
+      const title = (document.getElementById('newsTitleInput').value || '').trim();
+      const category = document.getElementById('newsCategorySelect').value || 'COMMUNIQUE_OFFICIEL';
+      const summary = (document.getElementById('newsSummaryInput').value || '').trim();
+
+      if (!title || !summary) {
+        showToast('Le titre et le résumé du communiqué sont obligatoires.');
+        return;
+      }
+
+      if (backendConnected && isOnline) {
+        const res = await authFetch('/api/news', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, summary, category, published: true })
+        });
+        if (res.ok) {
+          await syncWithBackendApi();
+          closeNewsPublishModal();
+          showToast('Communiqué officiel publié par l\'administrateur FNPSS (ADM-10) !');
+          return;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.error || 'Erreur lors de la publication du communiqué');
+          return;
+        }
+      }
+
+      const newArticle = {
+        id: 'NEWS-2026-00' + (state.news.length + 1),
+        title,
+        summary,
+        category,
+        publishedAt: new Date().toLocaleDateString('fr-FR')
+      };
+      state.news.unshift(newArticle);
+      state.auditLogs.unshift({
+        ts: new Date().toLocaleString('fr-FR'),
+        actor: 'Admin FNPSS (ADMIN)',
+        action: 'COMMUNIQUE_PUBLISHED',
+        target: newArticle.id,
+        detail: `Publication du communiqué : "${title}"`
+      });
+      closeNewsPublishModal();
+      renderNewsAndNotifs();
+      renderAuditLogs();
+      showToast('Communiqué officiel publié sur le portail ONG (ADM-10) !');
     }
 
     // Générateur visuel de QR Code SVG déterministe à partir du hash
@@ -1956,6 +1848,39 @@
           </div>
         </div>
 
+        <!-- Circuit d'approbation multi-niveaux ADM-08 & ADM-06 -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <strong style="color:var(--fnpss-navy);">Circuit d'Instruction Multi-Niveaux (ADM-08 / ADM-06) :</strong>
+            <span style="font-size:11px;color:var(--text-muted);">Workflow réglementaire</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span>1. Contrôle financier Quittance (Agent) :</span>
+              <span>${app.paymentValidated ? '<span class="badge badge-valide">✅ Quittance validée</span>' : '<span class="badge badge-soumis">⏳ En attente validation</span>'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span>2. Examen technique (Chef de Division) :</span>
+              <span>${app.divisionOpinion ? (app.divisionOpinion.favorable ? '<span class="badge badge-valide">✅ Avis Favorable</span>' : '<span class="badge badge-revoque">⚠️ Avis Réservé</span>') : '<span class="badge badge-instruction">⏳ En attente avis technique</span>'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span>3. Décision & Scellement Blockchain (Directeur Général) :</span>
+              <span>${app.docHash ? (app.certStatus === 'REVOKED' ? '<span class="badge badge-revoque">⛔ Acte Révoqué</span>' : '<span class="badge badge-valide">✅ Scellé & Signé</span>') : '<span class="badge badge-instruction">⏳ En attente signature DG</span>'}</span>
+            </div>
+            ${['S2', 'S6'].includes(app.serviceCode) ? `
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>4. Contre-seing Ministériel (Tutelle D1/ADM-06) :</span>
+                <span>${app.ministryCoSigned ? `<span class="badge badge-valide">✅ Co-signé (${app.ministryReference || 'CAB/MIN-AS'})</span>` : '<span class="badge badge-instruction">⏳ Requis pour ce service</span>'}</span>
+              </div>
+            ` : ''}
+          </div>
+          ${app.divisionOpinion?.opinionNote ? `
+            <div style="margin-top:6px;padding:6px 8px;background:#ffffff;border:1px dashed #cbd5e1;border-radius:4px;font-size:11px;color:var(--text-muted);">
+              <strong>Note Chef de Division :</strong> ${app.divisionOpinion.opinionNote}
+            </div>
+          ` : ''}
+        </div>
+
         <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 12px;border-radius:6px;margin-bottom:14px;font-size:12.5px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <strong>Pièces justificatives du dossier (ADM-05) :</strong>
@@ -1990,9 +1915,21 @@
               ✅ 1. Valider la Quittance (Démarrer SLA 10j)
             </button>
           ` : ''}
-          <button class="btn btn-purple" onclick="sealAndPublishCertificate('${app.id}')">
-            🔏 ${app.docHash ? 'Re-sceller' : '2. Approuver, Sceller sur Polygon & Publier QR Code'}
-          </button>
+          ${app.paymentValidated && !app.docHash ? `
+            <button class="btn btn-outline" style="border-color:var(--fnpss-blue);color:var(--fnpss-blue);" onclick="openDivisionOpinionModal('${app.id}')">
+              ⚖️ ${app.divisionOpinion ? 'Modifier Avis Chef de Division' : '2. Avis Chef de Division (ADM-08)'}
+            </button>
+          ` : ''}
+          ${app.paymentValidated ? `
+            <button class="btn btn-purple" onclick="sealAndPublishCertificate('${app.id}')">
+              🔏 ${app.docHash ? 'Re-sceller' : '3. Approuver, Sceller sur Polygon & Publier QR Code (DG)'}
+            </button>
+          ` : ''}
+          ${app.docHash && ['S2', 'S6'].includes(app.serviceCode) && !app.ministryCoSigned ? `
+            <button class="btn btn-outline" style="border-color:var(--purple-web3);color:var(--purple-web3);" onclick="openMinistryCoSignModal('${app.id}')">
+              ✍️ 4. Co-signature Ministère de Tutelle (ADM-06)
+            </button>
+          ` : ''}
           <button class="btn btn-outline" onclick="requestComplement('${app.id}')">
             ✉️ Demander Complément
           </button>
@@ -2002,8 +1939,8 @@
             </button>
           ` : ''}
           ${app.docHash && app.certStatus === 'ACTIVE' ? `
-            <button class="btn btn-danger" onclick="revokeCertificate('${app.id}')">
-              ⛔ Révoquer l'Acte On-Chain (CU06)
+            <button class="btn btn-danger" onclick="openRevokeModal('${app.id}')">
+              ⛔ Révoquer l'Acte On-Chain (VER-06)
             </button>
           ` : ''}
         </div>
