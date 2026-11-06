@@ -813,3 +813,4 @@ struct CertificateRecord {
 const outputPath = path.resolve('BILAN_REALISATIONS_TECHNIQUES_FNPSS.doc');
 fs.writeFileSync(outputPath, docContent, 'utf-8');
 console.log('Fichier généré avec succès :', outputPath);
+

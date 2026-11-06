@@ -8,6 +8,7 @@ import { FNPSS_SERVICES, validateRequiredDocuments, computeSlaDueDate } from '..
 import { computeSha256Bytes32, sealOfficialAct } from '../crypto/document-sealer.mjs';
 import { generateOfficialPdfBuffer } from '../pdf/certificate-generator.mjs';
 import { NotificationCenter } from '../notifications/notification-center.mjs';
+import { registrySimulator } from '../blockchain/registry-simulator.mjs';
 
 export const Roles = Object.freeze({
   REQUERANT: 'REQUERANT',
@@ -545,3 +546,9 @@ export class GuichetUniqueEngine {
     return app;
   }
 }
+
+export const applicationEngine = new GuichetUniqueEngine(
+  registrySimulator,
+  '0x2222222222222222222222222222222222222222'
+);
+

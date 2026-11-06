@@ -328,9 +328,45 @@ export class AuthService {
       .map(u => this._sanitizeUser(u));
   }
 
+  registerApplicant({ organizationName, representativeName, email, password }) {
+    const parts = (representativeName || '').trim().split(' ');
+    const firstName = parts[0] || 'Mandataire';
+    const lastName = parts.slice(1).join(' ') || 'FNPSS';
+    const user = this.registerUser({
+      email,
+      password,
+      firstName,
+      lastName,
+      organizationName,
+      role: Roles.REQUERANT
+    });
+    return { success: true, userId: user.id, user };
+  }
+
+  login(email, password) {
+    try {
+      const session = this.loginWithEmail({ email, password });
+      return { success: true, sessionToken: session.sessionToken, user: session.user };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+
   _sanitizeUser(user) {
     const { passwordHash, ...safe } = user;
     return { ...safe };
   }
 }
+
+export const authService = new AuthService();
+// Seed compte de référence
+authService.registerUser({
+  email: 'contact@espoir-kivu.org',
+  password: 'PasswordRDC#2026',
+  firstName: 'Amina',
+  lastName: 'Kahindo',
+  organizationName: 'ONG Espoir du Nord-Kivu',
+  role: Roles.REQUERANT
+});
+
 

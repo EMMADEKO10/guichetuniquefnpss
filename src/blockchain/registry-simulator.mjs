@@ -327,3 +327,9 @@ export class ResilientAnchorQueue {
   }
 }
 
+export const registrySimulator = new FNPSSRegistryContract(
+  '0x1111111111111111111111111111111111111111',
+  '0x2222222222222222222222222222222222222222'
+);
+
+

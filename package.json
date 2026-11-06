@@ -1,16 +1,23 @@
 {
   "name": "guichet-unique-fnpss",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Plateforme de Guichet Unique Dématérialisé du FNPSS (RDC) avec ancrage Blockchain SHA-256 et vérification QR Code DGDA",
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "test": "node --test tests/guichet-unique.test.mjs",
     "serve:prototype": "node src/server.mjs --demo-open",
     "serve": "node src/server.mjs"
+  },
+  "dependencies": {
+    "next": "^14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "engines": {
     "node": ">=20.0.0"
   }
 }
-

@@ -1737,3 +1737,149 @@ test('22. Circuit d\'Approbation Multi-Niveaux Chef de Division & Ministère (AD
   const audit = auditPrototypeAccessibility(html);
   assert.equal(audit.passed, true);
 });
+
+test('23. Initialisation Next.js App Router, Design System UX-05, Authentification REQ-01 & Routes API Hybrides (Phase 2)', async () => {
+  // 1. Configuration Next.js (next.config.mjs)
+  const nextConfigModule = await import('../next.config.mjs');
+  const nextConfig = nextConfigModule.default;
+  assert.ok(nextConfig, 'next.config.mjs doit exporter une configuration valide');
+  assert.equal(nextConfig.reactStrictMode, true);
+  assert.equal(nextConfig.poweredByHeader, false);
+  assert.ok(nextConfig.env.APP_NAME.includes('FNPSS'));
+  const headers = await nextConfig.headers();
+  assert.ok(headers.some(h => h.headers.some(header => header.key === 'X-Content-Type-Options' && header.value === 'nosniff')));
+
+  // 2. Package.json configuré pour Next.js (Phase 2, version 0.2.0)
+  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  assert.equal(pkg.version, '0.2.0');
+  assert.ok(pkg.scripts.dev.includes('next dev'));
+  assert.ok(pkg.scripts.build.includes('next build'));
+  assert.ok(pkg.scripts.start.includes('next start'));
+  assert.ok(pkg.dependencies.next);
+  assert.ok(pkg.dependencies.react);
+  assert.ok(pkg.dependencies['react-dom']);
+
+  // 3. Design System CSS Tokens (UX-05, src/app/globals.css)
+  const css = fs.readFileSync('src/app/globals.css', 'utf8');
+  assert.ok(css.includes('--fnpss-navy: #0a2540;'));
+  assert.ok(css.includes('--fnpss-blue: #065a82;'));
+  assert.ok(css.includes('--fnpss-accent: #1a73e8;'));
+  assert.ok(css.includes('--fnpss-green: #137333;'));
+  assert.ok(css.includes('--fnpss-red: #d93025;'));
+  assert.ok(css.includes('.drc-ribbon'));
+  assert.ok(css.includes('.btn-primary'));
+  assert.ok(css.includes('.badge-valide'));
+
+  // 4. Composants UI Réutilisables du Design System (UX-05)
+  const buttonSource = fs.readFileSync('src/components/ui/Button.jsx', 'utf8');
+  assert.ok(buttonSource.includes('btn-') && buttonSource.includes('aria-busy'));
+  const badgeSource = fs.readFileSync('src/components/ui/Badge.jsx', 'utf8');
+  assert.ok(badgeSource.includes('role="status"') && badgeSource.includes('badge-valide'));
+  const cardSource = fs.readFileSync('src/components/ui/Card.jsx', 'utf8');
+  assert.ok(cardSource.includes('card-header') && cardSource.includes('card-body'));
+  const modalSource = fs.readFileSync('src/components/ui/Modal.jsx', 'utf8');
+  assert.ok(modalSource.includes('role="dialog"') && modalSource.includes('aria-modal="true"'));
+  const docViewerSource = fs.readFileSync('src/components/ui/DocumentViewer.jsx', 'utf8');
+  assert.ok(docViewerSource.includes('document-viewer') && docViewerSource.includes('SHA-256'));
+  const headerSource = fs.readFileSync('src/components/ui/Header.jsx', 'utf8');
+  assert.ok(headerSource.includes('drc-ribbon') && headerSource.includes('Guichet Unique Dématérialisé'));
+  const footerSource = fs.readFileSync('src/components/ui/Footer.jsx', 'utf8');
+  assert.ok(footerSource.includes('Fonds National de Promotion et de Service Social') && footerSource.includes('SLA légal : 10 jours ouvrables'));
+
+  // 5. Pages de l'App Router Next.js (Accessibilité et conformité fonctionnelle)
+  const layoutSource = fs.readFileSync('src/app/layout.jsx', 'utf8');
+  assert.ok(layoutSource.includes('RootLayout') && layoutSource.includes('globals.css'));
+  const homeSource = fs.readFileSync('src/app/page.jsx', 'utf8');
+  assert.ok(homeSource.includes('Catalogue des Services Dématérialisés') && homeSource.includes('kpi-grid'));
+  const loginSource = fs.readFileSync('src/app/auth/login/page.jsx', 'utf8');
+  assert.ok(loginSource.includes('Connexion au Guichet Unique') && loginSource.includes('/api/auth/login'));
+  const registerSource = fs.readFileSync('src/app/auth/register/page.jsx', 'utf8');
+  assert.ok(registerSource.includes('Création de Compte ONG / ASBL') && registerSource.includes('/api/auth/register'));
+  const verifierSource = fs.readFileSync('src/app/verifier/page.jsx', 'utf8');
+  assert.ok(verifierSource.includes('Portail Public de Vérification d\'Authenticité') && verifierSource.includes('/api/verify'));
+
+  // 6. Test fonctionnel des Routes API Next.js (Bridge vers les moteurs souverains)
+  const authLoginRoute = await import('../src/app/api/auth/login/route.js');
+  const authRegisterRoute = await import('../src/app/api/auth/register/route.js');
+  const verifyRoute = await import('../src/app/api/verify/route.js');
+  const applicationsRoute = await import('../src/app/api/applications/route.js');
+
+  // API Login : Échec identifiants manquants
+  const emptyLoginReq = new Request('http://localhost:3000/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const emptyLoginRes = await authLoginRoute.POST(emptyLoginReq);
+  assert.equal(emptyLoginRes.status, 400);
+
+  // API Login : Succès avec compte seed
+  const validLoginReq = new Request('http://localhost:3000/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'contact@espoir-kivu.org', password: 'PasswordRDC#2026' })
+  });
+  const validLoginRes = await authLoginRoute.POST(validLoginReq);
+  assert.equal(validLoginRes.status, 200);
+  const validLoginData = await validLoginRes.json();
+  assert.equal(validLoginData.success, true);
+  assert.ok(validLoginData.sessionToken);
+
+  // API Register : Échec champs obligatoires manquants
+  const badRegReq = new Request('http://localhost:3000/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'nouveau@ong.cd' })
+  });
+  const badRegRes = await authRegisterRoute.POST(badRegReq);
+  assert.equal(badRegRes.status, 400);
+
+  // API Register : Création réussie
+  const goodRegReq = new Request('http://localhost:3000/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      organizationName: 'ONG Nouvelle Espérance Goma',
+      representativeName: 'Dr. Sarah Mwamba',
+      email: `contact.goma.${Date.now()}@esperance.cd`,
+      password: 'SecurePasswordRDC#2026'
+    })
+  });
+  const goodRegRes = await authRegisterRoute.POST(goodRegReq);
+  assert.equal(goodRegRes.status, 201);
+  const goodRegData = await goodRegRes.json();
+  assert.equal(goodRegData.success, true);
+  assert.ok(goodRegData.userId);
+
+  // API Applications : Liste des demandes
+  const listReq = new Request('http://localhost:3000/api/applications');
+  const listRes = await applicationsRoute.GET(listReq);
+  assert.equal(listRes.status, 200);
+  const listData = await listRes.json();
+  assert.equal(listData.success, true);
+  assert.ok(Array.isArray(listData.applications));
+
+  // API Verify : Erreur sans hash
+  const noHashReq = new Request('http://localhost:3000/api/verify');
+  const noHashRes = await verifyRoute.GET(noHashReq);
+  assert.equal(noHashRes.status, 400);
+
+  // API Verify : Recherche d'une attestation scellée
+  const { registrySimulator } = await import('../src/blockchain/registry-simulator.mjs');
+  const testHash = '0x' + '99'.repeat(32);
+  registrySimulator.registerDocument({
+    caller: '0x2222222222222222222222222222222222222222',
+    docHash: testHash,
+    certificateNumber: 'FNPSS-TEST-2026-001',
+    serviceCode: 4,
+    expiresAt: Math.floor(Date.now() / 1000) + 86400
+  });
+
+  const checkReq = new Request(`http://localhost:3000/api/verify?hash=${testHash}`);
+  const checkRes = await verifyRoute.GET(checkReq);
+  assert.equal(checkRes.status, 200);
+  const checkData = await checkRes.json();
+  assert.equal(checkData.found, true);
+  assert.equal(checkData.status, 1);
+  assert.equal(checkData.isValid, true);
+});

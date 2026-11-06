@@ -19,3 +19,18 @@ bin-release/
 
 # Etat local du script de pilotage GitHub
 .github/planning/.bootstrap-state.json
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+*.log
+
+# Office temporary lock files
+~$*.doc*
+~$*.xls*
+~$*.ppt*
+.DS_Store
+Thumbs.db
