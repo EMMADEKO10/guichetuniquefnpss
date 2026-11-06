@@ -22,18 +22,26 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
 - **Matrice de Traçabilité des 87 Issues, Réconciliation Comptable & COPIL S2 (`GOV-07`, `GOV-10`, `GOV-11`) :** [MATRICE_TRACABILITE_87_ISSUES_ET_RECONCILIATION_COMPTABLE.md](documentation%20du%20projet/MATRICE_TRACABILITE_87_ISSUES_ET_RECONCILIATION_COMPTABLE.md) · [Version Google Docs](https://docs.google.com/document/d/1mqargKXmOVyV0Wc7xaEvl00pnhRQYpPqUGUsW9L4Xtk/edit)
 - **Dossier de Revue G1, Fiches de Décision D1–D4 & Projet de PV COPIL (`GOV-09`, `GOV-05`, `GOV-11`, `UX-04`, `UX-05`) :** [DOSSIER_REVUE_G1_ET_DECISIONS_D1_D4.md](documentation%20du%20projet/DOSSIER_REVUE_G1_ET_DECISIONS_D1_D4.md) · [Version Google Docs](https://docs.google.com/document/d/1r7to-yfFOTI_91xLHo9boLj11u42cKsnG3io39k7NvA/edit)
 
-## Phase 2 — Sprint 1 : Application Next.js (App Router), Design System & Authentification
+## Phase 2 — Sprint 1 & Sprint 2 : Application Next.js (App Router), Design System, Authentification Hybride & Staging CI/CD
 - **Configuration Next.js 14+ :** [next.config.mjs](next.config.mjs) *(En-têtes de sécurité OWASP, variables souveraines, compression)*
 - **Design System Mobile-First & Accessibilité WCAG AA (`UX-05`) :** [src/app/globals.css](src/app/globals.css) · [src/components/ui/](src/components/ui/) (`Button`, `Badge`, `Card`, `Modal`, `DocumentViewer`, `Header`, `Footer`)
 - **Pages de l'App Router :**
   - Accueil & Catalogue des Services : [src/app/page.jsx](src/app/page.jsx)
   - Layout Racine : [src/app/layout.jsx](src/app/layout.jsx)
-  - Inscription & Connexion Requérant (`REQ-01`) : [src/app/auth/login/page.jsx](src/app/auth/login/page.jsx) · [src/app/auth/register/page.jsx](src/app/auth/register/page.jsx)
+  - Inscription & Connexion Requérant (`REQ-01`, `REQ-02`, `BLK-02`) : [src/app/auth/login/page.jsx](src/app/auth/login/page.jsx) · [src/app/auth/register/page.jsx](src/app/auth/register/page.jsx)
+  - Récupération & Réinitialisation Mot de Passe (`REQ-03`) : [src/app/auth/forgot-password/page.jsx](src/app/auth/forgot-password/page.jsx) · [src/app/auth/reset-password/page.jsx](src/app/auth/reset-password/page.jsx)
+  - Profil Organisation & Portefeuille Web3Auth (`REQ-04`, `BLK-03`) : [src/app/profile/page.jsx](src/app/profile/page.jsx)
   - Tableau de Bord Requérant (`REQ-05`, `REQ-08`) : [src/app/dashboard/page.jsx](src/app/dashboard/page.jsx)
-  - Assistant de Soumission Dynamique S1–S6 & Once-Only (`REQ-06`, `REQ-07`) : [src/app/applications/new/page.jsx](src/app/applications/new/page.jsx)
-  - Console Back-Office Multi-Niveaux & Inspection (`ADM-01`, `ADM-04`, `ADM-08`) : [src/app/admin/page.jsx](src/app/admin/page.jsx)
+  - Assistant de Soumission Dynamique S1–S6 & Once-Only (`REQ-06`, `REQ-07`, `REQ-11`) : [src/app/applications/new/page.jsx](src/app/applications/new/page.jsx)
+  - Console Back-Office Multi-Niveaux & Inspection (`ADM-01`, `ADM-04`, `ADM-05`, `ADM-08`, `ADM-06`, `VER-06`) : [src/app/admin/page.jsx](src/app/admin/page.jsx)
   - Portail de Vérification Douanière DGDA (`VER-03`) : [src/app/verifier/page.jsx](src/app/verifier/page.jsx)
-- **Routes API Hybrides (Bridges vers moteurs souverains) :** [src/app/api/auth/](src/app/api/auth/) · [src/app/api/verify/](src/app/api/verify/) · [src/app/api/applications/](src/app/api/applications/)
+- **Routes API Hybrides (Bridges vers moteurs souverains) :**
+  - `/api/auth/login`, `/api/auth/register`, `/api/auth/google`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/profile`, `/api/auth/logout`
+  - `/api/applications`, `/api/verify`, `/api/health`
+- **Déploiement Continu & Rollback Staging (`OPS-04`) :**
+  - Pipeline GitHub Actions Staging Blue/Green : [.github/workflows/deploy-staging.yml](.github/workflows/deploy-staging.yml)
+  - Procédure Opérationnelle & Rollback : [PROCEDURE_DEPLOIEMENT_ET_ROLLBACK_STAGING.md](documentation%20du%20projet/PROCEDURE_DEPLOIEMENT_ET_ROLLBACK_STAGING.md)
+  - Image Docker Alpine Multi-Stage : [Dockerfile](Dockerfile)
 - **Document de Bilan des Réalisations Techniques (.doc) :** [BILAN_REALISATIONS_TECHNIQUES_FNPSS.doc](BILAN_REALISATIONS_TECHNIQUES_FNPSS.doc)
 
 ## Socle Technique, Moteur Métier & Prototype Interactif (Sprint 0 / Sprint 1)
@@ -59,7 +67,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
   - Matrice d'Accès Rôle/Route (Fail-Closed), Anti-IDOR & Anti-Escalade Serveur (`ADM-01`, `SEC-04`) : [src/security/route-access-policy.mjs](src/security/route-access-policy.mjs)
   - Serveur HTTP, Modes d'Accès Sécurisé/Démo, API REST du moteur & Interopérabilité DGDA (`VER-05`, `ADM-01`) : [src/server.mjs](src/server.mjs)
-- **Suite de Tests Automatisés (24 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`..`08`, `REQ-01`..`08`, `REQ-11`..`13`, `VER-06`, `UX-05`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+- **Suite de Tests Automatisés (25 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`..`08`, `REQ-01`..`08`, `REQ-11`..`13`, `VER-06`, `UX-05`, `OPS-04`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
 - **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue & Déploiement Backlog GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/bootstrap-backlog.yml](.github/workflows/bootstrap-backlog.yml)
 

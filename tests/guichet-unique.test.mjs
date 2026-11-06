@@ -1925,3 +1925,194 @@ test('24. Parcours Interactifs Next.js : Tableau de Bord Requérant (REQ-05), As
     assert.ok(fs.statSync(r).size > 500, `La route Next.js ${r} doit avoir du contenu substantiel`);
   }
 });
+
+test('25. Authentification Google OAuth 2.0 (REQ-02, BLK-02), Réinitialisation Neutre Mot de Passe (REQ-03), Profil & Déconnexion (REQ-04) et CI/CD Staging OPS-04', async () => {
+  // 1. Google OAuth 2.0 & Dérivation Web3Auth MPC
+  const googleRoute = await import('../src/app/api/auth/google/route.js');
+  
+  // Échec sans email
+  const badGoogleReq = new Request('http://localhost:3000/api/auth/google', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const badGoogleRes = await googleRoute.POST(badGoogleReq);
+  assert.equal(badGoogleRes.status, 400);
+
+  // Succès Google OAuth
+  const googleEmail = `mandataire.ong.${Date.now()}@gmail.com`;
+  const goodGoogleReq = new Request('http://localhost:3000/api/auth/google', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      googleEmail,
+      givenName: 'Jean-Luc',
+      familyName: 'Mukendi',
+      organizationName: 'Solidarité Grand Bandundu',
+      province: 'Kwilu'
+    })
+  });
+  const goodGoogleRes = await googleRoute.POST(goodGoogleReq);
+  assert.equal(goodGoogleRes.status, 200);
+  const goodGoogleData = await goodGoogleRes.json();
+  assert.equal(goodGoogleData.success, true);
+  assert.ok(goodGoogleData.sessionToken);
+  assert.match(goodGoogleData.walletAddress, /^0x[0-9a-f]{40}$/i);
+
+  // 2. Demande de Réinitialisation de Mot de Passe (REQ-03)
+  const forgotRoute = await import('../src/app/api/auth/forgot-password/route.js');
+  
+  // Erreur sans email
+  const emptyForgotReq = new Request('http://localhost:3000/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const emptyForgotRes = await forgotRoute.POST(emptyForgotReq);
+  assert.equal(emptyForgotRes.status, 400);
+
+  // Email existant (seed user)
+  const knownForgotReq = new Request('http://localhost:3000/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'contact@espoir-kivu.org' })
+  });
+  const knownForgotRes = await forgotRoute.POST(knownForgotReq);
+  assert.equal(knownForgotRes.status, 200);
+  const knownForgotData = await knownForgotRes.json();
+  assert.equal(knownForgotData.success, true);
+  assert.ok(knownForgotData.message);
+  assert.ok(knownForgotData.devToken);
+
+  // Email inconnu : message neutre identique sans fuite d'information
+  const unknownForgotReq = new Request('http://localhost:3000/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'inconnu.absent@gouv.cd' })
+  });
+  const unknownForgotRes = await forgotRoute.POST(unknownForgotReq);
+  assert.equal(unknownForgotRes.status, 200);
+  const unknownForgotData = await unknownForgotRes.json();
+  assert.equal(unknownForgotData.message, knownForgotData.message);
+
+  // 3. Confirmation de Réinitialisation de Mot de Passe (REQ-03)
+  const resetRoute = await import('../src/app/api/auth/reset-password/route.js');
+  
+  // Échec mauvais jeton
+  const badTokenReq = new Request('http://localhost:3000/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: 'mauvais-jeton-invalide', newPassword: 'NewPassword2026#' })
+  });
+  const badTokenRes = await resetRoute.POST(badTokenReq);
+  assert.equal(badTokenRes.status, 400);
+
+  // Succès avec devToken
+  const resetToken = knownForgotData.devToken;
+  const goodResetReq = new Request('http://localhost:3000/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: resetToken, newPassword: 'NewPasswordRDC#2026' })
+  });
+  const goodResetRes = await resetRoute.POST(goodResetReq);
+  assert.equal(goodResetRes.status, 200);
+  const goodResetData = await goodResetRes.json();
+  assert.equal(goodResetData.success, true);
+
+  // 4. Profil de l'Organisation & Représentant Légal (REQ-04, BLK-03)
+  const profileRoute = await import('../src/app/api/auth/profile/route.js');
+  const authLoginRoute = await import('../src/app/api/auth/login/route.js');
+
+  // Connexion avec le nouveau mot de passe
+  const newLoginReq = new Request('http://localhost:3000/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'contact@espoir-kivu.org', password: 'NewPasswordRDC#2026' })
+  });
+  const newLoginRes = await authLoginRoute.POST(newLoginReq);
+  assert.equal(newLoginRes.status, 200);
+  const { sessionToken } = await newLoginRes.json();
+
+  // Consultation du profil avec sessionToken
+  const getProfReq = new Request('http://localhost:3000/api/auth/profile', {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${sessionToken}` }
+  });
+  const getProfRes = await profileRoute.GET(getProfReq);
+  assert.equal(getProfRes.status, 200);
+  const getProfData = await getProfRes.json();
+  assert.equal(getProfData.success, true);
+  assert.equal(getProfData.user.email, 'contact@espoir-kivu.org');
+  assert.match(getProfData.user.walletAddress, /^0x[0-9a-f]{40}$/i);
+
+  // Mise à jour du profil
+  const updateProfReq = new Request('http://localhost:3000/api/auth/profile', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({
+      organizationName: 'ONG Espoir Kivu & Maniema Mis à Jour',
+      province: 'Maniema',
+      enrollmentNumber: 'FNPSS-ONG-2026-MAN-0099'
+    })
+  });
+  const updateProfRes = await profileRoute.PUT(updateProfReq);
+  assert.equal(updateProfRes.status, 200);
+  const updateProfData = await updateProfRes.json();
+  assert.equal(updateProfData.user.organizationName, 'ONG Espoir Kivu & Maniema Mis à Jour');
+  assert.equal(updateProfData.user.province, 'Maniema');
+
+  // 5. Déconnexion (REQ-04)
+  const logoutRoute = await import('../src/app/api/auth/logout/route.js');
+  const logoutReq = new Request('http://localhost:3000/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionToken })
+  });
+  const logoutRes = await logoutRoute.POST(logoutReq);
+  assert.equal(logoutRes.status, 200);
+
+  // La session invalidée doit être rejetée
+  const deadProfReq = new Request('http://localhost:3000/api/auth/profile', {
+    headers: { 'Authorization': `Bearer ${sessionToken}` }
+  });
+  const deadProfRes = await profileRoute.GET(deadProfReq);
+  assert.equal(deadProfRes.status, 401);
+
+  // 6. Sonde de Santé Staging / Production (OPS-04)
+  const healthRoute = await import('../src/app/api/health/route.js');
+  const healthRes = await healthRoute.GET();
+  assert.equal(healthRes.status, 200);
+  const healthData = await healthRes.json();
+  assert.equal(healthData.status, 'healthy');
+  assert.equal(healthData.subsystems.nextAppRouter, 'UP');
+  assert.equal(healthData.subsystems.storageVaultAes256, 'HEALTHY');
+
+  // 7. Vérification des Nouveaux Écrans & Procédures d'Exploitation
+  const pages = [
+    'src/app/auth/forgot-password/page.jsx',
+    'src/app/auth/reset-password/page.jsx',
+    'src/app/profile/page.jsx'
+  ];
+  for (const p of pages) {
+    assert.ok(fs.existsSync(p), `La page ${p} doit exister`);
+    assert.ok(fs.statSync(p).size > 600, `La page ${p} doit avoir du contenu substantiel`);
+  }
+
+  // Vérification CI/CD et Rollback OPS-04
+  const cicdWorkflow = fs.readFileSync('.github/workflows/deploy-staging.yml', 'utf8');
+  assert.ok(cicdWorkflow.includes('CI/CD Staging'));
+  assert.ok(cicdWorkflow.includes('DÉCLENCHEMENT DE LA PROCÉDURE DE ROLLBACK STAGING'));
+  assert.ok(cicdWorkflow.includes('npm test'));
+
+  const rollbackDoc = fs.readFileSync('documentation du projet/PROCEDURE_DEPLOIEMENT_ET_ROLLBACK_STAGING.md', 'utf8');
+  assert.ok(rollbackDoc.includes('OPS-04'));
+  assert.ok(rollbackDoc.includes('Blue / Green'));
+  assert.ok(rollbackDoc.includes('/api/health'));
+
+  const dockerfile = fs.readFileSync('Dockerfile', 'utf8');
+  assert.ok(dockerfile.includes('HEALTHCHECK'));
+  assert.ok(dockerfile.includes('nextjs'));
+});

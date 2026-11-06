@@ -796,6 +796,24 @@ struct CertificateRecord {
         <td>Validation séquentielle complète, double confirmation DG de révocation, publication CMS et budget 3G.</td>
         <td><span class="badge-done">&#10003; PASS</span></td>
       </tr>
+      <tr>
+        <td><strong>23</strong></td>
+        <td>Initialisation Next.js App Router & Design System</td>
+        <td>Configuration Next.js 14, tokens CSS WCAG AA, composants UI accessibles, routes API login, register, verify, applications.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>24</strong></td>
+        <td>Parcours Interactifs Next.js (Dashboard, Assistant S1-S6, Back-Office)</td>
+        <td>Tableau de bord requérant (KPIs, édition, retrait), assistant 4 étapes Once-Only et console d'instruction multi-acteurs.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
+      <tr>
+        <td><strong>25</strong></td>
+        <td>Google OAuth, Web3Auth, Reset Neutre, Profil & CI/CD Staging OPS-04</td>
+        <td>Connexion Google OAuth 2.0, portefeuille MPC EVM sans clé privée, réinitialisation de mot de passe, gestion de profil et pipeline de déploiement Blue/Green avec rollback automatique.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
     </tbody>
   </table>
 

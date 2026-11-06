@@ -111,9 +111,14 @@ export default function DashboardPage() {
             Suivi en temps réel de vos dossiers et téléchargement des attestations scellées
           </p>
         </div>
-        <a href="/applications/new" className="btn btn-primary" style={{ textDecoration: 'none' }}>
-          ➕ Déposer une Nouvelle Demande
-        </a>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <a href="/profile" className="btn btn-outline" style={{ textDecoration: 'none' }}>
+            👤 Mon Profil ONG
+          </a>
+          <a href="/applications/new" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+            ➕ Déposer une Nouvelle Demande
+          </a>
+        </div>
       </div>
 
       {feedbackMsg && (
