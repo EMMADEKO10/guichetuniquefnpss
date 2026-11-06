@@ -1,0 +1,73 @@
+// Smoke test réel : démarre le serveur Next.js de production, interroge pages et API, puis l'arrête.
+import { spawn } from 'node:child_process';
+
+const PORT = 3123;
+const BASE = `http://127.0.0.1:${PORT}`;
+const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', String(PORT)], {
+  stdio: ['ignore', 'pipe', 'pipe']
+});
+let logs = '';
+server.stdout.on('data', d => (logs += d));
+server.stderr.on('data', d => (logs += d));
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const results = [];
+const check = (name, ok, detail = '') => results.push({ name, ok, detail });
+
+async function waitReady() {
+  for (let i = 0; i < 60; i++) {
+    try {
+      const r = await fetch(`${BASE}/api/health`);
+      if (r.ok) return true;
+    } catch {}
+    await sleep(500);
+  }
+  return false;
+}
+
+try {
+  if (!(await waitReady())) throw new Error('Serveur non démarré :\n' + logs);
+
+  for (const p of ['/', '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/dashboard', '/profile', '/applications/new', '/admin', '/verifier']) {
+    const r = await fetch(BASE + p);
+    const html = await r.text();
+    check(`GET ${p}`, r.status === 200 && html.includes('Guichet Unique'), `HTTP ${r.status}`);
+  }
+
+  const h1 = await (await fetch(`${BASE}/api/health`)).json();
+  await sleep(1100);
+  const h2 = await (await fetch(`${BASE}/api/health`)).json();
+  check('Sonde /api/health dynamique', h1.status === 'healthy' && h1.timestamp !== h2.timestamp);
+
+  const json = (method, body, headers = {}) => ({ method, headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+
+  const login = await fetch(`${BASE}/api/auth/login`, json('POST', { email: 'contact@espoir-kivu.org', password: 'PasswordRDC#2026' }));
+  const loginData = await login.json();
+  check('POST /api/auth/login (compte seed)', login.status === 200 && loginData.user?.role === 'REQUERANT', `HTTP ${login.status}, rôle ${loginData.user?.role}`);
+
+  const prof = await fetch(`${BASE}/api/auth/profile`, { headers: { Authorization: `Bearer ${loginData.sessionToken}` } });
+  check('GET /api/auth/profile (session entre deux requêtes)', prof.status === 200, `HTTP ${prof.status}`);
+
+  const g = await fetch(`${BASE}/api/auth/google`, json('POST', { googleEmail: 'smoke@gmail.com', givenName: 'A', familyName: 'B' }));
+  const gData = await g.json();
+  check('POST /api/auth/google (wallet Web3Auth)', g.status === 200 && /^0x[0-9a-f]{40}$/.test(gData.walletAddress || ''), `HTTP ${g.status}`);
+
+  const apps = await fetch(`${BASE}/api/applications`);
+  check('GET /api/applications', apps.status === 200, `HTTP ${apps.status}`);
+
+  const v = await fetch(`${BASE}/api/verify?hash=0x${'ab'.repeat(32)}`);
+  check('GET /api/verify (hash inconnu)', v.status === 200 || v.status === 404, `HTTP ${v.status}`);
+
+  const headers = (await fetch(BASE + '/')).headers;
+  check('En-têtes de sécurité', headers.get('x-frame-options') === 'DENY' && headers.get('x-content-type-options') === 'nosniff' && !headers.get('x-powered-by'));
+} catch (err) {
+  check('Exécution', false, err.message);
+} finally {
+  server.kill();
+}
+
+for (const r of results) console.log(`${r.ok ? 'OK  ' : 'FAIL'} ${r.name}${r.detail ? ' — ' + r.detail : ''}`);
+const failed = results.filter(r => !r.ok).length;
+console.log(`\n${results.length - failed}/${results.length} vérifications réussies`);
+process.exit(failed ? 1 : 0);
+

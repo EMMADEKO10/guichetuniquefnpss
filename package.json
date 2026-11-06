@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "test": "node --test tests/guichet-unique.test.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
     "serve:prototype": "node src/server.mjs --demo-open",
     "serve": "node src/server.mjs"
   },
