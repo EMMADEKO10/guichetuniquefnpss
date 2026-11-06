@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
@@ -119,3 +121,4 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+

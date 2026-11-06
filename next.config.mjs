@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Serveur autonome minimal pour l'image Docker (OPS-04)
+  output: 'standalone',
   poweredByHeader: false,
   compress: true,
   env: {

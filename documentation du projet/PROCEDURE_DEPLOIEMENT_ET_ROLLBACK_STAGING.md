@@ -8,6 +8,8 @@
 
 ---
 
+> **État réel au 06/11/2026.** Le pipeline exécute réellement : `npm ci`, la suite de tests, `next build`, la construction de l'image Docker et la sonde `/api/health` sur le conteneur démarré. **Aucun serveur de staging n'est encore provisionné** : le job de déploiement distant (Blue/Green via SSH, scripts `deploy.sh` / `rollback.sh` sur le serveur) est ignoré tant que les secrets `STAGING_HOST`, `STAGING_USER` et `STAGING_SSH_KEY` ne sont pas configurés dans GitHub. Les sections 3 et 5 décrivent la cible à mettre en place avec le DevOps ; elles ne sont pas encore opérationnelles. OPS-04 reste donc **partiellement réalisé**.
+
 ## 1. Objectifs & Cadre Opérationnel
 
 Le présent document consigne le protocole officiel de déploiement continu et de restauration d'urgence (rollback) sur l'environnement de Staging du Guichet Unique FNPSS, conformément aux règles de gouvernance étatique et de sécurité numérique :
@@ -141,8 +143,10 @@ curl -I https://staging.fnpss.gouv.cd/api/health
 ## 6. Checklist de Validation OPS-04
 
 Avant toute validation de jalon ou mise en service, vérifier la conformité :
-- [x] Fichier `.github/workflows/deploy-staging.yml` présent et syntaxiquement valide.
-- [x] Dockerfile multi-stage avec utilisateur non-root (`nextjs:1001`) et healthcheck natif.
+- [x] Fichier `.github/workflows/deploy-staging.yml` présent : tests, build Next.js, image Docker et sonde de santé réellement exécutés.
+- [x] Dockerfile multi-stage (sortie `standalone`) avec utilisateur non-root (`nextjs:1001`) et healthcheck natif.
 - [x] Endpoint `/api/health` actif et testé avec statut HTTP 200.
 - [x] Tests automatisés intégrés dans le pipeline bloquant tout déploiement en cas d'échec.
-- [x] Procédure de rollback documentée et testable manuellement ou automatiquement.
+- [ ] Serveur de staging provisionné et secrets `STAGING_*` configurés dans GitHub.
+- [ ] Scripts `deploy.sh` / `rollback.sh` installés sur le serveur et rollback testé en conditions réelles.
+

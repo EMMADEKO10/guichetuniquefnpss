@@ -1,4 +1,9 @@
-name: CI/CD Staging - Déploiement Continu & Rollback Automatique (OPS-04)
+name: CI/CD Staging - Build, Image Docker & Rollback (OPS-04)
+
+# Ce pipeline valide réellement le code (tests + build Next.js + image Docker + sonde de santé
+# sur le conteneur démarré). Le déploiement sur un serveur de staging distant est conditionné à
+# la présence des secrets STAGING_HOST / STAGING_SSH_KEY : tant que l'infrastructure n'est pas
+# provisionnée, cette étape est ignorée (et non simulée).
 
 on:
   push:
@@ -6,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       force_rollback:
-        description: 'Forcer un rollback immédiat vers la version précédente'
+        description: 'Forcer un rollback vers l''image précédente sur le serveur de staging'
         required: false
         default: 'false'
         type: choice
@@ -19,82 +24,102 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test-and-package:
-    name: 1. Validation Qualité, Tests Unitaires & Scénarios (SC-01..SC-05)
+  test-and-build:
+    name: 1. Tests automatisés & build Next.js
+    if: github.event.inputs.force_rollback != 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: 'npm'
+          cache: npm
 
-      - name: Exécution de la suite de tests automatisés (25 suites)
+      - name: Installation reproductible des dépendances
+        run: npm ci
+
+      - name: Suite de tests automatisés
         run: npm test
 
-      - name: Vérification de l'intégrité du build Next.js
-        run: |
-          echo "Vérification des routes et des modules Next.js App Router"
-          npm run build || echo "Mode simulation statique / export validé"
+      - name: Build de production Next.js (échec bloquant)
+        run: npm run build
 
-  deploy-staging:
-    name: 2. Déploiement Blue/Green Staging & Sonde de Santé
-    needs: test-and-package
+  docker-image:
+    name: 2. Image Docker & sonde de santé du conteneur
+    needs: test-and-build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Détection de la demande de Rollback Manuel
-        id: check_rollback
-        run: |
-          if [ "${{ github.event.inputs.force_rollback }}" = "true" ]; then
-            echo "rollback_mode=true" >> $GITHUB_OUTPUT
-            echo "⚠️ MODE ROLLBACK MANUEL ACTIVÉ"
-          else
-            echo "rollback_mode=false" >> $GITHUB_OUTPUT
-          fi
+      - name: Construction de l'image
+        run: docker build -t fnpss-guichet-unique:${{ github.sha }} .
 
-      - name: Préparation de l'environnement Staging
-        run: |
-          echo "Déploiement sur le cluster de pré-production FNPSS Staging"
-          echo "Configuration des variables d'environnement souveraines"
-          echo "Image cible : fnpss-guichet-unique:${{ github.sha }}"
+      - name: Démarrage du conteneur candidat
+        run: docker run -d --name fnpss-candidate -p 3000:3000 fnpss-guichet-unique:${{ github.sha }}
 
-      - name: Lancement du conteneur Staging (Slot Green)
+      - name: Sonde /api/health (10 tentatives)
         run: |
-          echo "Démarrage du conteneur en écoute sur le port 3000..."
-          # Simulation de conteneurisation et probe locale
-          node -e "
-            import('./src/app/api/health/route.js').then(async (m) => {
-              const res = await m.GET();
-              const body = await res.json();
-              if (res.status === 200 && body.status === 'healthy') {
-                console.log('✅ Sonde Staging /api/health validée :', JSON.stringify(body));
-              } else {
-                console.error('❌ Échec de la sonde de santé');
-                process.exit(1);
-              }
-            }).catch((err) => {
-              console.error('Erreur sonde:', err);
-              process.exit(1);
-            });
-          "
+          for i in $(seq 1 10); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then
+              echo ""
+              echo "Sonde de santé OK"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Échec de la sonde de santé"
+          docker logs fnpss-candidate
+          exit 1
 
-      - name: Basculement de trafic Blue/Green (Switching Nginx/Traefik)
-        if: steps.check_rollback.outputs.rollback_mode == 'false'
-        run: |
-          echo "Trafic réseau orienté vers le nouveau slot Green"
-          echo "Slot Blue mis en veille active (sauvegarde pour rollback instantané)"
+      - name: Arrêt du conteneur candidat
+        if: always()
+        run: docker rm -f fnpss-candidate || true
 
-      - name: Exécution du Rollback Automatique en cas d'échec
-        if: failure() || steps.check_rollback.outputs.rollback_mode == 'true'
+  deploy-staging:
+    name: 3. Déploiement staging (si infrastructure provisionnée)
+    needs: docker-image
+    runs-on: ubuntu-latest
+    env:
+      STAGING_HOST: ${{ secrets.STAGING_HOST }}
+    steps:
+      - name: Infrastructure de staging non configurée
+        if: env.STAGING_HOST == ''
+        run: echo "::notice::Secrets STAGING_HOST / STAGING_SSH_KEY absents - déploiement distant ignoré."
+
+      - name: Déploiement Blue/Green avec rollback automatique
+        if: env.STAGING_HOST != ''
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/fnpss-staging
+            ./deploy.sh ${{ github.sha }} || { echo "Échec - DÉCLENCHEMENT DE LA PROCÉDURE DE ROLLBACK STAGING"; ./rollback.sh; exit 1; }
+
+  manual-rollback:
+    name: Rollback manuel staging
+    if: github.event.inputs.force_rollback == 'true'
+    runs-on: ubuntu-latest
+    env:
+      STAGING_HOST: ${{ secrets.STAGING_HOST }}
+    steps:
+      - name: Infrastructure de staging non configurée
+        if: env.STAGING_HOST == ''
         run: |
-          echo "🚨 DÉCLENCHEMENT DE LA PROCÉDURE DE ROLLBACK STAGING (OPS-04)"
-          echo "1. Annulation du routage vers le slot défaillant Green"
-          echo "2. Rétablissement instantané du trafic vers le slot Blue précédent"
-          echo "3. Notification de l'équipe d'exploitation FNPSS"
-          echo "Rollback exécuté avec succès."
+          echo "::error::Rollback impossible : secrets STAGING_HOST / STAGING_SSH_KEY absents."
+          exit 1
+
+      - name: DÉCLENCHEMENT DE LA PROCÉDURE DE ROLLBACK STAGING
+        if: env.STAGING_HOST != ''
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: cd /opt/fnpss-staging && ./rollback.sh

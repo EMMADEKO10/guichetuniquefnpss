@@ -1,40 +1,36 @@
-# Dockerfile Multi-Stage pour Guichet Unique FNPSS (OPS-04, OPS-05)
-FROM node:20-alpine AS base
+# Dockerfile multi-étapes du Guichet Unique FNPSS (OPS-04, OPS-05)
+# Utilise la sortie "standalone" de Next.js : image finale minimale, sans dépendances de build.
+
+# --- Étape 1 : dépendances ---
+FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
-ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Étape 1 : Dépendances
-FROM base AS deps
+# --- Étape 2 : build Next.js ---
+FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json ./
-# Si package-lock.json existe, npm ci, sinon npm install
-RUN if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --production=false --ignore-scripts; fi
-
-# Étape 2 : Build de l'application Next.js
-FROM base AS builder
-WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build || echo "Static Next.js Build Finished"
+RUN npm run build
 
-# Étape 3 : Runner de Production Minimal
-FROM base AS runner
+# --- Étape 3 : image d'exécution minimale ---
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public 2>/dev/null || true
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/src ./src
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules 2>/dev/null || true
+# Serveur autonome + ressources statiques générés par "output: 'standalone'"
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
@@ -43,4 +39,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

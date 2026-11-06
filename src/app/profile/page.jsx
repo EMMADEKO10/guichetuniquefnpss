@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -17,7 +19,7 @@ export default function ProfilePage() {
     enrollmentNumber: '',
     email: '',
     walletAddress: '',
-    role: 'APPLICANT'
+    role: 'REQUERANT'
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function ProfilePage() {
           enrollmentNumber: data.user.enrollmentNumber || '',
           email: data.user.email || '',
           walletAddress: data.user.walletAddress || '',
-          role: data.user.role || 'APPLICANT'
+          role: data.user.role || 'REQUERANT'
         });
       }
     } catch (err) {
@@ -300,3 +302,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

@@ -5,18 +5,20 @@ import Footer from '../components/ui/Footer.jsx';
 
 export const metadata = {
   title: 'Guichet Unique Dématérialisé — FNPSS (RDC)',
-  description: 'Portail officiel dématérialisé d\'enrôlement, de partenariat, d\'avis techniques et d\'exonérations pour les ONG et ASBL en RDC.',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=5',
+  description: 'Portail officiel dématérialisé d\'enrôlement, de partenariat, d\'avis techniques et d\'exonérations pour les ONG et ASBL en RDC.'
+};
+
+// Next.js 14 : viewport et themeColor doivent être exportés séparément des métadonnées.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
   themeColor: '#0a2540'
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="fr">
-      <head>
-        <meta charSet="utf-8" />
-        <link rel="icon" href="/favicon.ico" />
-      </head>
       <body>
         <Header />
         <main className="container" id="main-content">

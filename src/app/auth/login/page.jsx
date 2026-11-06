@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
@@ -32,7 +34,7 @@ export default function LoginPage() {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('fnpss_session_token', data.sessionToken);
           sessionStorage.setItem('fnpss_user', JSON.stringify(data.user || {}));
-          window.location.href = data.user?.role === 'APPLICANT' ? '/dashboard' : '/admin';
+          window.location.href = data.user?.role === 'REQUERANT' ? '/dashboard' : '/admin';
         }
       }
     } catch (err) {
