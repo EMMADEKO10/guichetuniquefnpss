@@ -1883,3 +1883,45 @@ test('23. Initialisation Next.js App Router, Design System UX-05, Authentificati
   assert.equal(checkData.status, 1);
   assert.equal(checkData.isValid, true);
 });
+
+test('24. Parcours Interactifs Next.js : Tableau de Bord Requérant (REQ-05), Assistant S1-S6 (REQ-06) & Console Back-Office Multi-Niveaux (ADM-01, ADM-04, ADM-08)', () => {
+  // 1. Tableau de bord requérant (REQ-05, REQ-08)
+  const dashboardSource = fs.readFileSync('src/app/dashboard/page.jsx', 'utf8');
+  assert.ok(dashboardSource.includes('Tableau de Bord Requérant'));
+  assert.ok(dashboardSource.includes('Dossiers Déposés'));
+  assert.ok(dashboardSource.includes('Attestations Délivrées'));
+  assert.ok(dashboardSource.includes('handleOpenEdit') && dashboardSource.includes('handleWithdraw'));
+  assert.ok(dashboardSource.includes('certificate.pdf'));
+
+  // 2. Assistant de soumission multi-étapes S1-S6 avec Once-Only (REQ-06, REQ-07, REQ-11)
+  const newAppSource = fs.readFileSync('src/app/applications/new/page.jsx', 'utf8');
+  assert.ok(newAppSource.includes('Nouvelle Demande de Démarche FNPSS'));
+  assert.ok(newAppSource.includes('Étape 1') && newAppSource.includes('Étape 2') && newAppSource.includes('Étape 3') && newAppSource.includes('Étape 4'));
+  assert.ok(newAppSource.includes('Once-Only') && newAppSource.includes('isExempted'));
+  assert.ok(newAppSource.includes('crypto.subtle.digest'));
+  assert.ok(newAppSource.includes('idempotencyKey'));
+
+  // 3. Console d\'administration back-office et circuit 5 niveaux (ADM-01, ADM-04, ADM-05, ADM-08, ADM-06, VER-06)
+  const adminSource = fs.readFileSync('src/app/admin/page.jsx', 'utf8');
+  assert.ok(adminSource.includes('Console d\'Instruction Back-Office FNPSS'));
+  assert.ok(adminSource.includes('AGENT') && adminSource.includes('CHEF_DIVISION') && adminSource.includes('DG') && adminSource.includes('MINISTERE'));
+  assert.ok(adminSource.includes('DocumentViewer') && adminSource.includes('Inspection Documentaire'));
+  assert.ok(adminSource.includes('handleDivisionOpinion') && adminSource.includes('isOpinionModalOpen'));
+  assert.ok(adminSource.includes('handleCosignMinistry') && adminSource.includes('isCosignModalOpen'));
+  assert.ok(adminSource.includes('handleRevoke') && adminSource.includes('doubleConfirmed'));
+
+  // 4. Intégrité des 5 routes d\'écrans clés de l\'application Next.js
+  const routes = [
+    'src/app/page.jsx',
+    'src/app/auth/login/page.jsx',
+    'src/app/auth/register/page.jsx',
+    'src/app/dashboard/page.jsx',
+    'src/app/applications/new/page.jsx',
+    'src/app/admin/page.jsx',
+    'src/app/verifier/page.jsx'
+  ];
+  for (const r of routes) {
+    assert.ok(fs.existsSync(r), `La route Next.js ${r} doit exister`);
+    assert.ok(fs.statSync(r).size > 500, `La route Next.js ${r} doit avoir du contenu substantiel`);
+  }
+});

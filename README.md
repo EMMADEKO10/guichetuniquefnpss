@@ -29,6 +29,9 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Accueil & Catalogue des Services : [src/app/page.jsx](src/app/page.jsx)
   - Layout Racine : [src/app/layout.jsx](src/app/layout.jsx)
   - Inscription & Connexion Requérant (`REQ-01`) : [src/app/auth/login/page.jsx](src/app/auth/login/page.jsx) · [src/app/auth/register/page.jsx](src/app/auth/register/page.jsx)
+  - Tableau de Bord Requérant (`REQ-05`, `REQ-08`) : [src/app/dashboard/page.jsx](src/app/dashboard/page.jsx)
+  - Assistant de Soumission Dynamique S1–S6 & Once-Only (`REQ-06`, `REQ-07`) : [src/app/applications/new/page.jsx](src/app/applications/new/page.jsx)
+  - Console Back-Office Multi-Niveaux & Inspection (`ADM-01`, `ADM-04`, `ADM-08`) : [src/app/admin/page.jsx](src/app/admin/page.jsx)
   - Portail de Vérification Douanière DGDA (`VER-03`) : [src/app/verifier/page.jsx](src/app/verifier/page.jsx)
 - **Routes API Hybrides (Bridges vers moteurs souverains) :** [src/app/api/auth/](src/app/api/auth/) · [src/app/api/verify/](src/app/api/verify/) · [src/app/api/applications/](src/app/api/applications/)
 - **Document de Bilan des Réalisations Techniques (.doc) :** [BILAN_REALISATIONS_TECHNIQUES_FNPSS.doc](BILAN_REALISATIONS_TECHNIQUES_FNPSS.doc)
@@ -56,7 +59,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
   - Matrice d'Accès Rôle/Route (Fail-Closed), Anti-IDOR & Anti-Escalade Serveur (`ADM-01`, `SEC-04`) : [src/security/route-access-policy.mjs](src/security/route-access-policy.mjs)
   - Serveur HTTP, Modes d'Accès Sécurisé/Démo, API REST du moteur & Interopérabilité DGDA (`VER-05`, `ADM-01`) : [src/server.mjs](src/server.mjs)
-- **Suite de Tests Automatisés (23 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`..`08`, `REQ-01`..`08`, `REQ-11`..`13`, `VER-06`, `UX-05`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+- **Suite de Tests Automatisés (24 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`..`08`, `REQ-01`..`08`, `REQ-11`..`13`, `VER-06`, `UX-05`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
 - **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue & Déploiement Backlog GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/bootstrap-backlog.yml](.github/workflows/bootstrap-backlog.yml)
 
