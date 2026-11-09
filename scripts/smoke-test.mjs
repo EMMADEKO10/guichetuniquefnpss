@@ -16,7 +16,11 @@ function isManifestIntact(distDir) {
     return (
       fs.existsSync(path.join(distDir, 'standalone/server.js')) &&
       Object.keys(pagesManifest).length >= 2 &&
-      Boolean(appManifest['/api/health/route'])
+      Boolean(appManifest['/api/health/route']) &&
+      Boolean(appManifest['/api/blockchain/anchor-queue/route']) &&
+      Boolean(appManifest['/api/blockchain/deploy/route']) &&
+      Boolean(appManifest['/api/pwa/sync/route']) &&
+      Boolean(appManifest['/api/ops/gates/route'])
     );
   } catch {
     return false;
@@ -101,6 +105,20 @@ try {
 
   const news = await fetch(`${BASE}/api/cms/news`);
   check('GET /api/cms/news public', news.status === 200, `HTTP ${news.status}`);
+
+  const pwaSync = await fetch(`${BASE}/api/pwa/sync`, { headers: { Authorization: `Bearer ${loginData.sessionToken}` } });
+  check('GET /api/pwa/sync (REQ-11 brouillon & file hors-ligne)', pwaSync.status === 200, `HTTP ${pwaSync.status}`);
+
+  const staffLogin = await fetch(`${BASE}/api/auth/login`, json('POST', { email: 'dg@fnpss.cd', password: 'StaffFNPSS#2026' }));
+  const staffData = await staffLogin.json();
+  const anchorQueue = await fetch(`${BASE}/api/blockchain/anchor-queue`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
+  check('GET /api/blockchain/anchor-queue (BLK-09/BLK-10 Relayer)', anchorQueue.status === 200, `HTTP ${anchorQueue.status}`);
+
+  const deployInfo = await fetch(`${BASE}/api/blockchain/deploy`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
+  check('GET /api/blockchain/deploy (BLK-11 Polygon Amoy)', deployInfo.status === 200, `HTTP ${deployInfo.status}`);
+
+  const gatesInfo = await fetch(`${BASE}/api/ops/gates`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
+  check('GET /api/ops/gates (GOV-12 Jalon G2 Alpha)', gatesInfo.status === 200, `HTTP ${gatesInfo.status}`);
 
   const v = await fetch(`${BASE}/api/verify?hash=0x${'ab'.repeat(32)}`);
   check('GET /api/verify (hash inconnu)', v.status === 200 || v.status === 404, `HTTP ${v.status}`);

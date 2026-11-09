@@ -113,3 +113,6 @@ export class OfflinePwaSyncQueue {
   }
 }
 
+export const offlinePwaSyncQueue = new OfflinePwaSyncQueue();
+
+

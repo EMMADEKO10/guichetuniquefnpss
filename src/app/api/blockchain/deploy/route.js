@@ -1,0 +1,63 @@
+/**
+ * @fileoverview Route API Next.js — Déploiement et Vérification du Smart Contract `FNPSSRegistry.sol`
+ * sur Polygon Amoy Testnet (`BLK-11`, Chain ID 80002) et Polygon PoS Mainnet (`BLK-12`, Chain ID 137).
+ * - GET  /api/blockchain/deploy : réseaux configurés et dernier rapport de déploiement / smoke test
+ * - POST /api/blockchain/deploy : déploie et vérifie le contrat (réservé à ADMIN / DG)
+ */
+
+import { POLYGON_NETWORKS, deployAndVerifyRegistryContract } from '../../../../blockchain/polygon-deployer.mjs';
+import { Roles } from '../../../../workflow/application-engine.mjs';
+import { requireActor, isStaff, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+
+export const dynamic = 'force-dynamic';
+
+let latestDeploymentReport = deployAndVerifyRegistryContract({
+  networkKey: 'polygon-amoy',
+  initialRelayerBalancePol: 25.0
+});
+
+export async function GET(request) {
+  try {
+    const actor = requireActor(request);
+    if (!isStaff(actor)) {
+      throw new HttpError(403, 'RBAC: Accès réservé au personnel habilité FNPSS.');
+    }
+
+    return Response.json({
+      success: true,
+      networks: POLYGON_NETWORKS,
+      latestDeployment: latestDeploymentReport
+    });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
+export async function POST(request) {
+  try {
+    const actor = requireActor(request);
+    if (![Roles.ADMIN, Roles.DG].includes(actor.role)) {
+      throw new HttpError(403, 'RBAC: Seuls l\'Administrateur Système ou la Direction Générale peuvent déployer le Smart Contract.');
+    }
+
+    const body = await readJson(request);
+    const networkKey = body.networkKey || 'polygon-amoy';
+    // La validation de l'audit de sécurité Mainnet provient exclusivement de la configuration serveur
+    const serverAuditPassed = process.env.FNPSS_MAINNET_AUDIT_PASSED === 'true';
+
+    const report = deployAndVerifyRegistryContract({
+      networkKey,
+      initialRelayerBalancePol: body.initialRelayerBalancePol !== undefined ? Number(body.initialRelayerBalancePol) : 25.0,
+      auditPassed: serverAuditPassed
+    });
+
+    latestDeploymentReport = report;
+    return Response.json({
+      success: true,
+      deployment: report
+    }, { status: 201 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+

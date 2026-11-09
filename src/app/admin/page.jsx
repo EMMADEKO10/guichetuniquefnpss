@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [revokeData, setRevokeData] = useState({ reason: '', doubleConfirmed: false });
 
   const [statusMsg, setStatusMsg] = useState('');
+  const [blockchainInfo, setBlockchainInfo] = useState({ relayer: null, queue: null, deployment: null, milestoneG2: null });
 
   const ensureStaffSession = async (targetRole = role) => {
     const email = DEMO_STAFF_EMAILS[targetRole];
@@ -74,7 +75,12 @@ export default function AdminPage() {
     setIsLoading(true);
     try {
       const tk = tokenOverride || sessionToken || (await ensureStaffSession(role));
-      const res = await fetch('/api/applications', { headers: authHeaders(tk) });
+      const [res, queueRes, deployRes, gatesRes] = await Promise.all([
+        fetch('/api/applications', { headers: authHeaders(tk) }),
+        fetch('/api/blockchain/anchor-queue', { headers: authHeaders(tk) }),
+        fetch('/api/blockchain/deploy', { headers: authHeaders(tk) }),
+        fetch('/api/ops/gates', { headers: authHeaders(tk) })
+      ]);
       const data = await res.json();
       if (data.success) {
         setApplications(data.applications || []);
@@ -82,10 +88,53 @@ export default function AdminPage() {
           setSelectedApp(data.applications[0]);
         }
       }
+      const qData = queueRes.ok ? await queueRes.json() : {};
+      const dData = deployRes.ok ? await deployRes.json() : {};
+      const gData = gatesRes.ok ? await gatesRes.json() : {};
+      setBlockchainInfo({
+        relayer: qData.relayer || null,
+        queue: qData.queue || null,
+        deployment: dData.latestDeployment || null,
+        milestoneG2: gData.milestoneG2Alpha || null
+      });
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleFlushAnchorQueue = async () => {
+    try {
+      const res = await fetch('/api/blockchain/anchor-queue', {
+        method: 'POST',
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ action: 'flush', isNetworkOnline: true })
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setStatusMsg(`File d'ancrage résiliente traitée (${d.queue?.confirmedCount || 0} transaction(s) confirmée(s) sur Polygon).`);
+        fetchApplications();
+      }
+    } catch {
+      alert('Erreur réseau');
+    }
+  };
+
+  const handleDeployAmoy = async () => {
+    try {
+      const res = await fetch('/api/blockchain/deploy', {
+        method: 'POST',
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ networkKey: 'polygon-amoy', initialRelayerBalancePol: 25 })
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setStatusMsg(`Contrat FNPSSRegistry vérifié sur Polygon Amoy (${d.deployment?.contractAddress?.slice(0, 12)}...). Smoke test OK.`);
+        fetchApplications();
+      }
+    } catch {
+      alert('Erreur réseau');
     }
   };
 
@@ -259,7 +308,7 @@ export default function AdminPage() {
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', fontWeight: 600 }}>Rôle actif :</span>
-          {['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE'].map((r) => (
+          {['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'].map((r) => (
             <button
               key={r}
               type="button"
@@ -279,6 +328,37 @@ export default function AdminPage() {
               {r}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Bandeau Relayer Blockchain Polygon Amoy, File Résiliente & Jalon G2 Alpha (BLK-09..11, GOV-12) */}
+      <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', fontSize: '12px' }}>
+        <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span>
+            <strong>Réseau :</strong> {blockchainInfo.deployment?.network?.name || 'Polygon Amoy Testnet (80002)'}
+          </span>
+          <span className="mono">
+            <strong>Contrat :</strong> {(blockchainInfo.deployment?.contractAddress || '0x1111...').slice(0, 14)}...
+          </span>
+          <span>
+            <strong>Relayer Paymaster :</strong> 0 crypto requérant ({blockchainInfo.relayer?.anchoredDocumentsCount ?? 0} actes ancrés)
+          </span>
+          <span>
+            <strong>File résiliente (BLK-10) :</strong> {blockchainInfo.queue?.queuedCount ?? 0} en attente / {blockchainInfo.queue?.confirmedCount ?? 0} confirmé(s)
+          </span>
+          <Badge status="valide">
+            Jalon G2 Alpha : {blockchainInfo.milestoneG2?.status || 'VALIDATED'}
+          </Badge>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleFlushAnchorQueue}>
+            🔄 Synchroniser File d&apos;Ancrage
+          </Button>
+          {(role === 'DG' || role === 'ADMIN') && (
+            <Button variant="primary" size="sm" onClick={handleDeployAmoy}>
+              ⛓️ Qualifier Contrat Amoy (BLK-11)
+            </Button>
+          )}
         </div>
       </div>
 

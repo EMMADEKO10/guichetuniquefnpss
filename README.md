@@ -35,10 +35,11 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Assistant de Soumission Dynamique S1–S6 & Once-Only (`REQ-06`, `REQ-07`, `REQ-11`) : [src/app/applications/new/page.jsx](src/app/applications/new/page.jsx)
   - Console Back-Office Multi-Niveaux & Inspection (`ADM-01`, `ADM-04`, `ADM-05`, `ADM-08`, `ADM-06`, `VER-06`) : [src/app/admin/page.jsx](src/app/admin/page.jsx)
   - Portail de Vérification Douanière DGDA (`VER-03`) : [src/app/verifier/page.jsx](src/app/verifier/page.jsx)
-- **Routes API Hybrides (Bridges vers moteurs souverains, Sprint 1–3) :**
+- **Routes API Hybrides (Bridges vers moteurs souverains, Sprint 1–4 & Jalon G2 Alpha) :**
   - `/api/auth/login`, `/api/auth/register`, `/api/auth/google`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/profile`, `/api/auth/logout`
   - `/api/applications`, `/api/applications/[action]` (`validate-payment`, `request-complement`, `provide-complement`, `division-opinion`, `approve-seal`, `reject`, `cosign-ministry`, `revoke`, `withdraw`), `/api/applications/certificate.pdf`
   - `/api/notifications`, `/api/cms/news`, `/api/admin/applicants`, `/api/admin/audit`, `/api/verify`, `/api/health`
+  - `/api/blockchain/anchor-queue` (`BLK-09`, `BLK-10`), `/api/blockchain/deploy` (`BLK-11`, `BLK-12`), `/api/pwa/sync` (`REQ-11`), `/api/ops/gates` (`GOV-12`, `OPS-05`)
 - **Déploiement Continu & Rollback Staging (`OPS-04`) :**
   - Pipeline GitHub Actions Staging Blue/Green : [.github/workflows/deploy-staging.yml](.github/workflows/deploy-staging.yml)
   - Procédure Opérationnelle & Rollback : [PROCEDURE_DEPLOIEMENT_ET_ROLLBACK_STAGING.md](documentation%20du%20projet/PROCEDURE_DEPLOIEMENT_ET_ROLLBACK_STAGING.md)
@@ -68,7 +69,7 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
   - Matrice d'Accès Rôle/Route (Fail-Closed), Anti-IDOR & Anti-Escalade Serveur (`ADM-01`, `SEC-04`) : [src/security/route-access-policy.mjs](src/security/route-access-policy.mjs)
   - Serveur HTTP, Modes d'Accès Sécurisé/Démo, API REST du moteur & Interopérabilité DGDA (`VER-05`, `ADM-01`) : [src/server.mjs](src/server.mjs)
-- **Suite de Tests Automatisés (26 suites unitaires et E2E) (`BLK-08`, `SEC-01`, `SEC-02`, `ADM-01`..`10`, `REQ-01`..`13`, `NOT-01`..`04`, `VER-06`, `UX-05`, `OPS-04`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+- **Suite de Tests Automatisés (27 suites unitaires et E2E) (`BLK-05`..`12`, `SEC-01`, `SEC-02`, `ADM-01`..`10`, `REQ-01`..`13`, `NOT-01`..`04`, `VER-06`, `UX-05`, `OPS-04`, `OPS-05`, `GOV-12`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
 - **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue & Déploiement Backlog GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/bootstrap-backlog.yml](.github/workflows/bootstrap-backlog.yml)
 

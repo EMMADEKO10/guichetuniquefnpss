@@ -2387,3 +2387,231 @@ test('26. Sprint 3 API Next.js : Instruction Back-Office (ADM-03..08, ADM-10), E
   );
   assert.equal(createNewsRes.status, 201);
 });
+
+test('27. Sprint 4 API Next.js : Relayer & File Résiliente d\'Ancrage (BLK-09, BLK-10), Déploiement Polygon Amoy (BLK-11), File Hors-Ligne PWA (REQ-11) & Jalon G2 Alpha / Sauvegarde Chiffrée (GOV-12, OPS-05)', async () => {
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const anchorQueueRoute = await import('../src/app/api/blockchain/anchor-queue/route.js');
+  const deployRoute = await import('../src/app/api/blockchain/deploy/route.js');
+  const pwaSyncRoute = await import('../src/app/api/pwa/sync/route.js');
+  const opsGatesRoute = await import('../src/app/api/ops/gates/route.js');
+  const verifyRoute = await import('../src/app/api/verify/route.js');
+
+  const jsonReq = (url, method, body, token = '') =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+
+  const loginAs = async (email, password) => {
+    const res = await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email, password }));
+    assert.equal(res.status, 200);
+    return res.json();
+  };
+
+  const pwaEmail = `ong.pwa.${Date.now()}@kivu.cd`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Résilience 3G Nord-Kivu',
+    representativeName: 'Chantal Kahindo',
+    email: pwaEmail,
+    password: 'PasswordRDC#2026'
+  }));
+
+  const { sessionToken: tokenReq } = await loginAs(pwaEmail, 'PasswordRDC#2026');
+  const { sessionToken: tokenAgent } = await loginAs('agent@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenDg } = await loginAs('dg@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenAdmin } = await loginAs('admin@fnpss.cd', 'StaffFNPSS#2026');
+
+  // 1. Contrôle RBAC sur le Relayer & File Résiliente d'Ancrage (BLK-09, BLK-10)
+  const unauthQueueRes = await anchorQueueRoute.GET(new Request('http://localhost:3000/api/blockchain/anchor-queue'));
+  assert.equal(unauthQueueRes.status, 401);
+
+  const reqForbiddenQueue = await anchorQueueRoute.GET(
+    new Request('http://localhost:3000/api/blockchain/anchor-queue', {
+      headers: { Authorization: `Bearer ${tokenReq}` }
+    })
+  );
+  assert.equal(reqForbiddenQueue.status, 403);
+
+  const statusQueueRes = await anchorQueueRoute.GET(
+    new Request('http://localhost:3000/api/blockchain/anchor-queue', {
+      headers: { Authorization: `Bearer ${tokenDg}` }
+    })
+  );
+  assert.equal(statusQueueRes.status, 200);
+  const statusQueueData = await statusQueueRes.json();
+  assert.equal(statusQueueData.relayer.zeroCryptoForApplicant, true);
+  assert.equal(statusQueueData.relayer.gasSponsorshipModel, 'BACKEND_PAYMASTER_RELAYER');
+
+  // Mise en file d'attente d'un acte pendant une coupure RPC (isNetworkOnline: false) puis reprise (isNetworkOnline: true)
+  const queuedHash = '0x' + 'c4'.repeat(32);
+  const queuedCert = `FNPSS-QUEUE-2026-${Date.now()}`;
+  const enqueueRes = await anchorQueueRoute.POST(
+    jsonReq('http://localhost:3000/api/blockchain/anchor-queue', 'POST', {
+      action: 'enqueue',
+      docHash: queuedHash,
+      certificateNumber: queuedCert,
+      serviceCode: 6,
+      expiresAt: Math.floor(Date.now() / 1000) + 86400 * 365
+    }, tokenDg)
+  );
+  assert.equal(enqueueRes.status, 201);
+  assert.equal((await enqueueRes.json()).job.status, 'QUEUED');
+
+  // Coupure réseau simulée : le job reste en attente avec NETWORK_OFFLINE_QUEUED
+  const offlineFlushRes = await anchorQueueRoute.POST(
+    jsonReq('http://localhost:3000/api/blockchain/anchor-queue', 'POST', {
+      action: 'flush',
+      isNetworkOnline: false
+    }, tokenDg)
+  );
+  assert.equal(offlineFlushRes.status, 200);
+  const offlineFlushData = await offlineFlushRes.json();
+  const offlineJob = offlineFlushData.processed.find(j => j.docHash === queuedHash);
+  assert.equal(offlineJob.lastError, 'NETWORK_OFFLINE_QUEUED');
+
+  // Reprise réseau : le job est confirmé et ancré sur le registre
+  const onlineFlushRes = await anchorQueueRoute.POST(
+    jsonReq('http://localhost:3000/api/blockchain/anchor-queue', 'POST', {
+      action: 'flush',
+      isNetworkOnline: true
+    }, tokenDg)
+  );
+  assert.equal(onlineFlushRes.status, 200);
+  const onlineFlushData = await onlineFlushRes.json();
+  const confirmedJob = onlineFlushData.processed.find(j => j.docHash === queuedHash);
+  assert.equal(confirmedJob.status, 'CONFIRMED');
+  assert.match(confirmedJob.txHash, /^0x[0-9a-f]{64}$/);
+
+  // Vérification publique immédiate de l'acte ancré via la file résiliente
+  const checkAnchored = await verifyRoute.GET(new Request(`http://localhost:3000/api/verify?hash=${queuedHash}`));
+  assert.equal(checkAnchored.status, 200);
+  assert.equal((await checkAnchored.json()).verdict, 'PASTILLE_VERTE_VALIDE');
+
+  // 2. Déploiement & Qualification du Smart Contract sur Polygon Amoy Testnet (BLK-11, BLK-12)
+  const getDeployRes = await deployRoute.GET(
+    new Request('http://localhost:3000/api/blockchain/deploy', {
+      headers: { Authorization: `Bearer ${tokenAgent}` }
+    })
+  );
+  assert.equal(getDeployRes.status, 200);
+  const getDeployData = await getDeployRes.json();
+  assert.equal(getDeployData.networks.AMOY_TESTNET.chainId, 80002);
+
+  // Rejet du réseau déprécié Mumbai (80001)
+  const mumbaiRes = await deployRoute.POST(
+    jsonReq('http://localhost:3000/api/blockchain/deploy', 'POST', { networkKey: 'polygon-mumbai' }, tokenAdmin)
+  );
+  assert.equal(mumbaiRes.status, 400);
+
+  // Rejet de Mainnet (137) tant que l'audit serveur n'est pas activé, même si le client passe auditPassed: true
+  const mainnetBlockedRes = await deployRoute.POST(
+    jsonReq('http://localhost:3000/api/blockchain/deploy', 'POST', { networkKey: 'polygon-mainnet', auditPassed: true }, tokenAdmin)
+  );
+  assert.equal(mainnetBlockedRes.status, 400);
+
+  // Déploiement et smoke test sur Polygon Amoy Testnet (80002)
+  const amoyDeployRes = await deployRoute.POST(
+    jsonReq('http://localhost:3000/api/blockchain/deploy', 'POST', {
+      networkKey: 'polygon-amoy',
+      initialRelayerBalancePol: 30
+    }, tokenAdmin)
+  );
+  assert.equal(amoyDeployRes.status, 201);
+  const amoyDeployData = await amoyDeployRes.json();
+  assert.equal(amoyDeployData.deployment.network.chainId, 80002);
+  assert.equal(amoyDeployData.deployment.sourceCodeVerified, true);
+  assert.equal(amoyDeployData.deployment.smokeTest.passed, true);
+
+  // 3. File Hors-Ligne PWA & Synchronisation Idempotente anti-doublon (REQ-11)
+  const draftRes = await pwaSyncRoute.POST(
+    jsonReq('http://localhost:3000/api/pwa/sync', 'POST', {
+      action: 'save-draft',
+      draft: {
+        serviceCode: 'S1',
+        projectTitle: 'Brouillon hors-ligne Masisi',
+        goodsSummary: 'Tentes médicales',
+        paymentReference: 'RAWBANK-PWA-DRAFT-01'
+      }
+    }, tokenReq)
+  );
+  assert.equal(draftRes.status, 200);
+  assert.equal((await draftRes.json()).draft.projectTitle, 'Brouillon hors-ligne Masisi');
+
+  const pwaPayload = {
+    serviceCode: 'S1',
+    projectTitle: 'Enrôlement hors-ligne 3G Masisi',
+    goodsSummary: 'Équipements cliniques',
+    paymentReference: 'RAWBANK-PWA-SYNC-001',
+    uploadedDocTypes: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE']
+  };
+
+  // Premier envoi en file hors-ligne -> 201 (deduplicated: false)
+  const pwaEnq1 = await pwaSyncRoute.POST(
+    jsonReq('http://localhost:3000/api/pwa/sync', 'POST', { action: 'enqueue', payload: pwaPayload }, tokenReq)
+  );
+  assert.equal(pwaEnq1.status, 201);
+  const pwaEnq1Data = await pwaEnq1.json();
+  assert.equal(pwaEnq1Data.submission.deduplicated, false);
+
+  // Rebond réseau 3G (même demande soumise une seconde fois) -> 200 (deduplicated: true, zéro doublon)
+  const pwaEnq2 = await pwaSyncRoute.POST(
+    jsonReq('http://localhost:3000/api/pwa/sync', 'POST', { action: 'enqueue', payload: pwaPayload }, tokenReq)
+  );
+  assert.equal(pwaEnq2.status, 200);
+  assert.equal((await pwaEnq2.json()).submission.deduplicated, true);
+
+  // Synchronisation automatique au retour de la connexion
+  const pwaSyncRes = await pwaSyncRoute.POST(
+    jsonReq('http://localhost:3000/api/pwa/sync', 'POST', { action: 'sync', isOnline: true }, tokenReq)
+  );
+  assert.equal(pwaSyncRes.status, 200);
+  const pwaSyncData = await pwaSyncRes.json();
+  assert.equal(pwaSyncData.results.length, 1);
+  assert.equal(pwaSyncData.results[0].status, 'SYNCED');
+  assert.match(pwaSyncData.results[0].referenceNumber, /^FNPSS\/DEM\//);
+
+  // 4. Évaluation du Jalon G2 Alpha (GOV-12) et Sauvegarde Chiffrée AES-256-GCM (OPS-05)
+  const gatesRes = await opsGatesRoute.GET(
+    new Request('http://localhost:3000/api/ops/gates', {
+      headers: { Authorization: `Bearer ${tokenDg}` }
+    })
+  );
+  assert.equal(gatesRes.status, 200);
+  const gatesData = await gatesRes.json();
+  assert.equal(gatesData.milestoneG2Alpha.gate, 'G2');
+  assert.equal(gatesData.milestoneG2Alpha.status, 'VALIDATED');
+  assert.equal(gatesData.evaluation.allGatesGreen, true);
+
+  // Sauvegarde chiffrée : refusée sans clé explicite 64 hex
+  const noKeyBackup = await opsGatesRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/gates', 'POST', { action: 'backup' }, tokenAdmin)
+  );
+  assert.equal(noKeyBackup.status, 400);
+
+  const explicitKey = 'e5'.repeat(32);
+  const backupRes = await opsGatesRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/gates', 'POST', {
+      action: 'backup',
+      encryptionKeyHex: explicitKey
+    }, tokenAdmin)
+  );
+  assert.equal(backupRes.status, 200);
+  const backupBundle = (await backupRes.json()).backup;
+  assert.equal(backupBundle.cipherAlgorithm, 'AES-256-GCM');
+
+  const restoreRes = await opsGatesRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/gates', 'POST', {
+      action: 'restore',
+      backup: backupBundle,
+      encryptionKeyHex: explicitKey
+    }, tokenAdmin)
+  );
+  assert.equal(restoreRes.status, 200);
+  assert.equal((await restoreRes.json()).integrityVerified, true);
+});
+

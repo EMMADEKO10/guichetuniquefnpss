@@ -817,6 +817,12 @@ struct CertificateRecord {
         <td>Routes d'instruction RBAC côté serveur, exemption Once-Only P2 vérifiée sur S1 délivré, téléchargement PDF tracé (REQ-09), centre de notifications anti-IDOR (NOT-01..04), gestion ONG (ADM-03), export CSV audit (ADM-07) et CMS (ADM-10).</td>
         <td><span class="badge-done">&#10003; PASS</span></td>
       </tr>
+      <tr>
+        <td><strong>27</strong></td>
+        <td>Sprint 4 API Next.js & Jalon G2 Alpha : Relayer & File Résiliente (BLK-09/10), Polygon Amoy (BLK-11), File Hors-Ligne PWA (REQ-11) & Sauvegarde Chiffrée (GOV-12, OPS-05)</td>
+        <td>Sponsorisation gaz Paymaster (0 crypto requérant), file d'ancrage résiliente aux coupures RPC, déploiement et smoke test Polygon Amoy (80002), déduplication idempotente PWA hors-ligne 3G, validation G2 Alpha et sauvegarde/restauration AES-256-GCM.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
     </tbody>
   </table>
 

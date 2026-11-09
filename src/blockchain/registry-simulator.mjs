@@ -337,5 +337,11 @@ registrySimulator.setMinistrySigner(
   true
 );
 
+export const resilientAnchorQueue = new ResilientAnchorQueue(
+  registrySimulator,
+  '0x2222222222222222222222222222222222222222'
+);
+
+
 
 
