@@ -829,6 +829,12 @@ struct CertificateRecord {
         <td>Contrôle douanier par numéro d'acte et téléversement PDF sans QR Code, quotas X-API-Key DGDA/DGRAD/DGI, statistiques exécutives et export CSV comptable, supervision 3G (&lt; 3,0s) et qualification G3 Beta (SEC-03, SEC-04, SEC-07).</td>
         <td><span class="badge-done">&#10003; PASS</span></td>
       </tr>
+      <tr>
+        <td><strong>29</strong></td>
+        <td>Sprint 6 API Next.js & Jalon G4 Production : Infrastructure Souveraine (OPS-07, DEP-01), Polygon Mainnet (BLK-12), Guide ONG (DEP-03), Formations FNPSS/Ministères/DGDA (DEP-04/05) & Go/No-Go G4 (DEP-02)</td>
+        <td>Cluster souverain Kinshasa/Lubumbashi (RPO 15m, RTO 30m, TLS 1.3), certification serveur d'audit et déploiement Polygon Mainnet (137, 250 POL), guide ONG publié (/guide), émargement formations et signature Go/No-Go G4.</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
     </tbody>
   </table>
 

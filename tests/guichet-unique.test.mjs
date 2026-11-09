@@ -2841,4 +2841,124 @@ test('28. Sprint 5 API Next.js & Jalon G3 Beta : Vérification PDF sans Scan QR 
   assert.equal(supData.milestoneG3Beta.sec07UatScenarios.status, 'SIGNED');
 });
 
+test('29. Sprint 6 API Next.js & Jalon G4 Production : Infrastructure Souveraine (OPS-07, DEP-01), Déploiement Polygon Mainnet (BLK-12), Guide ONG (DEP-03), Formations FNPSS/Ministères/DGDA (DEP-04/05) & Go/No-Go G4 (DEP-02)', async () => {
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const prodRoute = await import('../src/app/api/ops/production/route.js');
+  const deployRoute = await import('../src/app/api/blockchain/deploy/route.js');
+
+  const jsonReq = (url, method, body, token = '') =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+
+  const loginAs = async (email, password) => {
+    const res = await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email, password }));
+    assert.equal(res.status, 200);
+    return res.json();
+  };
+
+  const { sessionToken: tokenAgent } = await loginAs('agent@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenDg } = await loginAs('dg@fnpss.cd', 'StaffFNPSS#2026');
+
+  // 1. Guide Utilisateur Simplifié ONG/ASBL publié publiquement sur le portail (DEP-03)
+  const publicGuideRes = await prodRoute.GET(
+    new Request('http://localhost:3000/api/ops/production?section=guide-ong')
+  );
+  assert.equal(publicGuideRes.status, 200);
+  const publicGuideData = await publicGuideRes.json();
+  assert.equal(publicGuideData.dep03OngUserGuide.publishedOnPortal, true);
+  assert.equal(publicGuideData.dep03OngUserGuide.reviewedByOngPanel, true);
+  assert.equal(publicGuideData.dep03OngUserGuide.modulesCount, 5);
+  assert.ok(fs.existsSync('src/app/guide/page.jsx'));
+
+  // 2. Consultation de l'infrastructure souveraine & plan PRA (OPS-07, DEP-01)
+  const unauthProdRes = await prodRoute.GET(new Request('http://localhost:3000/api/ops/production'));
+  assert.equal(unauthProdRes.status, 401);
+
+  const staffProdRes = await prodRoute.GET(
+    new Request('http://localhost:3000/api/ops/production', {
+      headers: { Authorization: `Bearer ${tokenDg}` }
+    })
+  );
+  assert.equal(staffProdRes.status, 200);
+  const staffProdData = await staffProdRes.json();
+  assert.equal(staffProdData.sovereignCluster.primarySite.code, 'KINSHASA_GOMBE_DC1');
+  assert.equal(staffProdData.sovereignCluster.disasterRecoverySite.rpoTargetMinutes, 15);
+  assert.equal(staffProdData.sovereignCluster.disasterRecoverySite.rtoTargetMinutes, 30);
+  assert.deepEqual(staffProdData.sovereignCluster.networkAndSecurity.exposedPorts, [443]);
+  assert.equal(staffProdData.dep01ProductionMigration.status, 'MIGRATED_SOVEREIGN_PROD');
+
+  // 3. Formations FNPSS (DEP-04), Ministères & Douaniers DGDA (DEP-05) avec feuille d'émargement
+  assert.equal(staffProdData.dep04And05Trainings.sessionsCount, 3);
+  const trnRes = await prodRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/production', 'POST', {
+      action: 'record-training',
+      sessionId: 'TRN-DGDA-DOUANE',
+      participantName: 'Inspecteur Laurent Bahati',
+      institution: 'DGDA — Poste Frontalier de Goma (Nord-Kivu)',
+      role: 'DOUANE',
+      practicalQrExercisePassed: true,
+      quizScorePct: 97
+    }, tokenDg)
+  );
+  assert.equal(trnRes.status, 201);
+  const trnData = await trnRes.json();
+  assert.equal(trnData.participant.practicalQrExercisePassed, true);
+  assert.equal(trnData.participant.quizScorePct, 97);
+
+  // 4. Certification serveur de clôture d'audit (SEC-03/SEC-05) & Déploiement Polygon Mainnet (BLK-12)
+  // Un simple AGENT ne peut pas certifier l'audit Mainnet -> 403
+  const agentCertifyRes = await prodRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/production', 'POST', {
+      action: 'certify-mainnet-audit'
+    }, tokenAgent)
+  );
+  assert.equal(agentCertifyRes.status, 403);
+
+  // La DG certifie formellement la clôture de l'audit Smart Contract & Pen-test OWASP
+  const dgCertifyRes = await prodRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/production', 'POST', {
+      action: 'certify-mainnet-audit',
+      auditReportRef: 'SEC-03-AUDIT-FINAL-2026-PASS',
+      pentestReportRef: 'SEC-04-PENTEST-FINAL-2026-PASS'
+    }, tokenDg)
+  );
+  assert.equal(dgCertifyRes.status, 200);
+  assert.equal((await dgCertifyRes.json()).certification.certified, true);
+
+  // Déploiement effectif sur Polygon PoS Mainnet (Chain ID 137) avec provision de gaz initiale de 250 POL (BLK-12)
+  const mainnetDeployRes = await deployRoute.POST(
+    jsonReq('http://localhost:3000/api/blockchain/deploy', 'POST', {
+      networkKey: 'polygon-mainnet',
+      initialRelayerBalancePol: 250
+    }, tokenDg)
+  );
+  assert.equal(mainnetDeployRes.status, 201);
+  const mainnetDeployData = await mainnetDeployRes.json();
+  assert.equal(mainnetDeployData.deployment.network.chainId, 137);
+  assert.equal(mainnetDeployData.deployment.network.isMainnet, true);
+  assert.equal(mainnetDeployData.deployment.relayerGasProvisionPol, 250);
+  assert.equal(mainnetDeployData.deployment.smokeTest.passed, true);
+
+  // 5. Décision formelle Go/No-Go Jalon G4 de mise en production (DEP-02)
+  const g4SignRes = await prodRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/production', 'POST', {
+      action: 'sign-go-nogo-g4',
+      residualRisksAccepted: true,
+      sponsorNote: 'Mise en production souveraine approuvée par la DG FNPSS — Jalon G4'
+    }, tokenDg)
+  );
+  assert.equal(g4SignRes.status, 200);
+  const g4SignData = await g4SignRes.json();
+  assert.equal(g4SignData.signOff.signed, true);
+  assert.equal(g4SignData.signOff.decision, 'GO_PRODUCTION');
+  assert.equal(g4SignData.signOff.evaluation.allGatesGreen, true);
+});
+
+
 

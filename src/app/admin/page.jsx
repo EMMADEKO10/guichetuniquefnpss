@@ -388,6 +388,13 @@ export default function AdminPage() {
               >
                 📊 Export CSV (ADM-09)
               </a>
+              <a
+                href="/guide"
+                className="btn btn-outline btn-sm"
+                style={{ textDecoration: 'none' }}
+              >
+                🎓 Guides &amp; Formations (DEP-03..05)
+              </a>
             </>
           )}
         </div>

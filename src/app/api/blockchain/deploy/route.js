@@ -6,6 +6,7 @@
  */
 
 import { POLYGON_NETWORKS, deployAndVerifyRegistryContract } from '../../../../blockchain/polygon-deployer.mjs';
+import { productionTrainingManager } from '../../../../ops/production-training-manager.mjs';
 import { Roles } from '../../../../workflow/application-engine.mjs';
 import { requireActor, isStaff, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
 
@@ -42,8 +43,10 @@ export async function POST(request) {
 
     const body = await readJson(request);
     const networkKey = body.networkKey || 'polygon-amoy';
-    // La validation de l'audit de sécurité Mainnet provient exclusivement de la configuration serveur
-    const serverAuditPassed = process.env.FNPSS_MAINNET_AUDIT_PASSED === 'true';
+    // La validation de l'audit de sécurité Mainnet provient exclusivement de la configuration ou certification serveur
+    const serverAuditPassed =
+      process.env.FNPSS_MAINNET_AUDIT_PASSED === 'true' ||
+      productionTrainingManager.isMainnetAuditCertified();
 
     const report = deployAndVerifyRegistryContract({
       networkKey,
@@ -51,6 +54,9 @@ export async function POST(request) {
       auditPassed: serverAuditPassed
     });
 
+    if (report.network?.isMainnet) {
+      productionTrainingManager.recordMainnetDeployment(report);
+    }
     latestDeploymentReport = report;
     return Response.json({
       success: true,

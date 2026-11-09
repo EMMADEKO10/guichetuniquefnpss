@@ -66,6 +66,18 @@ export default function Header({
 
         {/* Contrôles statut & réseau */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <a
+            href="/guide"
+            style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
+          >
+            📘 Guide ONG &amp; Formations
+          </a>
+          <a
+            href="/verifier"
+            style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
+          >
+            🔍 Contrôle Douane DGDA
+          </a>
           <span
             className="net-pill"
             style={{

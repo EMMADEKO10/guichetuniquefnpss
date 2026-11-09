@@ -22,7 +22,8 @@ function isManifestIntact(distDir) {
       Boolean(appManifest['/api/pwa/sync/route']) &&
       Boolean(appManifest['/api/ops/gates/route']) &&
       Boolean(appManifest['/api/admin/stats/route']) &&
-      Boolean(appManifest['/api/ops/supervision/route'])
+      Boolean(appManifest['/api/ops/supervision/route']) &&
+      Boolean(appManifest['/api/ops/production/route'])
     );
   } catch {
     return false;
@@ -72,7 +73,7 @@ async function waitReady() {
 try {
   if (!(await waitReady())) throw new Error('Serveur non démarré :\n' + logs);
 
-  for (const p of ['/', '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/dashboard', '/profile', '/applications/new', '/admin', '/verifier']) {
+  for (const p of ['/', '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/dashboard', '/profile', '/applications/new', '/admin', '/verifier', '/guide']) {
     const r = await fetch(BASE + p);
     const html = await r.text();
     check(`GET ${p}`, r.status === 200 && html.includes('Guichet Unique'), `HTTP ${r.status}`);
@@ -127,6 +128,12 @@ try {
 
   const supInfo = await fetch(`${BASE}/api/ops/supervision`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
   check('GET /api/ops/supervision (OPS-06, REQ-12 Budget 3G & GOV-13 Jalon G3 Beta)', supInfo.status === 200, `HTTP ${supInfo.status}`);
+
+  const prodGuide = await fetch(`${BASE}/api/ops/production?section=guide-ong`);
+  check('GET /api/ops/production?section=guide-ong (DEP-03 Guide ONG public)', prodGuide.status === 200, `HTTP ${prodGuide.status}`);
+
+  const prodInfo = await fetch(`${BASE}/api/ops/production`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
+  check('GET /api/ops/production (OPS-07, DEP-01/02/04/05 & Jalon G4)', prodInfo.status === 200, `HTTP ${prodInfo.status}`);
 
   const v = await fetch(`${BASE}/api/verify?hash=0x${'ab'.repeat(32)}`, { headers: { 'X-API-Key': 'dgda-live-key-2026' } });
   check('GET /api/verify + X-API-Key DGDA (VER-03/VER-05)', (v.status === 200 || v.status === 404) && v.headers.get('x-ratelimit-limit') === '600', `HTTP ${v.status}`);
