@@ -8,25 +8,59 @@ import Modal from '../../components/ui/Modal.jsx';
 
 export default function DashboardPage() {
   const [applications, setApplications] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [selectedService, setSelectedService] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [activeModalApp, setActiveModalApp] = useState(null);
   const [editFormData, setEditFormData] = useState({ projectTitle: '', goodsSummary: '' });
   const [feedbackMsg, setFeedbackMsg] = useState('');
+  const [sessionToken, setSessionToken] = useState('');
+
+  const getToken = () =>
+    typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') || '' : '';
+
+  const authHeaders = (extra = {}) => {
+    const t = getToken();
+    return t ? { Authorization: `Bearer ${t}`, ...extra } : { ...extra };
+  };
 
   const fetchApplications = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/applications');
+      const t = getToken();
+      setSessionToken(t);
+      const res = await fetch('/api/applications', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setApplications(data.applications || []);
+      }
+      const nRes = await fetch('/api/notifications', { headers: authHeaders() });
+      if (nRes.ok) {
+        const nData = await nRes.json();
+        setNotifications(nData.notifications || []);
+        setUnreadCount(nData.unreadCount || 0);
       }
     } catch (err) {
       console.error('Erreur chargement demandes', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleMarkNotificationRead = async (notificationId) => {
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ notificationId, read: true })
+      });
+      if (res.ok) {
+        fetchApplications();
+      }
+    } catch (err) {
+      console.error('Erreur notification', err);
     }
   };
 
@@ -62,7 +96,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch('/api/applications', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           referenceNumber: activeModalApp.referenceNumber,
           ...editFormData
@@ -89,7 +123,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch('/api/applications/withdraw', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ referenceNumber: app.referenceNumber })
       });
       if (res.ok) {
@@ -275,7 +309,7 @@ export default function DashboardPage() {
                         )}
                         {app.certificate && (
                           <a
-                            href={`/api/applications/certificate.pdf?ref=${app.referenceNumber}`}
+                            href={`/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}&token=${encodeURIComponent(sessionToken)}`}
                             className="btn btn-sm btn-success"
                             style={{ textDecoration: 'none' }}
                             target="_blank"
@@ -290,6 +324,52 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Centre de Notifications In-App (NOT-02) */}
+      <Card
+        title={`Centre de Notifications (${unreadCount} non lue${unreadCount > 1 ? 's' : ''}) — NOT-02`}
+        style={{ marginTop: '20px' }}
+      >
+        {notifications.length === 0 ? (
+          <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
+            Aucune notification pour le moment.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {notifications.slice(0, 6).map((n) => (
+              <div
+                key={n.id}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  background: n.read ? '#ffffff' : '#eef6fc',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: n.read ? 600 : 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
+                    {n.title}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '12px' }}>{n.message}</div>
+                </div>
+                {!n.read && (
+                  <button
+                    type="button"
+                    onClick={() => handleMarkNotificationRead(n.id)}
+                    className="btn btn-sm btn-outline"
+                  >
+                    Marquer lu
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </Card>

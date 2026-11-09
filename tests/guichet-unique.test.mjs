@@ -1851,8 +1851,13 @@ test('23. Initialisation Next.js App Router, Design System UX-05, Authentificati
   assert.equal(goodRegData.success, true);
   assert.ok(goodRegData.userId);
 
-  // API Applications : Liste des demandes
-  const listReq = new Request('http://localhost:3000/api/applications');
+  // API Applications : rejet sans jeton (401) puis liste authentifiée (200)
+  const unauthListRes = await applicationsRoute.GET(new Request('http://localhost:3000/api/applications'));
+  assert.equal(unauthListRes.status, 401);
+
+  const listReq = new Request('http://localhost:3000/api/applications', {
+    headers: { Authorization: `Bearer ${validLoginData.sessionToken}` }
+  });
   const listRes = await applicationsRoute.GET(listReq);
   assert.equal(listRes.status, 200);
   const listData = await listRes.json();
@@ -2115,4 +2120,270 @@ test('25. Authentification Google OAuth 2.0 (REQ-02, BLK-02), Réinitialisation 
   const dockerfile = fs.readFileSync('Dockerfile', 'utf8');
   assert.ok(dockerfile.includes('HEALTHCHECK'));
   assert.ok(dockerfile.includes('nextjs'));
+});
+
+test('26. Sprint 3 API Next.js : Instruction Back-Office (ADM-03..08, ADM-10), Exemption P2 Serveur (REQ-06), Téléchargement PDF Tracé (REQ-09) & Notifications Anti-IDOR (NOT-01..04)', async () => {
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const appsRoute = await import('../src/app/api/applications/route.js');
+  const actionRoute = await import('../src/app/api/applications/[action]/route.js');
+  const certPdfRoute = await import('../src/app/api/applications/certificate.pdf/route.js');
+  const notifRoute = await import('../src/app/api/notifications/route.js');
+  const cmsRoute = await import('../src/app/api/cms/news/route.js');
+  const adminApplicantsRoute = await import('../src/app/api/admin/applicants/route.js');
+  const adminAuditRoute = await import('../src/app/api/admin/audit/route.js');
+
+  const jsonReq = (url, method, body, token = '') =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+
+  const loginAs = async (email, password) => {
+    const res = await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email, password }));
+    assert.equal(res.status, 200, `Login échoué pour ${email}`);
+    const data = await res.json();
+    return data;
+  };
+
+  // Création de deux requérants distincts pour vérifier l'isolation anti-IDOR
+  const emailA = `ong.alpha.${Date.now()}@rdc.org`;
+  const emailB = `ong.beta.${Date.now()}@rdc.org`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Alpha Kivu',
+    representativeName: 'Marie Lukusa',
+    email: emailA,
+    password: 'PasswordRDC#2026'
+  }));
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Beta Katanga',
+    representativeName: 'Paul Ilunga',
+    email: emailB,
+    password: 'PasswordRDC#2026'
+  }));
+
+  const { sessionToken: tokenA, user: userA } = await loginAs(emailA, 'PasswordRDC#2026');
+  const { sessionToken: tokenB } = await loginAs(emailB, 'PasswordRDC#2026');
+  const { sessionToken: tokenAgent } = await loginAs('agent@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenChef } = await loginAs('chef.division@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenDg } = await loginAs('dg@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenMin } = await loginAs('ministere@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenAdmin } = await loginAs('admin@fnpss.cd', 'StaffFNPSS#2026');
+
+  // 1. Exemption Once-Only P2 vérifiée côté serveur (REQ-06)
+  // Sans dossier S1 validé, soumettre S4 sans P2 échoue même si le client injecte isExemptedOnceOnly: true
+  const baseDocsWithoutP2 = ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'].map((code, i) => ({
+    docCode: code,
+    fileName: `${code.toLowerCase()}.pdf`,
+    sizeBytes: 2048,
+    sha256Hash: '0x' + String(i + 1).repeat(64)
+  }));
+
+  const spoofedS4Res = await appsRoute.POST(
+    jsonReq('http://localhost:3000/api/applications', 'POST', {
+      serviceCode: 'S4',
+      projectTitle: 'Tentative contournement P2',
+      goodsSummary: 'Groupes électrogènes',
+      paymentReference: 'RAWBANK-SPOOF-001',
+      attachedDocuments: [
+        ...baseDocsWithoutP2,
+        { docCode: 'P2_ENROLEMENT', fileName: 'fake.pdf', sizeBytes: 100, sha256Hash: '0x' + '2'.repeat(64), isExemptedOnceOnly: true }
+      ]
+    }, tokenA)
+  );
+  assert.equal(spoofedS4Res.status, 400, 'Le serveur doit refuser une exemption P2 auto-déclarée sans S1 actif');
+
+  // Dépôt légitime d'un dossier S1 par l'ONG Alpha
+  const s1Res = await appsRoute.POST(
+    jsonReq('http://localhost:3000/api/applications', 'POST', {
+      serviceCode: 'S1',
+      projectTitle: 'Enrôlement national ONG Alpha',
+      goodsSummary: 'Dossier statutaire complet',
+      paymentReference: 'RAWBANK-S1-001',
+      attachedDocuments: baseDocsWithoutP2
+    }, tokenA)
+  );
+  assert.equal(s1Res.status, 201);
+  const s1Data = await s1Res.json();
+  const s1Ref = s1Data.application.referenceNumber;
+  assert.equal(s1Data.onceOnlyApplied, false);
+
+  // 2. Anti-escalade RBAC : un requérant ne peut pas valider son propre paiement (403)
+  const selfValRes = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/validate-payment', 'POST', { referenceNumber: s1Ref }, tokenA),
+    { params: { action: 'validate-payment' } }
+  );
+  assert.equal(selfValRes.status, 403);
+
+  // 3. Circuit d'instruction complet sur S1 : Agent -> Chef de Division -> DG
+  const valS1Res = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/validate-payment', 'POST', { referenceNumber: s1Ref }, tokenAgent),
+    { params: { action: 'validate-payment' } }
+  );
+  assert.equal(valS1Res.status, 200);
+
+  const opS1Res = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/division-opinion', 'POST', {
+      referenceNumber: s1Ref,
+      favorable: true,
+      opinionNote: 'Statuts conformes à la Loi n°004/2001'
+    }, tokenChef),
+    { params: { action: 'division-opinion' } }
+  );
+  assert.equal(opS1Res.status, 200);
+
+  const sealS1Res = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/approve-seal', 'POST', { referenceNumber: s1Ref }, tokenDg),
+    { params: { action: 'approve-seal' } }
+  );
+  assert.equal(sealS1Res.status, 200);
+
+  // Maintenant que S1 est VALIDE_DELIVRE, le dépôt S4 sans P2 bénéficie de l'exemption Once-Only côté serveur
+  const validS4Res = await appsRoute.POST(
+    jsonReq('http://localhost:3000/api/applications', 'POST', {
+      serviceCode: 'S4',
+      projectTitle: 'Importation convoi médical Kivu',
+      goodsSummary: '200 kits chirurgicaux',
+      paymentReference: 'RAWBANK-S4-002',
+      attachedDocuments: baseDocsWithoutP2
+    }, tokenA)
+  );
+  assert.equal(validS4Res.status, 201);
+  const validS4Data = await validS4Res.json();
+  assert.equal(validS4Data.onceOnlyApplied, true);
+  const s4Ref = validS4Data.application.referenceNumber;
+
+  // 4. Isolation anti-IDOR sur GET /api/applications
+  const listBRes = await appsRoute.GET(new Request('http://localhost:3000/api/applications', {
+    headers: { Authorization: `Bearer ${tokenB}` }
+  }));
+  const listBData = await listBRes.json();
+  assert.equal(listBData.applications.length, 0, 'ONG Beta ne doit voir aucun dossier d\'ONG Alpha');
+
+  // 5. Complément documentaire (request-complement -> provide-complement), scellement & co-signature ministérielle sur S4
+  await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/validate-payment', 'POST', { referenceNumber: s4Ref }, tokenAgent),
+    { params: { action: 'validate-payment' } }
+  );
+  const reqCompRes = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/request-complement', 'POST', {
+      referenceNumber: s4Ref,
+      reason: 'Préciser les codes SH douaniers sur la liste de colisage P5'
+    }, tokenAgent),
+    { params: { action: 'request-complement' } }
+  );
+  assert.equal(reqCompRes.status, 200);
+  assert.equal((await reqCompRes.json()).application.status, 'COMPLEMENT_REQUIS');
+
+  const provCompRes = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/provide-complement', 'POST', {
+      referenceNumber: s4Ref,
+      docCode: 'P5_PROJET'
+    }, tokenA),
+    { params: { action: 'provide-complement' } }
+  );
+  assert.equal(provCompRes.status, 200);
+  assert.equal((await provCompRes.json()).application.status, 'EN_COURS_INSTRUCTION');
+
+  await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/approve-seal', 'POST', { referenceNumber: s4Ref }, tokenDg),
+    { params: { action: 'approve-seal' } }
+  );
+  const cosignRes = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/cosign-ministry', 'POST', {
+      referenceNumber: s4Ref,
+      ministryReference: 'CAB/MIN-AS/2026/0888'
+    }, tokenMin),
+    { params: { action: 'cosign-ministry' } }
+  );
+  assert.equal(cosignRes.status, 200);
+  assert.equal((await cosignRes.json()).application.ministryCoSigned, true);
+
+  // 6. Téléchargement PDF officiel réservé au propriétaire et tracé (REQ-09)
+  const forbiddenPdfRes = await certPdfRoute.GET(
+    new Request(`http://localhost:3000/api/applications/certificate.pdf?ref=${encodeURIComponent(s4Ref)}`, {
+      headers: { Authorization: `Bearer ${tokenB}` }
+    })
+  );
+  assert.equal(forbiddenPdfRes.status, 403, 'Un autre requérant ne peut pas télécharger le PDF');
+
+  const ownerPdfRes = await certPdfRoute.GET(
+    new Request(`http://localhost:3000/api/applications/certificate.pdf?ref=${encodeURIComponent(s4Ref)}&token=${tokenA}`)
+  );
+  assert.equal(ownerPdfRes.status, 200);
+  assert.equal(ownerPdfRes.headers.get('content-type'), 'application/pdf');
+  const pdfBytes = Buffer.from(await ownerPdfRes.arrayBuffer());
+  assert.ok(pdfBytes.subarray(0, 8).toString('ascii').startsWith('%PDF-1.4'));
+
+  // 7. Décision de rejet motivé par la DG (ADM-06) sur un nouveau dossier
+  const s2Res = await appsRoute.POST(
+    jsonReq('http://localhost:3000/api/applications', 'POST', {
+      serviceCode: 'S2',
+      projectTitle: 'Demande incomplète à rejeter',
+      goodsSummary: 'Divers',
+      paymentReference: 'RAWBANK-S2-003',
+      attachedDocuments: baseDocsWithoutP2
+    }, tokenA)
+  );
+  const s2Ref = (await s2Res.json()).application.referenceNumber;
+  const rejectRes = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/reject', 'POST', {
+      referenceNumber: s2Ref,
+      reason: 'Objet non éligible au partenariat humanitaire'
+    }, tokenDg),
+    { params: { action: 'reject' } }
+  );
+  assert.equal(rejectRes.status, 200);
+  assert.equal((await rejectRes.json()).application.status, 'REJETE');
+
+  // 8. Centre de notifications & protection anti-IDOR sur le marquage lu (NOT-01..04)
+  const notifARes = await notifRoute.GET(
+    new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokenA}` } })
+  );
+  assert.equal(notifARes.status, 200);
+  const notifAData = await notifARes.json();
+  assert.ok(notifAData.unreadCount >= 4, 'ONG Alpha doit avoir reçu les notifications du cycle de vie');
+  const targetNotifId = notifAData.notifications[0].id;
+
+  // ONG Beta tente de marquer comme lue la notification d'ONG Alpha -> 404
+  const idorMarkRes = await notifRoute.PUT(
+    jsonReq('http://localhost:3000/api/notifications', 'PUT', { notificationId: targetNotifId, read: true }, tokenB)
+  );
+  assert.equal(idorMarkRes.status, 404);
+
+  // ONG Alpha marque sa propre notification comme lue -> 200
+  const okMarkRes = await notifRoute.PUT(
+    jsonReq('http://localhost:3000/api/notifications', 'PUT', { notificationId: targetNotifId, read: true }, tokenA)
+  );
+  assert.equal(okMarkRes.status, 200);
+  assert.equal((await okMarkRes.json()).notification.read, true);
+
+  // 9. Administration des requérants (ADM-03), export CSV d'audit (ADM-07) et CMS (ADM-10)
+  const appListAdminRes = await adminApplicantsRoute.GET(
+    new Request('http://localhost:3000/api/admin/applicants?q=Alpha', { headers: { Authorization: `Bearer ${tokenAdmin}` } })
+  );
+  assert.equal(appListAdminRes.status, 200);
+  const appListAdminData = await appListAdminRes.json();
+  assert.ok(appListAdminData.applicants.some(u => u.id === userA.id && u.applicationsCount >= 3));
+
+  const auditCsvRes = await adminAuditRoute.GET(
+    new Request(`http://localhost:3000/api/admin/audit?targetId=${encodeURIComponent(s4Ref)}&format=csv`, {
+      headers: { Authorization: `Bearer ${tokenAdmin}` }
+    })
+  );
+  assert.equal(auditCsvRes.status, 200);
+  const csvText = await auditCsvRes.text();
+  assert.ok(csvText.includes('CERTIFICATE_DOWNLOADED'));
+
+  const createNewsRes = await cmsRoute.POST(
+    jsonReq('http://localhost:3000/api/cms/news', 'POST', {
+      title: 'Communiqué Sprint 3 : Mise en service du centre de notifications',
+      summary: 'Suivi temps réel des décisions d\'instruction et téléchargement PDF sécurisé.'
+    }, tokenAdmin)
+  );
+  assert.equal(createNewsRes.status, 201);
 });

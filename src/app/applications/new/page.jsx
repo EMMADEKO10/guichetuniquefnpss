@@ -13,9 +13,24 @@ export default function NewApplicationPage() {
   const [goodsSummary, setGoodsSummary] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [attachedDocs, setAttachedDocs] = useState({});
-  const [hasS1Enrollment, setHasS1Enrollment] = useState(true);
+  const [hasS1Enrollment, setHasS1Enrollment] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') : '';
+    if (!token) return;
+    fetch('/api/applications?service=S1&status=VALIDE_DELIVRE', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.applications) && d.applications.length > 0) {
+          setHasS1Enrollment(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const docDefinitions = [
     { code: 'P1_REQUETE', name: 'Requête motivée adressée au DG FNPSS' },
@@ -76,9 +91,13 @@ export default function NewApplicationPage() {
     }
 
     try {
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') || '' : '';
       const res = await fetch('/api/applications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           serviceCode,
           organizationName,

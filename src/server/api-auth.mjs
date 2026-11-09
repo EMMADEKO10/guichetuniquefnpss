@@ -27,7 +27,15 @@ export class HttpError extends Error {
 
 export function extractBearerToken(request) {
   const header = request.headers.get('authorization') || '';
-  return header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (header.startsWith('Bearer ')) {
+    return header.slice(7).trim();
+  }
+  try {
+    const url = new URL(request.url);
+    return (url.searchParams.get('token') || '').trim();
+  } catch {
+    return '';
+  }
 }
 
 /**

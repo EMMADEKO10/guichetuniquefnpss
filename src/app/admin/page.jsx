@@ -7,8 +7,17 @@ import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import DocumentViewer from '../../components/ui/DocumentViewer.jsx';
 
+const DEMO_STAFF_EMAILS = {
+  AGENT: 'agent@fnpss.cd',
+  CHEF_DIVISION: 'chef.division@fnpss.cd',
+  DG: 'dg@fnpss.cd',
+  MINISTERE: 'ministere@fnpss.cd',
+  ADMIN: 'admin@fnpss.cd'
+};
+
 export default function AdminPage() {
   const [role, setRole] = useState('AGENT');
+  const [sessionToken, setSessionToken] = useState('');
   const [applications, setApplications] = useState([]);
   const [selectedApp, setSelectedApp] = useState(null);
   const [selectedService, setSelectedService] = useState('ALL');
@@ -19,6 +28,12 @@ export default function AdminPage() {
   const [isOpinionModalOpen, setIsOpinionModalOpen] = useState(false);
   const [opinionData, setOpinionData] = useState({ favorable: true, note: 'Avis favorable après examen des pièces' });
 
+  const [isComplementModalOpen, setIsComplementModalOpen] = useState(false);
+  const [complementReason, setComplementReason] = useState('');
+
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
   const [isCosignModalOpen, setIsCosignModalOpen] = useState(false);
   const [cosignRef, setCosignRef] = useState('CAB/MIN-AS/2026/0150');
 
@@ -27,10 +42,39 @@ export default function AdminPage() {
 
   const [statusMsg, setStatusMsg] = useState('');
 
-  const fetchApplications = async () => {
+  const ensureStaffSession = async (targetRole = role) => {
+    const email = DEMO_STAFF_EMAILS[targetRole];
+    if (!email) return sessionToken;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'StaffFNPSS#2026' })
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.sessionToken) {
+          setSessionToken(d.sessionToken);
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('fnpss_session_token', d.sessionToken);
+          }
+          return d.sessionToken;
+        }
+      }
+    } catch {}
+    return typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') || '' : '';
+  };
+
+  const authHeaders = (tokenOverride = sessionToken, extra = {}) => ({
+    ...(tokenOverride ? { Authorization: `Bearer ${tokenOverride}` } : {}),
+    ...extra
+  });
+
+  const fetchApplications = async (tokenOverride) => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/applications');
+      const tk = tokenOverride || sessionToken || (await ensureStaffSession(role));
+      const res = await fetch('/api/applications', { headers: authHeaders(tk) });
       const data = await res.json();
       if (data.success) {
         setApplications(data.applications || []);
@@ -46,8 +90,8 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    fetchApplications();
-  }, []);
+    ensureStaffSession(role).then((tk) => fetchApplications(tk));
+  }, [role]);
 
   const filteredApps = applications.filter((app) => {
     if (selectedService !== 'ALL' && app.serviceCode !== selectedService) return false;
@@ -59,7 +103,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/applications/validate-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ referenceNumber: ref })
       });
       if (res.ok) {
@@ -71,15 +115,59 @@ export default function AdminPage() {
     }
   };
 
+  const handleRequestComplement = async () => {
+    if (!selectedApp || !complementReason.trim()) return;
+    try {
+      const res = await fetch('/api/applications/request-complement', {
+        method: 'POST',
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          referenceNumber: selectedApp.referenceNumber,
+          reason: complementReason
+        })
+      });
+      if (res.ok) {
+        setStatusMsg(`Complément demandé sur le dossier ${selectedApp.referenceNumber}. Requérant notifié.`);
+        setIsComplementModalOpen(false);
+        setComplementReason('');
+        fetchApplications();
+      }
+    } catch (err) {
+      alert('Erreur réseau');
+    }
+  };
+
   const handleApproveSeal = async (ref) => {
     try {
       const res = await fetch('/api/applications/approve-seal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ referenceNumber: ref })
       });
       if (res.ok) {
         setStatusMsg(`Attestation ${ref} approuvée et scellée avec succès sur la blockchain Polygon.`);
+        fetchApplications();
+      }
+    } catch (err) {
+      alert('Erreur réseau');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedApp || !rejectReason.trim()) return;
+    try {
+      const res = await fetch('/api/applications/reject', {
+        method: 'POST',
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          referenceNumber: selectedApp.referenceNumber,
+          reason: rejectReason
+        })
+      });
+      if (res.ok) {
+        setStatusMsg(`Dossier ${selectedApp.referenceNumber} rejeté avec motif notifié au requérant.`);
+        setIsRejectModalOpen(false);
+        setRejectReason('');
         fetchApplications();
       }
     } catch (err) {
@@ -92,7 +180,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/applications/division-opinion', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           referenceNumber: selectedApp.referenceNumber,
           favorable: opinionData.favorable,
@@ -114,7 +202,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/applications/cosign-ministry', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           referenceNumber: selectedApp.referenceNumber,
           ministryReference: cosignRef
@@ -140,7 +228,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/applications/revoke', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           referenceNumber: selectedApp.referenceNumber,
           reason: revokeData.reason,
@@ -285,16 +373,27 @@ export default function AdminPage() {
                   </Button>
                 )}
 
+                {(role === 'AGENT' || role === 'CHEF_DIVISION') && selectedApp.status !== 'VALIDE_DELIVRE' && selectedApp.status !== 'REVOQUE' && (
+                  <Button variant="outline" size="sm" onClick={() => setIsComplementModalOpen(true)}>
+                    📩 Demander Complément
+                  </Button>
+                )}
+
                 {role === 'CHEF_DIVISION' && (
                   <Button variant="accent" size="sm" onClick={() => setIsOpinionModalOpen(true)}>
                     📝 Émettre Avis Technique Division
                   </Button>
                 )}
 
-                {role === 'DG' && selectedApp.status !== 'VALIDE_DELIVRE' && selectedApp.status !== 'REVOQUE' && (
-                  <Button variant="success" size="sm" onClick={() => handleApproveSeal(selectedApp.referenceNumber)}>
-                    ✍️ Approuver & Sceller Blockchain
-                  </Button>
+                {role === 'DG' && selectedApp.status !== 'VALIDE_DELIVRE' && selectedApp.status !== 'REVOQUE' && selectedApp.status !== 'REJETE' && (
+                  <>
+                    <Button variant="success" size="sm" onClick={() => handleApproveSeal(selectedApp.referenceNumber)}>
+                      ✍️ Approuver & Sceller Blockchain
+                    </Button>
+                    <Button variant="danger" size="sm" onClick={() => setIsRejectModalOpen(true)}>
+                      ✕ Rejeter la Demande
+                    </Button>
+                  </>
                 )}
 
                 {role === 'MINISTERE' && selectedApp.certificate && !selectedApp.ministryCoSigned && (
@@ -340,6 +439,58 @@ export default function AdminPage() {
           </Card>
         </div>
       </div>
+
+      {/* Modale Demande de Complément (ADM-06, NOT-04) */}
+      <Modal
+        isOpen={isComplementModalOpen}
+        onClose={() => setIsComplementModalOpen(false)}
+        title="Demande de Complément Documentaire (ADM-06)"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsComplementModalOpen(false)}>Annuler</Button>
+            <Button variant="primary" onClick={handleRequestComplement}>Notifier le Requérant</Button>
+          </>
+        }
+      >
+        <div className="form-group">
+          <label htmlFor="comp-reason">Motif & Pièces Complémentaires Sollicitées</label>
+          <textarea
+            id="comp-reason"
+            rows="3"
+            className="form-control"
+            value={complementReason}
+            onChange={(e) => setComplementReason(e.target.value)}
+            placeholder="Ex: Veuillez joindre le rapport annuel certifié 2025 (Pièce P4)"
+            required
+          />
+        </div>
+      </Modal>
+
+      {/* Modale Rejet de Demande (ADM-06) */}
+      <Modal
+        isOpen={isRejectModalOpen}
+        onClose={() => setIsRejectModalOpen(false)}
+        title="Rejet Motivé de la Demande (ADM-06)"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsRejectModalOpen(false)}>Annuler</Button>
+            <Button variant="danger" onClick={handleReject}>Confirmer le Rejet</Button>
+          </>
+        }
+      >
+        <div className="form-group">
+          <label htmlFor="rej-reason">Motif Officiel du Rejet</label>
+          <textarea
+            id="rej-reason"
+            rows="3"
+            className="form-control"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Ex: Non-conformité des codes SH douaniers avec l'objet social"
+            required
+          />
+        </div>
+      </Modal>
 
       {/* Modale Avis Chef de Division */}
       <Modal

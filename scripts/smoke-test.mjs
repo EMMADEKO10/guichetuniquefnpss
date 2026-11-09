@@ -63,8 +63,17 @@ try {
   const gData = await g.json();
   check('POST /api/auth/google (wallet Web3Auth)', g.status === 200 && /^0x[0-9a-f]{40}$/.test(gData.walletAddress || ''), `HTTP ${g.status}`);
 
-  const apps = await fetch(`${BASE}/api/applications`);
-  check('GET /api/applications', apps.status === 200, `HTTP ${apps.status}`);
+  const unauthApps = await fetch(`${BASE}/api/applications`);
+  check('GET /api/applications sans jeton (rejet 401)', unauthApps.status === 401, `HTTP ${unauthApps.status}`);
+
+  const apps = await fetch(`${BASE}/api/applications`, { headers: { Authorization: `Bearer ${loginData.sessionToken}` } });
+  check('GET /api/applications authentifié', apps.status === 200, `HTTP ${apps.status}`);
+
+  const notifs = await fetch(`${BASE}/api/notifications`, { headers: { Authorization: `Bearer ${loginData.sessionToken}` } });
+  check('GET /api/notifications authentifié', notifs.status === 200, `HTTP ${notifs.status}`);
+
+  const news = await fetch(`${BASE}/api/cms/news`);
+  check('GET /api/cms/news public', news.status === 200, `HTTP ${news.status}`);
 
   const v = await fetch(`${BASE}/api/verify?hash=0x${'ab'.repeat(32)}`);
   check('GET /api/verify (hash inconnu)', v.status === 200 || v.status === 404, `HTTP ${v.status}`);

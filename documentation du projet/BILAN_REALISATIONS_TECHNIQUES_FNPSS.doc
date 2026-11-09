@@ -811,6 +811,12 @@ struct CertificateRecord {
         <td>Connexion Google OAuth 2.0, portefeuille MPC EVM sans clé privée, réinitialisation de mot de passe, gestion de profil et pipeline de déploiement Blue/Green avec rollback automatique.</td>
         <td><span class="badge-done">&#10003; PASS</span></td>
       </tr>
+      <tr>
+        <td><strong>26</strong></td>
+        <td>Sprint 3 API Next.js : Instruction Back-Office, Exemption P2 Serveur, PDF Tracé & Notifications</td>
+        <td>Routes d'instruction RBAC côté serveur, exemption Once-Only P2 vérifiée sur S1 délivré, téléchargement PDF tracé (REQ-09), centre de notifications anti-IDOR (NOT-01..04), gestion ONG (ADM-03), export CSV audit (ADM-07) et CMS (ADM-10).</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
     </tbody>
   </table>
 
