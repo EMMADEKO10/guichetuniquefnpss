@@ -1,10 +1,21 @@
-// Smoke test réel : démarre le serveur Next.js de production, interroge pages et API, puis l'arrête.
+// Smoke test réel : démarre le serveur Next.js de production (sortie standalone, comme l'image Docker),
+// interroge pages et API, puis l'arrête. Prérequis : `npm run build`.
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 
 const PORT = 3123;
 const BASE = `http://127.0.0.1:${PORT}`;
-const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', String(PORT)], {
-  stdio: ['ignore', 'pipe', 'pipe']
+
+if (!fs.existsSync('.next/standalone/server.js')) {
+  console.error('Build standalone absent : lancer `npm run build` avant `npm run smoke`.');
+  process.exit(1);
+}
+// Comme dans le Dockerfile : les ressources statiques accompagnent le serveur autonome.
+fs.cpSync('.next/static', '.next/standalone/.next/static', { recursive: true });
+
+const server = spawn(process.execPath, ['.next/standalone/server.js'], {
+  stdio: ['ignore', 'pipe', 'pipe'],
+  env: { ...process.env, PORT: String(PORT), HOSTNAME: '127.0.0.1', FNPSS_ENABLE_DEMO_STAFF: 'true' }
 });
 let logs = '';
 server.stdout.on('data', d => (logs += d));

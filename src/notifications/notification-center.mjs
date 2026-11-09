@@ -28,6 +28,10 @@ const EMAIL_TEMPLATES_FR = Object.freeze({
   CERTIFICATE_REVOKED: d => ({
     subject: `[FNPSS Guichet Unique] ALERTE : Révocation administrative de l'acte ${d.certificateNumber}`,
     body: `Notification officielle : L'acte ${d.certificateNumber} (Dossier ${d.referenceNumber}) a été révoqué sur le registre Blockchain FNPSS/DGDA. Motif : ${d.reason}.`
+  }),
+  APPLICATION_REJECTED: d => ({
+    subject: `[FNPSS Guichet Unique] Décision défavorable sur le dossier ${d.referenceNumber}`,
+    body: `Bonjour ${d.organizationName || 'Partenaire'},\nAprès instruction, la Direction Générale du FNPSS a rendu une décision défavorable sur le dossier ${d.referenceNumber}. Motif : ${d.reason}. Vous pouvez déposer une nouvelle demande après correction.`
   })
 });
 
@@ -122,10 +126,15 @@ export class NotificationCenter {
 
   /**
    * Marque une notification comme lue ou non-lue (NOT-02).
+   * Si `ownerUserId` est fourni, refuse de modifier la notification d'un autre utilisateur (anti-IDOR).
    */
-  markNotificationRead(notificationId, isRead = true) {
+  markNotificationRead(notificationId, isRead = true, ownerUserId = null) {
     const found = this.inAppNotifications.find(n => n.id === notificationId);
     if (!found) {
+      throw new Error(`Notification introuvable : ${notificationId}`);
+    }
+    if (ownerUserId && found.userId !== ownerUserId && found.userId !== 'ALL') {
+      // Même message que « introuvable » : ne révèle pas l'existence de la notification d'autrui.
       throw new Error(`Notification introuvable : ${notificationId}`);
     }
     found.read = Boolean(isRead);

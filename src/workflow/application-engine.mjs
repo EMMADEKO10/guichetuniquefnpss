@@ -482,9 +482,71 @@ export class GuichetUniqueEngine {
     return { ...app };
   }
 
-  listApplications({ serviceCode = null, status = null } = {}) {
+  /**
+   * Rejet motivé d'une demande par la Direction Générale (ADM-06 : décision « rejeté »).
+   * Un dossier déjà délivré, révoqué ou rejeté ne peut plus être rejeté.
+   */
+  rejectApplication(actor, referenceNumber, reason) {
+    assertPermission(actor, 'REJECT_APPLICATION');
+    if (!reason || !String(reason).trim()) {
+      throw new Error('ADM-06: Le motif de rejet est obligatoire');
+    }
+    const app = this._getApp(referenceNumber);
+    if (['VALIDE_DELIVRE', 'REVOQUE', 'REJETE'].includes(app.status)) {
+      throw new Error(`ADM-06: Rejet impossible pour un dossier au statut ${app.status}`);
+    }
+    const rejectedAt = new Date().toISOString();
+    app.status = 'REJETE';
+    app.slaPaused = true;
+    app.rejectionReason = String(reason).trim();
+    app.approvalSteps.push({
+      step: 'REJET_DG',
+      actorId: actor.id,
+      actorRole: actor.role,
+      note: app.rejectionReason,
+      timestamp: rejectedAt
+    });
+    this._logAudit(actor, 'APPLICATION_REJECTED', referenceNumber, { reason: app.rejectionReason });
+    this.notifications?.notifyTransactionalEvent({
+      userId: app.ownerId,
+      eventType: 'APPLICATION_REJECTED',
+      referenceNumber,
+      details: { organizationName: app.organizationName, reason: app.rejectionReason }
+    });
+    return { ...app };
+  }
+
+  /**
+   * Retourne le PDF officiel d'un dossier et trace le téléchargement (REQ-09).
+   * Accès réservé au propriétaire du dossier ou au personnel FNPSS habilité.
+   */
+  downloadCertificate(actor, referenceNumber) {
+    const app = this._getApp(referenceNumber);
+    const isOwner = app.ownerId === actor?.id;
+    const isStaffReader = [Roles.AGENT, Roles.CHEF_DIVISION, Roles.DG, Roles.MINISTERE, Roles.ADMIN].includes(actor?.role);
+    if (isOwner) {
+      assertPermission(actor, 'DOWNLOAD_OWN_CERTIFICATE');
+    } else if (!isStaffReader) {
+      throw new Error('RBAC: Accès au document réservé au propriétaire du dossier');
+    }
+    if (!app.certificate?.pdfBuffer) {
+      throw new Error('Aucun document officiel disponible pour ce dossier');
+    }
+    this._logAudit(actor, 'CERTIFICATE_DOWNLOADED', referenceNumber, {
+      certificateNumber: app.certificate.certificateNumber,
+      certificateStatus: app.certificate.status
+    });
+    return {
+      fileName: `${app.certificate.certificateNumber}.pdf`,
+      pdfBuffer: app.certificate.pdfBuffer,
+      certificateStatus: app.certificate.status
+    };
+  }
+
+  listApplications({ serviceCode = null, status = null, ownerId = null } = {}) {
     return Array.from(this.applications.values())
       .filter(app => {
+        if (ownerId && app.ownerId !== ownerId) return false;
         if (serviceCode && app.serviceCode !== serviceCode) return false;
         if (status && app.status !== status) return false;
         return true;

@@ -369,4 +369,28 @@ authService.registerUser({
   role: Roles.REQUERANT
 });
 
+/**
+ * Comptes internes FNPSS de démonstration (circuit d'instruction ADM-04..08).
+ * Jamais créés en production : les comptes agents réels seront provisionnés par l'administrateur.
+ * Mot de passe surchargeable via FNPSS_DEV_STAFF_PASSWORD.
+ */
+export const DEV_STAFF_ACCOUNTS = Object.freeze([
+  { email: 'agent@fnpss.cd', role: Roles.AGENT, firstName: 'Agent', lastName: 'Instructeur' },
+  { email: 'chef.division@fnpss.cd', role: Roles.CHEF_DIVISION, firstName: 'Chef', lastName: 'de Division' },
+  { email: 'dg@fnpss.cd', role: Roles.DG, firstName: 'Direction', lastName: 'Générale' },
+  { email: 'ministere@fnpss.cd', role: Roles.MINISTERE, firstName: 'Point Focal', lastName: 'Ministère' },
+  { email: 'admin@fnpss.cd', role: Roles.ADMIN, firstName: 'Administrateur', lastName: 'FNPSS' }
+]);
+
+if (process.env.NODE_ENV !== 'production' || process.env.FNPSS_ENABLE_DEMO_STAFF === 'true') {
+  const staffPassword = process.env.FNPSS_DEV_STAFF_PASSWORD || 'StaffFNPSS#2026';
+  for (const acc of DEV_STAFF_ACCOUNTS) {
+    authService.registerUser({
+      ...acc,
+      password: staffPassword,
+      organizationName: 'FNPSS - Direction Générale'
+    });
+  }
+}
+
 
