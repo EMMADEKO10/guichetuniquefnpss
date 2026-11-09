@@ -186,3 +186,6 @@ export class PaymentReconciliationLedger {
   }
 }
 
+export const paymentReconciliationLedger = new PaymentReconciliationLedger();
+
+

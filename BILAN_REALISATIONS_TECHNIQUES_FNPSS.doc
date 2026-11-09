@@ -823,6 +823,12 @@ struct CertificateRecord {
         <td>Sponsorisation gaz Paymaster (0 crypto requérant), file d'ancrage résiliente aux coupures RPC, déploiement et smoke test Polygon Amoy (80002), déduplication idempotente PWA hors-ligne 3G, validation G2 Alpha et sauvegarde/restauration AES-256-GCM.</td>
         <td><span class="badge-done">&#10003; PASS</span></td>
       </tr>
+      <tr>
+        <td><strong>28</strong></td>
+        <td>Sprint 5 API Next.js & Jalon G3 Beta : Vérification PDF sans Scan QR (VER-01..04), Passerelle Partenaires DGDA/DGRAD/DGI (VER-05), Reporting & Réconciliation (ADM-09, GOV-11) & Supervision 3G (OPS-06, REQ-12, GOV-13)</td>
+        <td>Contrôle douanier par numéro d'acte et téléversement PDF sans QR Code, quotas X-API-Key DGDA/DGRAD/DGI, statistiques exécutives et export CSV comptable, supervision 3G (&lt; 3,0s) et qualification G3 Beta (SEC-03, SEC-04, SEC-07).</td>
+        <td><span class="badge-done">&#10003; PASS</span></td>
+      </tr>
     </tbody>
   </table>
 

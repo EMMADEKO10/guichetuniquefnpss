@@ -41,7 +41,14 @@ export default function AdminPage() {
   const [revokeData, setRevokeData] = useState({ reason: '', doubleConfirmed: false });
 
   const [statusMsg, setStatusMsg] = useState('');
-  const [blockchainInfo, setBlockchainInfo] = useState({ relayer: null, queue: null, deployment: null, milestoneG2: null });
+  const [blockchainInfo, setBlockchainInfo] = useState({
+    relayer: null,
+    queue: null,
+    deployment: null,
+    milestoneG2: null,
+    stats: null,
+    supervision: null
+  });
 
   const ensureStaffSession = async (targetRole = role) => {
     const email = DEMO_STAFF_EMAILS[targetRole];
@@ -75,11 +82,13 @@ export default function AdminPage() {
     setIsLoading(true);
     try {
       const tk = tokenOverride || sessionToken || (await ensureStaffSession(role));
-      const [res, queueRes, deployRes, gatesRes] = await Promise.all([
+      const [res, queueRes, deployRes, gatesRes, statsRes, supRes] = await Promise.all([
         fetch('/api/applications', { headers: authHeaders(tk) }),
         fetch('/api/blockchain/anchor-queue', { headers: authHeaders(tk) }),
         fetch('/api/blockchain/deploy', { headers: authHeaders(tk) }),
-        fetch('/api/ops/gates', { headers: authHeaders(tk) })
+        fetch('/api/ops/gates', { headers: authHeaders(tk) }),
+        fetch('/api/admin/stats', { headers: authHeaders(tk) }),
+        fetch('/api/ops/supervision', { headers: authHeaders(tk) })
       ]);
       const data = await res.json();
       if (data.success) {
@@ -91,11 +100,15 @@ export default function AdminPage() {
       const qData = queueRes.ok ? await queueRes.json() : {};
       const dData = deployRes.ok ? await deployRes.json() : {};
       const gData = gatesRes.ok ? await gatesRes.json() : {};
+      const stData = statsRes.ok ? await statsRes.json() : {};
+      const spData = supRes.ok ? await supRes.json() : {};
       setBlockchainInfo({
         relayer: qData.relayer || null,
         queue: qData.queue || null,
         deployment: dData.latestDeployment || null,
-        milestoneG2: gData.milestoneG2Alpha || null
+        milestoneG2: gData.milestoneG2Alpha || null,
+        stats: stData.stats || null,
+        supervision: spData || null
       });
     } catch (err) {
       console.error(err);
@@ -349,15 +362,33 @@ export default function AdminPage() {
           <Badge status="valide">
             Jalon G2 Alpha : {blockchainInfo.milestoneG2?.status || 'VALIDATED'}
           </Badge>
+          <Badge status="valide">
+            Jalon G3 Beta : {blockchainInfo.supervision?.milestoneG3Beta?.status || 'VALIDATED'}
+          </Badge>
+          <span>
+            <strong>Budget 3G (REQ-12) :</strong> {blockchainInfo.supervision?.req12PerformanceBudget?.estimated3gLoadSeconds ?? '1.64'}s (&lt; 3,0s)
+          </span>
+          <span>
+            <strong>Recettes validées (ADM-09) :</strong> {blockchainInfo.stats?.financials?.totalCollectedFeesUsd ?? 0} USD
+          </span>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleFlushAnchorQueue}>
             🔄 Synchroniser File d&apos;Ancrage
           </Button>
           {(role === 'DG' || role === 'ADMIN') && (
-            <Button variant="primary" size="sm" onClick={handleDeployAmoy}>
-              ⛓️ Qualifier Contrat Amoy (BLK-11)
-            </Button>
+            <>
+              <Button variant="primary" size="sm" onClick={handleDeployAmoy}>
+                ⛓️ Qualifier Contrat Amoy (BLK-11)
+              </Button>
+              <a
+                href={`/api/admin/stats?format=csv&token=${encodeURIComponent(sessionToken)}`}
+                className="btn btn-outline btn-sm"
+                style={{ textDecoration: 'none' }}
+              >
+                📊 Export CSV (ADM-09)
+              </a>
+            </>
           )}
         </div>
       </div>

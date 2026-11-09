@@ -157,3 +157,6 @@ export class PartnerApiGateway {
   }
 }
 
+export const partnerApiGateway = new PartnerApiGateway();
+
+

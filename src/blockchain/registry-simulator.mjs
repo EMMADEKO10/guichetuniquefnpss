@@ -222,7 +222,7 @@ export class FNPSSRegistryContract {
   verifyDocument(docHash, nowTimestamp = Math.floor(Date.now() / 1000)) {
     const resolvedHash = this.records.has(docHash)
       ? docHash
-      : (this.pdfHashToDocHash.get(docHash) || docHash);
+      : (this.pdfHashToDocHash.get(docHash) || this.numberToHash.get(docHash) || docHash);
     const rec = this.records.get(resolvedHash);
     if (!rec) {
       return {

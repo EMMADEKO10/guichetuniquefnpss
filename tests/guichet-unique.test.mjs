@@ -2615,3 +2615,230 @@ test('27. Sprint 4 API Next.js : Relayer & File Résiliente d\'Ancrage (BLK-09, 
   assert.equal((await restoreRes.json()).integrityVerified, true);
 });
 
+test('28. Sprint 5 API Next.js & Jalon G3 Beta : Vérification PDF sans Scan QR (VER-01..04), Passerelle Partenaires DGDA/DGRAD/DGI (VER-05), Reporting Statistique & Réconciliation (ADM-09, GOV-11) & Supervision 3G (OPS-06, REQ-12, GOV-13)', async () => {
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const appsRoute = await import('../src/app/api/applications/route.js');
+  const actionRoute = await import('../src/app/api/applications/[action]/route.js');
+  const certPdfRoute = await import('../src/app/api/applications/certificate.pdf/route.js');
+  const verifyRoute = await import('../src/app/api/verify/route.js');
+  const statsRoute = await import('../src/app/api/admin/stats/route.js');
+  const supervisionRoute = await import('../src/app/api/ops/supervision/route.js');
+
+  const jsonReq = (url, method, body, token = '', extraHeaders = {}) =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...extraHeaders
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+
+  const loginAs = async (email, password) => {
+    const res = await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email, password }));
+    assert.equal(res.status, 200);
+    return res.json();
+  };
+
+  const ongEmail = `ong.sprint5.${Date.now()}@matadi.cd`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Corridor Humanitaire Matadi',
+    representativeName: 'Jean-Baptiste Mbuyi',
+    email: ongEmail,
+    password: 'PasswordRDC#2026'
+  }));
+
+  const { sessionToken: tokenOng } = await loginAs(ongEmail, 'PasswordRDC#2026');
+  const { sessionToken: tokenAgent } = await loginAs('agent@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenDg } = await loginAs('dg@fnpss.cd', 'StaffFNPSS#2026');
+
+  // 1. Émission d'un Certificat d'Exonérations S4 et téléchargement du PDF officiel (VER-01, VER-02)
+  const fullDocs = ['P1_REQUETE', 'P2_ENROLEMENT', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'].map((code, idx) => ({
+    docCode: code,
+    fileName: `${code.toLowerCase()}.pdf`,
+    sizeBytes: 4096,
+    sha256Hash: '0x' + String(idx + 1).repeat(64)
+  }));
+
+  const subRes = await appsRoute.POST(
+    jsonReq('http://localhost:3000/api/applications', 'POST', {
+      serviceCode: 'S4',
+      projectTitle: 'Convoi humanitaire port de Matadi',
+      goodsSummary: '50 tonnes de vivres et groupes électrogènes hospitaliers',
+      paymentReference: `RAWBANK-MATADI-${Date.now()}`,
+      attachedDocuments: fullDocs
+    }, tokenOng)
+  );
+  assert.equal(subRes.status, 201);
+  const s4Ref = (await subRes.json()).application.referenceNumber;
+
+  await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/validate-payment', 'POST', { referenceNumber: s4Ref }, tokenAgent),
+    { params: { action: 'validate-payment' } }
+  );
+  const sealRes = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/approve-seal', 'POST', { referenceNumber: s4Ref }, tokenDg),
+    { params: { action: 'approve-seal' } }
+  );
+  assert.equal(sealRes.status, 200);
+  const sealedApp = (await sealRes.json()).application;
+  const certNumber = sealedApp.certificate.certificateNumber;
+
+  // Téléchargement du PDF binaire officiel (%PDF-1.4)
+  const pdfRes = await certPdfRoute.GET(
+    new Request(`http://localhost:3000/api/applications/certificate.pdf?ref=${encodeURIComponent(s4Ref)}`, {
+      headers: { Authorization: `Bearer ${tokenOng}` }
+    })
+  );
+  assert.equal(pdfRes.status, 200);
+  const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+
+  // 2. Vérification par Numéro d'Acte ET Passerelle API Partenaire DGDA (VER-03, VER-05)
+  const dgdaVerifyRes = await verifyRoute.GET(
+    new Request(`http://localhost:3000/api/verify?ref=${encodeURIComponent(certNumber)}`, {
+      headers: { 'X-API-Key': 'dgda-live-key-2026' }
+    })
+  );
+  assert.equal(dgdaVerifyRes.status, 200);
+  assert.equal(dgdaVerifyRes.headers.get('x-ratelimit-limit'), '600');
+  const dgdaVerifyData = await dgdaVerifyRes.json();
+  assert.equal(dgdaVerifyData.verdict, 'PASTILLE_VERTE_VALIDE');
+  assert.equal(dgdaVerifyData.partnerId, 'DGDA_SYDONIA_WORLD');
+  assert.equal(dgdaVerifyData.certificateNumber, certNumber);
+  assert.match(dgdaVerifyData.certType, /CERTIFICAT D'EXONERATIONS \(S4\)/);
+
+  // Clé API partenaire invalide -> rejet 401 et alerte enregistrée (VER-05)
+  const badPartnerRes = await verifyRoute.GET(
+    new Request(`http://localhost:3000/api/verify?ref=${encodeURIComponent(certNumber)}`, {
+      headers: { 'X-API-Key': 'cle-fausse-pirate-999' }
+    })
+  );
+  assert.equal(badPartnerRes.status, 401);
+
+  // 3. Vérification directe par téléversement du fichier PDF sans scan QR Code (VER-04)
+  const pdfVerifyRes = await verifyRoute.POST(
+    jsonReq(
+      'http://localhost:3000/api/verify',
+      'POST',
+      {
+        fileName: `${certNumber}.pdf`,
+        pdfContent: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`
+      },
+      '',
+      { 'X-API-Key': 'dgrad-live-key-2026' }
+    )
+  );
+  assert.equal(pdfVerifyRes.status, 200);
+  const pdfVerifyData = await pdfVerifyRes.json();
+  assert.equal(pdfVerifyData.isValid, true);
+  assert.equal(pdfVerifyData.verdict, 'PASTILLE_VERTE_VALIDE');
+  assert.equal(pdfVerifyData.partnerId, 'DGRAD_PORTAIL');
+  assert.equal(pdfVerifyData.computedSha256, sealedApp.certificate.pdfSha256);
+
+  // Rejet d'un PDF contenant une charge active malveillante (/JavaScript) (REQ-07, VER-04)
+  const maliciousPdf = Buffer.from('%PDF-1.4\n1 0 obj << /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >> endobj\n%%EOF');
+  const malVerifyRes = await verifyRoute.POST(
+    jsonReq('http://localhost:3000/api/verify', 'POST', {
+      fileName: 'exploit.pdf',
+      pdfContent: maliciousPdf.toString('base64')
+    })
+  );
+  assert.equal(malVerifyRes.status, 400);
+
+  // Révocation DG avec double confirmation (VER-06) -> la vérification PDF passe immédiatement au ROUGE_REVOQUE
+  const revRes = await actionRoute.POST(
+    jsonReq('http://localhost:3000/api/applications/revoke', 'POST', {
+      referenceNumber: s4Ref,
+      reason: 'Détournement constaté au poste douanier de Matadi',
+      doubleConfirmed: true
+    }, tokenDg),
+    { params: { action: 'revoke' } }
+  );
+  assert.equal(revRes.status, 200);
+
+  const revokedPdfCheck = await verifyRoute.POST(
+    jsonReq('http://localhost:3000/api/verify', 'POST', {
+      fileName: `${certNumber}.pdf`,
+      pdfContent: pdfBuffer.toString('base64')
+    })
+  );
+  assert.equal(revokedPdfCheck.status, 200);
+  const revokedPdfData = await revokedPdfCheck.json();
+  assert.equal(revokedPdfData.isValid, false);
+  assert.equal(revokedPdfData.verdict, 'PASTILLE_ROUGE_REVOQUE');
+  assert.equal(revokedPdfData.statusLabel, 'REVOKED');
+  assert.match(revokedPdfData.revocationReason, /Matadi/);
+
+  // 4. Tableau de bord statistique (ADM-09) & Réconciliation comptable anti-doublon (GOV-11, REQ-10)
+  const statsRes = await statsRoute.GET(
+    new Request('http://localhost:3000/api/admin/stats', {
+      headers: { Authorization: `Bearer ${tokenDg}` }
+    })
+  );
+  assert.equal(statsRes.status, 200);
+  const statsData = await statsRes.json();
+  assert.ok(statsData.stats.totals.totalApplications >= 1);
+  assert.equal(statsData.stats.financials.unitFeeBreakdownUsd.totalPerDossierUsd, 320);
+
+  // Enregistrement et rapprochement d'une quittance puis rejet de doublon sur un autre dossier
+  const uniquePayRef = `EQUITYBCDC-2026-${Date.now()}`;
+  const regRecRes = await statsRoute.POST(
+    jsonReq('http://localhost:3000/api/admin/stats', 'POST', {
+      action: 'register-receipt',
+      referenceNumber: 'FNPSS/DEM/2026/99001',
+      organizationName: 'ONG Corridor Humanitaire Matadi',
+      serviceCode: 'S4',
+      paymentReference: uniquePayRef
+    }, tokenAgent)
+  );
+  assert.equal(regRecRes.status, 201);
+
+  const dupRecRes = await statsRoute.POST(
+    jsonReq('http://localhost:3000/api/admin/stats', 'POST', {
+      action: 'register-receipt',
+      referenceNumber: 'FNPSS/DEM/2026/99002',
+      organizationName: 'Autre ONG',
+      serviceCode: 'S4',
+      paymentReference: uniquePayRef
+    }, tokenAgent)
+  );
+  assert.equal(dupRecRes.status, 400, 'La réutilisation d\'une même quittance sur un second dossier doit être bloquée');
+
+  const recValRes = await statsRoute.POST(
+    jsonReq('http://localhost:3000/api/admin/stats', 'POST', {
+      action: 'reconcile-receipt',
+      referenceNumber: 'FNPSS/DEM/2026/99001',
+      bankStatementMatch: true
+    }, tokenAgent)
+  );
+  assert.equal(recValRes.status, 200);
+  assert.match((await recValRes.json()).receipt.voucherNumber, /^BORD-FNPSS-2026-/);
+
+  const csvStatsRes = await statsRoute.GET(
+    new Request('http://localhost:3000/api/admin/stats?format=csv', {
+      headers: { Authorization: `Bearer ${tokenDg}` }
+    })
+  );
+  assert.equal(csvStatsRes.status, 200);
+  assert.ok((await csvStatsRes.text()).includes('Bordereau_FNPSS,Dossier_Ref,Quittance_Ref'));
+
+  // 5. Supervision opérationnelle (OPS-06), Budget 3G (< 3,0s, REQ-12) & Revue du Jalon G3 Beta (GOV-13)
+  const supRes = await supervisionRoute.GET(
+    new Request('http://localhost:3000/api/ops/supervision', {
+      headers: { Authorization: `Bearer ${tokenDg}` }
+    })
+  );
+  assert.equal(supRes.status, 200);
+  const supData = await supRes.json();
+  assert.equal(supData.req12PerformanceBudget.withinBudget, true);
+  assert.ok(supData.req12PerformanceBudget.estimated3gLoadSeconds < 3.0);
+  assert.equal(supData.milestoneG3Beta.gate, 'G3');
+  assert.equal(supData.milestoneG3Beta.status, 'VALIDATED');
+  assert.equal(supData.milestoneG3Beta.sec03SmartContractAudit.status, 'PASSED');
+  assert.equal(supData.milestoneG3Beta.sec04OwaspPentest.status, 'PASSED');
+  assert.equal(supData.milestoneG3Beta.sec07UatScenarios.status, 'SIGNED');
+});
+
+

@@ -20,7 +20,9 @@ function isManifestIntact(distDir) {
       Boolean(appManifest['/api/blockchain/anchor-queue/route']) &&
       Boolean(appManifest['/api/blockchain/deploy/route']) &&
       Boolean(appManifest['/api/pwa/sync/route']) &&
-      Boolean(appManifest['/api/ops/gates/route'])
+      Boolean(appManifest['/api/ops/gates/route']) &&
+      Boolean(appManifest['/api/admin/stats/route']) &&
+      Boolean(appManifest['/api/ops/supervision/route'])
     );
   } catch {
     return false;
@@ -120,8 +122,14 @@ try {
   const gatesInfo = await fetch(`${BASE}/api/ops/gates`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
   check('GET /api/ops/gates (GOV-12 Jalon G2 Alpha)', gatesInfo.status === 200, `HTTP ${gatesInfo.status}`);
 
-  const v = await fetch(`${BASE}/api/verify?hash=0x${'ab'.repeat(32)}`);
-  check('GET /api/verify (hash inconnu)', v.status === 200 || v.status === 404, `HTTP ${v.status}`);
+  const statsInfo = await fetch(`${BASE}/api/admin/stats`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
+  check('GET /api/admin/stats (ADM-09 Reporting & GOV-11 Réconciliation)', statsInfo.status === 200, `HTTP ${statsInfo.status}`);
+
+  const supInfo = await fetch(`${BASE}/api/ops/supervision`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
+  check('GET /api/ops/supervision (OPS-06, REQ-12 Budget 3G & GOV-13 Jalon G3 Beta)', supInfo.status === 200, `HTTP ${supInfo.status}`);
+
+  const v = await fetch(`${BASE}/api/verify?hash=0x${'ab'.repeat(32)}`, { headers: { 'X-API-Key': 'dgda-live-key-2026' } });
+  check('GET /api/verify + X-API-Key DGDA (VER-03/VER-05)', (v.status === 200 || v.status === 404) && v.headers.get('x-ratelimit-limit') === '600', `HTTP ${v.status}`);
 
   const headers = (await fetch(BASE + '/')).headers;
   check('En-têtes de sécurité', headers.get('x-frame-options') === 'DENY' && headers.get('x-content-type-options') === 'nosniff' && !headers.get('x-powered-by'));
