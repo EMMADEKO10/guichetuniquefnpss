@@ -23,6 +23,7 @@ bin-release/
 # Node & Next.js
 node_modules/
 .next/
+.next-smoke/
 out/
 build/
 dist/

@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Permet d'isoler un build/smoke-test (.next-smoke) lorsqu'un serveur `next dev` tourne déjà sur `.next`
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // Serveur autonome minimal pour l'image Docker (OPS-04)
   output: 'standalone',
   poweredByHeader: false,

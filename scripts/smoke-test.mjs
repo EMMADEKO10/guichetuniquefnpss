@@ -1,19 +1,46 @@
 // Smoke test réel : démarre le serveur Next.js de production (sortie standalone, comme l'image Docker),
-// interroge pages et API, puis l'arrête. Prérequis : `npm run build`.
-import { spawn } from 'node:child_process';
+// interroge pages et API, puis l'arrête.
+// Si un serveur `next dev` tourne en parallèle sur `.next`, utilise un dossier isolé `.next-smoke`
+// pour éviter que le watcher de `next dev` n'écrase `pages-manifest.json` / `app-paths-manifest.json`.
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 const PORT = 3123;
 const BASE = `http://127.0.0.1:${PORT}`;
 
-if (!fs.existsSync('.next/standalone/server.js')) {
-  console.error('Build standalone absent : lancer `npm run build` avant `npm run smoke`.');
-  process.exit(1);
+function isManifestIntact(distDir) {
+  try {
+    const pagesManifest = JSON.parse(fs.readFileSync(path.join(distDir, 'server/pages-manifest.json'), 'utf8'));
+    const appManifest = JSON.parse(fs.readFileSync(path.join(distDir, 'server/app-paths-manifest.json'), 'utf8'));
+    return (
+      fs.existsSync(path.join(distDir, 'standalone/server.js')) &&
+      Object.keys(pagesManifest).length >= 2 &&
+      Boolean(appManifest['/api/health/route'])
+    );
+  } catch {
+    return false;
+  }
 }
-// Comme dans le Dockerfile : les ressources statiques accompagnent le serveur autonome.
-fs.cpSync('.next/static', '.next/standalone/.next/static', { recursive: true });
 
-const server = spawn(process.execPath, ['.next/standalone/server.js'], {
+let distDir = process.env.NEXT_DIST_DIR || '.next';
+if (!isManifestIntact(distDir)) {
+  distDir = '.next-smoke';
+  if (!isManifestIntact(distDir)) {
+    console.log(`Construction d'un build isolé dans ${distDir} (évite tout conflit avec next dev)...`);
+    fs.rmSync(distDir, { recursive: true, force: true });
+    const build = spawnSync(process.execPath, ['node_modules/next/dist/bin/next', 'build'], {
+      stdio: 'inherit',
+      env: { ...process.env, NEXT_DIST_DIR: distDir }
+    });
+    if (build.status !== 0) process.exit(build.status || 1);
+  }
+}
+
+// Comme dans le Dockerfile : les ressources statiques accompagnent le serveur autonome.
+fs.cpSync(path.join(distDir, 'static'), path.join(distDir, 'standalone', distDir, 'static'), { recursive: true });
+
+const server = spawn(process.execPath, [path.join(distDir, 'standalone/server.js')], {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, PORT: String(PORT), HOSTNAME: '127.0.0.1', FNPSS_ENABLE_DEMO_STAFF: 'true' }
 });
@@ -90,4 +117,3 @@ for (const r of results) console.log(`${r.ok ? 'OK  ' : 'FAIL'} ${r.name}${r.det
 const failed = results.filter(r => !r.ok).length;
 console.log(`\n${results.length - failed}/${results.length} vérifications réussies`);
 process.exit(failed ? 1 : 0);
-
