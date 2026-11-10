@@ -36,11 +36,11 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Console Back-Office Multi-Niveaux & Inspection (`ADM-01`, `ADM-04`, `ADM-05`, `ADM-08`, `ADM-06`, `VER-06`) : [src/app/admin/page.jsx](src/app/admin/page.jsx)
   - Portail de Vérification Douanière DGDA (`VER-03`, `VER-04`) : [src/app/verifier/page.jsx](src/app/verifier/page.jsx)
   - Guide Utilisateur Simplifié ONG/ASBL & Supports de Formation FNPSS/Ministères/DGDA (`DEP-03`, `DEP-04`, `DEP-05`) : [src/app/guide/page.jsx](src/app/guide/page.jsx)
-- **Routes API Hybrides (Bridges vers moteurs souverains, Sprint 1–6 & Jalons G2 Alpha / G3 Beta / G4 Production) :**
+- **Routes API Hybrides (Bridges vers moteurs souverains, Sprint 1–7 & Jalons G2 Alpha / G3 Beta / G4 Production) :**
   - `/api/auth/login`, `/api/auth/register`, `/api/auth/google`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/profile`, `/api/auth/logout`
   - `/api/applications`, `/api/applications/[action]` (`validate-payment`, `request-complement`, `provide-complement`, `division-opinion`, `approve-seal`, `reject`, `cosign-ministry`, `revoke`, `withdraw`), `/api/applications/certificate.pdf`
   - `/api/notifications`, `/api/cms/news`, `/api/admin/applicants`, `/api/admin/audit`, `/api/admin/stats` (`ADM-09`, `GOV-11`), `/api/verify` (`GET` QR / `POST` PDF `VER-04` + `X-API-Key` `VER-05`), `/api/health`
-  - `/api/blockchain/anchor-queue` (`BLK-09`, `BLK-10`), `/api/blockchain/deploy` (`BLK-11`, `BLK-12`), `/api/pwa/sync` (`REQ-11`), `/api/ops/gates` (`GOV-12`, `OPS-05`), `/api/ops/supervision` (`OPS-06`, `REQ-12`, `GOV-13`), `/api/ops/production` (`OPS-07`, `DEP-01`..`05`)
+  - `/api/blockchain/anchor-queue` (`BLK-09`, `BLK-10`), `/api/blockchain/deploy` (`BLK-11`, `BLK-12`), `/api/pwa/sync` (`REQ-11`), `/api/ops/gates` (`GOV-12`, `OPS-05`), `/api/ops/supervision` (`OPS-06`, `REQ-12`, `GOV-13`), `/api/ops/production` (`OPS-07`, `DEP-01`..`05`), `/api/ops/pilot` (`DEP-06`..`09`, `GOV-10`)
 - **Déploiement Continu & Rollback Staging (`OPS-04`) :**
   - Pipeline GitHub Actions Staging Blue/Green : [.github/workflows/deploy-staging.yml](.github/workflows/deploy-staging.yml)
   - Procédure Opérationnelle & Rollback : [PROCEDURE_DEPLOIEMENT_ET_ROLLBACK_STAGING.md](documentation%20du%20projet/PROCEDURE_DEPLOIEMENT_ET_ROLLBACK_STAGING.md)
@@ -66,11 +66,11 @@ Ce guichet unique (portail web) est un point d’accès qui permet aux différen
   - Générateur des 6 gabarits officiels PDF 1.4 (`VER-01`, `VER-02`) : [src/pdf/certificate-generator.mjs](src/pdf/certificate-generator.mjs)
   - Simulateur Smart Contract & File d'ancrage résiliente hors-ligne (`BLK-10`) : [src/blockchain/registry-simulator.mjs](src/blockchain/registry-simulator.mjs)
   - Déployeur & Vérificateur Polygon Amoy Testnet (`80002`) / Mainnet (`137`) (`BLK-11`, `BLK-12`) : [src/blockchain/polygon-deployer.mjs](src/blockchain/polygon-deployer.mjs)
-  - Sauvegarde/Restauration Chiffrée `AES-256-GCM` (`OPS-05`), Go/No-Go `G1`–`G4` (`DEP-02`) & Suivi Pilote/Hypercare (`DEP-06`, `DEP-07`) : [src/ops/backup-and-pilot-manager.mjs](src/ops/backup-and-pilot-manager.mjs)
+  - Sauvegarde/Restauration Chiffrée `AES-256-GCM` (`OPS-05`), Go/No-Go `G1`–`G4` (`DEP-02`), Suivi Pilote/Hypercare (`DEP-06`, `DEP-07`), Contrat TMA (`DEP-08`), Roadmap Année 2 (`DEP-09`) & Clôture COPIL (`GOV-10`) : [src/ops/backup-and-pilot-manager.mjs](src/ops/backup-and-pilot-manager.mjs)
   - Machine à états des dossiers, RBAC (`ADM-01`) et Journal d'Audit (`ADM-07`) : [src/workflow/application-engine.mjs](src/workflow/application-engine.mjs)
   - Matrice d'Accès Rôle/Route (Fail-Closed), Anti-IDOR & Anti-Escalade Serveur (`ADM-01`, `SEC-04`) : [src/security/route-access-policy.mjs](src/security/route-access-policy.mjs)
   - Serveur HTTP, Modes d'Accès Sécurisé/Démo, API REST du moteur & Interopérabilité DGDA (`VER-05`, `ADM-01`) : [src/server.mjs](src/server.mjs)
-- **Suite de Tests Automatisés (29 suites unitaires et E2E) (`BLK-05`..`12`, `SEC-01`..`07`, `ADM-01`..`10`, `REQ-01`..`13`, `NOT-01`..`04`, `VER-01`..`06`, `UX-05`, `OPS-04`..`07`, `DEP-01`..`05`, `GOV-11`..`13`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
+- **Suite de Tests Automatisés (30 suites unitaires et E2E — 100% du backlog S0–S7 couvert) (`BLK-05`..`12`, `SEC-01`..`07`, `ADM-01`..`10`, `REQ-01`..`13`, `NOT-01`..`04`, `VER-01`..`06`, `UX-05`, `OPS-04`..`07`, `DEP-01`..`09`, `GOV-09`..`13`) :** [tests/guichet-unique.test.mjs](tests/guichet-unique.test.mjs) (`npm test`)
 - **Environnements Docker & Configuration (`OPS-02`, `OPS-05`) :** [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example)
 - **Intégration Continue & Déploiement Backlog GitHub Actions (`OPS-01`) :** [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/bootstrap-backlog.yml](.github/workflows/bootstrap-backlog.yml)
 

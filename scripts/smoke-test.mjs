@@ -23,7 +23,8 @@ function isManifestIntact(distDir) {
       Boolean(appManifest['/api/ops/gates/route']) &&
       Boolean(appManifest['/api/admin/stats/route']) &&
       Boolean(appManifest['/api/ops/supervision/route']) &&
-      Boolean(appManifest['/api/ops/production/route'])
+      Boolean(appManifest['/api/ops/production/route']) &&
+      Boolean(appManifest['/api/ops/pilot/route'])
     );
   } catch {
     return false;
@@ -134,6 +135,9 @@ try {
 
   const prodInfo = await fetch(`${BASE}/api/ops/production`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
   check('GET /api/ops/production (OPS-07, DEP-01/02/04/05 & Jalon G4)', prodInfo.status === 200, `HTTP ${prodInfo.status}`);
+
+  const pilotInfo = await fetch(`${BASE}/api/ops/pilot`, { headers: { Authorization: `Bearer ${staffData.sessionToken}` } });
+  check('GET /api/ops/pilot (DEP-06..09 Pilote ONG, Hypercare, TMA & Roadmap Année 2)', pilotInfo.status === 200, `HTTP ${pilotInfo.status}`);
 
   const v = await fetch(`${BASE}/api/verify?hash=0x${'ab'.repeat(32)}`, { headers: { 'X-API-Key': 'dgda-live-key-2026' } });
   check('GET /api/verify + X-API-Key DGDA (VER-03/VER-05)', (v.status === 200 || v.status === 404) && v.headers.get('x-ratelimit-limit') === '600', `HTTP ${v.status}`);

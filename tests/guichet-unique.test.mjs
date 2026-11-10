@@ -2960,5 +2960,139 @@ test('29. Sprint 6 API Next.js & Jalon G4 Production : Infrastructure Souveraine
   assert.equal(g4SignData.signOff.evaluation.allGatesGreen, true);
 });
 
+test('30. Routes API Next.js Sprint 7 : Lancement Pilote Cohorte ONG (DEP-06), Support Intensif Hypercare (DEP-07), Contrat TMA & Rétrospective (DEP-08), Retours & Backlog Année 2 (DEP-09) et Clôture COPIL S1–S16 (GOV-10)', async () => {
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const pilotRoute = await import('../src/app/api/ops/pilot/route.js');
+
+  const jsonReq = (url, method, body, token) =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+  const loginAs = async (email, password) => {
+    const res = await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email, password }));
+    assert.equal(res.status, 200);
+    return res.json();
+  };
+
+  const ongPilotEmail = `ong.pilot.s7.${Date.now()}@goma.cd`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Espoir du Nord-Kivu',
+    representativeName: 'Marie-Claire Kavira',
+    email: ongPilotEmail,
+    password: 'PasswordRDC#2026'
+  }));
+
+  const { sessionToken: tokenOng } = await loginAs(ongPilotEmail, 'PasswordRDC#2026');
+  const { sessionToken: tokenAgent } = await loginAs('agent@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenDg } = await loginAs('dg@fnpss.cd', 'StaffFNPSS#2026');
+
+  // 1. Contrôle d'accès RBAC sur GET /api/ops/pilot (réservé au personnel habilité)
+  const ongGetRes = await pilotRoute.GET(
+    new Request('http://localhost:3000/api/ops/pilot', {
+      headers: { Authorization: `Bearer ${tokenOng}` }
+    })
+  );
+  assert.equal(ongGetRes.status, 403);
+
+  const staffGetRes = await pilotRoute.GET(
+    new Request('http://localhost:3000/api/ops/pilot', {
+      headers: { Authorization: `Bearer ${tokenDg}` }
+    })
+  );
+  assert.equal(staffGetRes.status, 200);
+  const pilotSummary = await staffGetRes.json();
+
+  // Vérification de la cohorte pilote initiale (DEP-06), du contrat TMA (DEP-08), du backlog Année 2 (DEP-09) et de la clôture COPIL (GOV-10)
+  assert.equal(pilotSummary.pilotCohortSize, 5);
+  assert.equal(pilotSummary.tmaContractAndRetrospective.status, 'ACTIVE_SIGNED');
+  assert.equal(pilotSummary.tmaContractAndRetrospective.initialBuildBudgetUsd, 11000);
+  assert.equal(pilotSummary.tmaContractAndRetrospective.annualRecurringTmaUsd, 4700);
+  assert.equal(pilotSummary.tmaContractAndRetrospective.backlogCompletionPct, 100);
+  assert.equal(pilotSummary.tmaContractAndRetrospective.totalBacklogIssuesClosed, 87);
+  assert.equal(pilotSummary.year2RoadmapBacklog.length, 4);
+  assert.equal(pilotSummary.copilGovernanceSummary.status, 'CLOSED_ON_TIME_ON_BUDGET');
+  assert.equal(pilotSummary.copilGovernanceSummary.sprintsCompleted.length, 8);
+  assert.equal(pilotSummary.copilGovernanceSummary.openCriticalRisksCount, 0);
+
+  // 2. Support intensif Hypercare (DEP-07) : ouverture d'un ticket P1 par une ONG pilote et résolution sous SLA (<= 120 min) par un agent FNPSS
+  const openTicketRes = await pilotRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/pilot', 'POST', {
+      action: 'log-incident',
+      reporterOrg: 'ONG Espoir du Nord-Kivu',
+      severity: 'CRITICAL',
+      summary: 'Vérification du délai de synchronisation PWA 3G après coupure réseau à Goma',
+      openedAtMs: 500000
+    }, tokenOng)
+  );
+  assert.equal(openTicketRes.status, 201);
+  const openTicketData = await openTicketRes.json();
+  assert.equal(openTicketData.ticket.severity, 'CRITICAL');
+  assert.equal(openTicketData.ticket.slaTargetMinutes, 120);
+  assert.equal(openTicketData.ticket.status, 'OPEN');
+
+  // Une ONG ne peut pas clôturer elle-même un ticket Hypercare -> 403
+  const ongResolveRes = await pilotRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/pilot', 'POST', {
+      action: 'resolve-incident',
+      ticketId: openTicketData.ticket.ticketId
+    }, tokenOng)
+  );
+  assert.equal(ongResolveRes.status, 403);
+
+  // Résolution par l'agent FNPSS en 18 minutes (<= 120 min SLA)
+  const staffResolveRes = await pilotRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/pilot', 'POST', {
+      action: 'resolve-incident',
+      ticketId: openTicketData.ticket.ticketId,
+      resolutionNote: 'Synchronisation idempotente confirmée et quittance rapprochée en 18 min.',
+      resolvedAtMs: 500000 + 18 * 60000
+    }, tokenAgent)
+  );
+  assert.equal(staffResolveRes.status, 200);
+  const resolvedData = await staffResolveRes.json();
+  assert.equal(resolvedData.ticket.status, 'RESOLVED');
+  assert.equal(resolvedData.ticket.resolutionMinutes, 18);
+  assert.equal(resolvedData.ticket.slaMet, true);
+  assert.equal(resolvedData.summary.hypercareSlaCompliancePct, 100);
+
+  // 3. Recueil d'un retour d'expérience pilote (DEP-09)
+  const feedbackRes = await pilotRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/pilot', 'POST', {
+      action: 'submit-feedback',
+      pilotId: 'PILOT-01',
+      organizationName: 'ONG Espoir du Nord-Kivu',
+      ratingOn5: 5,
+      comment: 'Clôture du premier mois pilote avec 100% de nos cargaisons humanitaires dédouanées sans litige.',
+      suggestedEvolution: 'Application mobile dédiée pour les transitaires partenaires en Année 2.'
+    }, tokenOng)
+  );
+  assert.equal(feedbackRes.status, 201);
+  const feedbackData = await feedbackRes.json();
+  assert.equal(feedbackData.feedback.ratingOn5, 5);
+  assert.equal(feedbackData.summary.pilotFeedbackCount, 6);
+
+  // 4. Extension de la cohorte pilote par la Direction Générale (DEP-06)
+  const onboardRes = await pilotRoute.POST(
+    jsonReq('http://localhost:3000/api/ops/pilot', 'POST', {
+      action: 'onboard-pilot',
+      organizationName: 'Association Humanitaire Ituri Paix',
+      province: 'Ituri (Bunia)',
+      focusService: 'S6'
+    }, tokenDg)
+  );
+  assert.equal(onboardRes.status, 201);
+  const onboardData = await onboardRes.json();
+  assert.equal(onboardData.organization.id, 'PILOT-06');
+  assert.equal(onboardData.summary.pilotCohortSize, 6);
+});
+
+
 
 

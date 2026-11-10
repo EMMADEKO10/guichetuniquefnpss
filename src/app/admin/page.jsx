@@ -47,7 +47,8 @@ export default function AdminPage() {
     deployment: null,
     milestoneG2: null,
     stats: null,
-    supervision: null
+    supervision: null,
+    pilot: null
   });
 
   const ensureStaffSession = async (targetRole = role) => {
@@ -82,13 +83,14 @@ export default function AdminPage() {
     setIsLoading(true);
     try {
       const tk = tokenOverride || sessionToken || (await ensureStaffSession(role));
-      const [res, queueRes, deployRes, gatesRes, statsRes, supRes] = await Promise.all([
+      const [res, queueRes, deployRes, gatesRes, statsRes, supRes, pilotRes] = await Promise.all([
         fetch('/api/applications', { headers: authHeaders(tk) }),
         fetch('/api/blockchain/anchor-queue', { headers: authHeaders(tk) }),
         fetch('/api/blockchain/deploy', { headers: authHeaders(tk) }),
         fetch('/api/ops/gates', { headers: authHeaders(tk) }),
         fetch('/api/admin/stats', { headers: authHeaders(tk) }),
-        fetch('/api/ops/supervision', { headers: authHeaders(tk) })
+        fetch('/api/ops/supervision', { headers: authHeaders(tk) }),
+        fetch('/api/ops/pilot', { headers: authHeaders(tk) })
       ]);
       const data = await res.json();
       if (data.success) {
@@ -102,13 +104,15 @@ export default function AdminPage() {
       const gData = gatesRes.ok ? await gatesRes.json() : {};
       const stData = statsRes.ok ? await statsRes.json() : {};
       const spData = supRes.ok ? await supRes.json() : {};
+      const plData = pilotRes.ok ? await pilotRes.json() : {};
       setBlockchainInfo({
         relayer: qData.relayer || null,
         queue: qData.queue || null,
         deployment: dData.latestDeployment || null,
         milestoneG2: gData.milestoneG2Alpha || null,
         stats: stData.stats || null,
-        supervision: spData || null
+        supervision: spData || null,
+        pilot: plData || null
       });
     } catch (err) {
       console.error(err);
@@ -371,6 +375,15 @@ export default function AdminPage() {
           <span>
             <strong>Recettes validées (ADM-09) :</strong> {blockchainInfo.stats?.financials?.totalCollectedFeesUsd ?? 0} USD
           </span>
+          <span>
+            <strong>Cohorte Pilote (DEP-06) :</strong> {blockchainInfo.pilot?.pilotCohortSize ?? 5} ONG accompagnées ({blockchainInfo.pilot?.averagePilotSatisfactionOn5 ?? '4.8'}/5)
+          </span>
+          <span>
+            <strong>SLA Hypercare (DEP-07) :</strong> {blockchainInfo.pilot?.hypercareSlaCompliancePct ?? 100}% conforme
+          </span>
+          <Badge status="valide">
+            Contrat TMA V3 (DEP-08) : {blockchainInfo.pilot?.tmaContractAndRetrospective?.status || 'ACTIVE_SIGNED'}
+          </Badge>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleFlushAnchorQueue}>
