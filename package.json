@@ -12,6 +12,7 @@
     "smoke": "node scripts/smoke-test.mjs",
     "db:neon": "node scripts/neon-setup.mjs",
     "storage:cloudinary": "node scripts/cloudinary-setup.mjs",
+    "email:test": "node scripts/test-smtp.mjs",
     "serve:prototype": "node src/server.mjs --demo-open",
     "serve": "node src/server.mjs"
   },
