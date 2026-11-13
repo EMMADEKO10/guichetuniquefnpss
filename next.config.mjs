@@ -11,7 +11,7 @@ const nextConfig = {
     APP_NAME: 'Guichet Unique Dématérialisé FNPSS',
     APP_VERSION: '0.2.0',
     POLYGON_NETWORK: process.env.BLOCKCHAIN_NETWORK || 'polygon-amoy',
-    PUBLIC_VERIFY_BASE_URL: process.env.PUBLIC_VERIFY_BASE_URL || 'https://guichet.fnpss.cd/verifier'
+    PUBLIC_VERIFY_BASE_URL: process.env.PUBLIC_VERIFY_BASE_URL || 'https://guichetuniquefnpss.vercel.app/verifier'
   },
   async headers() {
     return [

@@ -1,4 +1,5 @@
 import { authService } from '../../../../auth/auth-service.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 function extractToken(request, bodyToken) {
   if (bodyToken) return bodyToken;
@@ -16,6 +17,7 @@ function extractToken(request, bodyToken) {
  */
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     let bodyToken = null;
     try {
       const body = await request.json();
@@ -33,6 +35,7 @@ export async function POST(request) {
     }
 
     const result = authService.logout(token);
+    await persistToNeon();
     return Response.json({
       success: true,
       message: 'Déconnexion réussie.',

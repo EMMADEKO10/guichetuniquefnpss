@@ -57,13 +57,25 @@ export default function NewApplicationPage() {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const sha256Hex = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
+      let fileBase64 = null;
+      if (file.size <= 3 * 1024 * 1024) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        fileBase64 = btoa(binary);
+      }
+
       setAttachedDocs(prev => ({
         ...prev,
         [docCode]: {
           docCode,
           fileName: file.name,
           sizeBytes: file.size,
-          sha256Hash: sha256Hex
+          sha256Hash: sha256Hex,
+          ...(fileBase64 ? { fileBase64 } : {})
         }
       }));
     } catch (err) {

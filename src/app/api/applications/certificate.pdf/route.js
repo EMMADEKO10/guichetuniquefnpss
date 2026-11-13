@@ -1,5 +1,6 @@
 import { applicationEngine } from '../../../../workflow/application-engine.mjs';
 import { requireActor, errorResponse, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const { searchParams } = new URL(request.url);
     const ref = searchParams.get('ref');
@@ -18,6 +20,7 @@ export async function GET(request) {
     }
 
     const { fileName, pdfBuffer, certificateStatus } = applicationEngine.downloadCertificate(actor, ref);
+    await persistToNeon();
 
     return new Response(pdfBuffer, {
       status: 200,

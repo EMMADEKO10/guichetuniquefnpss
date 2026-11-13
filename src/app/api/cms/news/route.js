@@ -1,5 +1,6 @@
 import { newsAndStatsService } from '../../../../cms/news-and-stats.mjs';
 import { requireActor, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category') || null;
     if (searchParams.get('all') === 'true') {
@@ -29,6 +31,7 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
     const article = newsAndStatsService.createNewsArticle(actor, {
@@ -39,6 +42,7 @@ export async function POST(request) {
       published: body.published !== false,
       publishedAt: body.publishedAt
     });
+    await persistToNeon();
     return Response.json({ success: true, article }, { status: 201 });
   } catch (err) {
     return errorResponse(err);
@@ -50,12 +54,14 @@ export async function POST(request) {
  */
 export async function PUT(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
     if (!body.articleId || typeof body.published !== 'boolean') {
       throw new HttpError(400, 'articleId et published (booléen) requis.');
     }
     const article = newsAndStatsService.setNewsPublishedState(actor, body.articleId, body.published);
+    await persistToNeon();
     return Response.json({ success: true, article });
   } catch (err) {
     return errorResponse(err);

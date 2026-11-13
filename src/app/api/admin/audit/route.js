@@ -1,5 +1,6 @@
 import { applicationEngine, assertPermission } from '../../../../workflow/application-engine.mjs';
 import { requireActor, errorResponse } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     assertPermission(actor, 'VIEW_AUDIT_LOGS');
 

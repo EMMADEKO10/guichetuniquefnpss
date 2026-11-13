@@ -8,6 +8,9 @@ import {
   serializeApplication,
   HttpError
 } from '../../../server/api-auth.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../infra/neon-persistence.mjs';
+import { resolveCloudinaryConfig, uploadEncryptedPdfToCloudinary } from '../../../storage/cloudinary-storage.mjs';
+import { sendTransactionalWorkflowEmail } from '../../../infra/smtp-mailer.mjs';
 
 /**
  * GET /api/applications — liste des dossiers (REQ-05, ADM-04).
@@ -16,6 +19,7 @@ import {
  */
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const { searchParams } = new URL(request.url);
     const serviceCode = searchParams.get('service') || null;
@@ -44,6 +48,7 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
 
@@ -52,8 +57,37 @@ export async function POST(request) {
       .length > 0;
 
     // Les pièces « exemptées » déclarées par le client ne sont jamais prises en compte.
-    const attachedDocuments = (Array.isArray(body.attachedDocuments) ? body.attachedDocuments : [])
+    const rawDocs = (Array.isArray(body.attachedDocuments) ? body.attachedDocuments : [])
       .filter(d => d && d.docCode && !d.isExemptedOnceOnly);
+
+    const cldCfg = resolveCloudinaryConfig();
+    const cloudinaryActive =
+      !process.env.NODE_TEST_CONTEXT &&
+      process.env.FNPSS_DISABLE_STORAGE !== 'true' &&
+      Boolean(cldCfg.cloudName && cldCfg.apiKey && cldCfg.apiSecret && cldCfg.encryptionKeyHex);
+
+    const attachedDocuments = [];
+    for (const doc of rawDocs) {
+      const { fileBase64, ...docMeta } = doc;
+      if (cloudinaryActive && typeof fileBase64 === 'string' && fileBase64.length > 0) {
+        const cleanB64 = fileBase64.includes(',') ? fileBase64.split(',').pop() : fileBase64;
+        const pdfBuffer = Buffer.from(cleanB64, 'base64');
+        const uploaded = await uploadEncryptedPdfToCloudinary(pdfBuffer, {
+          fileName: docMeta.fileName || `${docMeta.docCode}.pdf`,
+          publicId: `${actor.id}_${docMeta.docCode}_${Date.now()}`
+        });
+        attachedDocuments.push({
+          ...docMeta,
+          sizeBytes: docMeta.sizeBytes || uploaded.originalByteSize,
+          sha256Hash: uploaded.sha256Hash || docMeta.sha256Hash,
+          storageKey: uploaded.storageKey,
+          cloudinaryUrl: uploaded.secureUrl,
+          encryptedAtRest: true
+        });
+      } else {
+        attachedDocuments.push(docMeta);
+      }
+    }
 
     const user = authService.usersById.get(actor.id);
     const application = applicationEngine.submitApplication(actor, {
@@ -65,6 +99,16 @@ export async function POST(request) {
       attachedDocuments,
       hasActiveS1Enrollment
     });
+
+    await persistToNeon();
+    if (user?.email) {
+      await sendTransactionalWorkflowEmail({
+        to: user.email,
+        eventType: 'APPLICATION_SUBMITTED',
+        referenceNumber: application.referenceNumber,
+        details: { organizationName: application.organizationName, serviceCode: application.serviceCode }
+      }).catch(() => null);
+    }
 
     return Response.json(
       { success: true, application: serializeApplication(application), onceOnlyApplied: hasActiveS1Enrollment },
@@ -80,6 +124,7 @@ export async function POST(request) {
  */
 export async function PUT(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
     if (!body.referenceNumber) {
@@ -90,6 +135,7 @@ export async function PUT(request) {
       goodsSummary: body.goodsSummary,
       paymentReference: body.paymentReference
     });
+    await persistToNeon();
     return Response.json({ success: true, application: serializeApplication(application) });
   } catch (err) {
     return errorResponse(err);

@@ -1,6 +1,7 @@
 import { authService } from '../../../../auth/auth-service.mjs';
 import { applicationEngine, assertPermission } from '../../../../workflow/application-engine.mjs';
 import { requireActor, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     assertPermission(actor, 'MANAGE_USERS');
 
@@ -45,6 +47,7 @@ export async function GET(request) {
  */
 export async function PUT(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
     if (!body.userId || !body.status) {
@@ -56,6 +59,7 @@ export async function PUT(request) {
       body.status,
       body.reason || ''
     );
+    await persistToNeon();
     return Response.json({ success: true, user: updated });
   } catch (err) {
     return errorResponse(err);

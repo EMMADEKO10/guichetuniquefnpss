@@ -6,6 +6,7 @@ import {
   readJson,
   HttpError
 } from '../../../server/api-auth.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const { searchParams } = new URL(request.url);
     const ref = searchParams.get('ref');
@@ -49,6 +51,7 @@ export async function GET(request) {
  */
 export async function PUT(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
     if (!body.notificationId) {
@@ -59,6 +62,7 @@ export async function PUT(request) {
       body.read !== false,
       actor.id
     );
+    await persistToNeon();
     return Response.json({ success: true, notification });
   } catch (err) {
     return errorResponse(err);
@@ -73,6 +77,7 @@ export async function PUT(request) {
  */
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
     const action = body.action || 'dossier-message';
@@ -92,6 +97,7 @@ export async function POST(request) {
         message: body.message,
         attachmentDocType: body.attachmentDocType || null
       });
+      await persistToNeon();
       return Response.json({ success: true, entry }, { status: 201 });
     }
 
@@ -106,6 +112,7 @@ export async function POST(request) {
         subject: body.subject,
         message: body.message
       });
+      await persistToNeon();
       return Response.json({ success: true, broadcast: record }, { status: 201 });
     }
 
@@ -114,6 +121,7 @@ export async function POST(request) {
         throw new HttpError(403, 'RBAC: Reprise de la file SMTP réservée au personnel FNPSS');
       }
       const sentCount = applicationEngine.notifications.flushEmailRetryQueue(true);
+      await persistToNeon();
       return Response.json({ success: true, sentCount });
     }
 

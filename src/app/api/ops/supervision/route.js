@@ -6,11 +6,13 @@
 import { partnerApiGateway, OWASP_SECURITY_HEADERS } from '../../../../security/partner-api-gateway.mjs';
 import { applicationEngine } from '../../../../workflow/application-engine.mjs';
 import { requireActor, isStaff, errorResponse, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (!isStaff(actor)) {
       throw new HttpError(403, 'RBAC: Accès réservé au personnel habilité FNPSS.');

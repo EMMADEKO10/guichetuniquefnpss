@@ -10,6 +10,8 @@ import { verifyUploadedPdfAgainstRegistry } from '../../../storage/document-uplo
 import { partnerApiGateway } from '../../../security/partner-api-gateway.mjs';
 import { applicationEngine } from '../../../workflow/application-engine.mjs';
 import { OFFICIAL_ACT_TEMPLATES } from '../../../pdf/certificate-generator.mjs';
+import { hydrateFromNeon } from '../../../infra/neon-persistence.mjs';
+import { verifyDocumentOnChain } from '../../../infra/polygon-client.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +80,7 @@ function handleGatewayOrDomainError(err) {
 
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const { searchParams } = new URL(request.url);
     const hash = (searchParams.get('hash') || searchParams.get('ref') || '').trim();
 
@@ -89,7 +92,18 @@ export async function GET(request) {
     }
 
     const gatewayInfo = runPartnerGateway(request, '/api/verify', hash);
-    const verification = registrySimulator.verifyDocument(hash);
+    let verification = registrySimulator.verifyDocument(hash);
+
+    const onChain = await verifyDocumentOnChain(hash).catch(() => null);
+    if ((!verification || !verification.record) && onChain?.foundOnChain) {
+      verification = {
+        isValid: onChain.isValid,
+        isExpired: onChain.isExpired,
+        status: onChain.status,
+        verdict: onChain.verdict,
+        record: onChain.record
+      };
+    }
 
     if (!verification || !verification.record) {
       return Response.json({
@@ -98,6 +112,7 @@ export async function GET(request) {
         statusLabel: 'UNKNOWN',
         verdict: verification?.verdict || 'PASTILLE_ROUGE_FALSIFIE',
         isValid: false,
+        onChainVerified: false,
         partnerId: gatewayInfo.partnerId,
         message: 'Aucun enregistrement blockchain trouvé pour cette empreinte.'
       }, { status: 404, headers: gatewayInfo.headers });
@@ -105,6 +120,9 @@ export async function GET(request) {
 
     return Response.json({
       ...enrichVerificationPayload(verification),
+      onChainVerified: Boolean(onChain?.foundOnChain),
+      onChainContractAddress: onChain?.contractAddress || null,
+      onChainExplorerUrl: onChain?.explorerUrl || null,
       partnerId: gatewayInfo.partnerId
     }, { status: 200, headers: gatewayInfo.headers });
   } catch (err) {
@@ -114,6 +132,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     let body;
     try {
       body = await request.json();
@@ -128,16 +147,33 @@ export async function POST(request) {
       return Response.json({ error: 'VER-04: Contenu du fichier PDF (pdfContent) requis.' }, { status: 400 });
     }
 
-    const pdfVerification = verifyUploadedPdfAgainstRegistry(
+    let pdfVerification = verifyUploadedPdfAgainstRegistry(
       body.pdfContent,
       registrySimulator,
       Math.floor(Date.now() / 1000),
       { fileName }
     );
 
+    const onChain = pdfVerification?.computedSha256
+      ? await verifyDocumentOnChain(pdfVerification.computedSha256).catch(() => null)
+      : null;
+
+    if (!pdfVerification.record && onChain?.foundOnChain) {
+      pdfVerification = {
+        ...pdfVerification,
+        isValid: onChain.isValid,
+        isExpired: onChain.isExpired,
+        status: onChain.status,
+        verdict: onChain.verdict,
+        record: onChain.record
+      };
+    }
+
     const enriched = enrichVerificationPayload(pdfVerification);
     return Response.json({
       ...enriched,
+      onChainVerified: Boolean(onChain?.foundOnChain),
+      onChainContractAddress: onChain?.contractAddress || null,
       fileName: pdfVerification.fileName,
       byteSize: pdfVerification.byteSize,
       pdfVersion: pdfVerification.pdfVersion,

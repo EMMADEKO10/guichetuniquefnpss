@@ -1,7 +1,9 @@
 import { authService } from '../../../../auth/auth-service.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const body = await request.json();
     const { organizationName, representativeName, email, password } = body;
 
@@ -26,6 +28,7 @@ export async function POST(request) {
       );
     }
 
+    await persistToNeon();
     return Response.json({
       success: true,
       message: 'Compte requérant créé avec succès.',

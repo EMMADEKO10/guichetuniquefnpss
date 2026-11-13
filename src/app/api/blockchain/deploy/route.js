@@ -9,6 +9,8 @@ import { POLYGON_NETWORKS, deployAndVerifyRegistryContract } from '../../../../b
 import { productionTrainingManager } from '../../../../ops/production-training-manager.mjs';
 import { Roles } from '../../../../workflow/application-engine.mjs';
 import { requireActor, isStaff, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon } from '../../../../infra/neon-persistence.mjs';
+import { getPolygonNetworkStatus } from '../../../../infra/polygon-client.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,15 +21,18 @@ let latestDeploymentReport = deployAndVerifyRegistryContract({
 
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (!isStaff(actor)) {
       throw new HttpError(403, 'RBAC: Accès réservé au personnel habilité FNPSS.');
     }
 
+    const liveContractStatus = await getPolygonNetworkStatus().catch(() => null);
     return Response.json({
       success: true,
       networks: POLYGON_NETWORKS,
-      latestDeployment: latestDeploymentReport
+      latestDeployment: latestDeploymentReport,
+      liveContractStatus
     });
   } catch (err) {
     return errorResponse(err);
@@ -36,6 +41,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (![Roles.ADMIN, Roles.DG].includes(actor.role)) {
       throw new HttpError(403, 'RBAC: Seuls l\'Administrateur Système ou la Direction Générale peuvent déployer le Smart Contract.');

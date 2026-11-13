@@ -1,4 +1,5 @@
 import { authService } from '../../../../auth/auth-service.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 function extractToken(request) {
   const authHeader = request.headers.get('authorization') || '';
@@ -14,6 +15,7 @@ function extractToken(request) {
  */
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const token = extractToken(request);
     if (!token) {
       return Response.json(
@@ -45,6 +47,7 @@ export async function GET(request) {
 
 export async function PUT(request) {
   try {
+    await hydrateFromNeon();
     const token = extractToken(request);
     if (!token) {
       return Response.json(
@@ -63,6 +66,7 @@ export async function PUT(request) {
       province: body.province,
       enrollmentNumber: body.enrollmentNumber
     });
+    await persistToNeon();
 
     return Response.json({
       success: true,

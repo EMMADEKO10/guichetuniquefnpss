@@ -529,8 +529,11 @@ export class GuichetUniqueEngine {
     } else if (!isStaffReader) {
       throw new Error('RBAC: Accès au document réservé au propriétaire du dossier');
     }
-    if (!app.certificate?.pdfBuffer) {
+    if (!app.certificate) {
       throw new Error('Aucun document officiel disponible pour ce dossier');
+    }
+    if (!app.certificate.pdfBuffer) {
+      app.certificate.pdfBuffer = generateOfficialPdfBuffer(app.certificate);
     }
     this._logAudit(actor, 'CERTIFICATE_DOWNLOADED', referenceNumber, {
       certificateNumber: app.certificate.certificateNumber,

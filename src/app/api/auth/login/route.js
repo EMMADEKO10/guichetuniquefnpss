@@ -1,7 +1,9 @@
 import { authService } from '../../../../auth/auth-service.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const body = await request.json();
     const { email, password } = body;
 
@@ -13,6 +15,7 @@ export async function POST(request) {
     }
 
     const session = await authService.login(email, password);
+    await persistToNeon();
     if (!session || !session.success) {
       return Response.json(
         { error: session?.message || 'Identifiants invalides.' },

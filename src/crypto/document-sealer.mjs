@@ -72,7 +72,7 @@ export function sealOfficialAct({
   goodsSummary,
   issuedAtIso,
   expiresAtIso,
-  baseUrl = 'https://guichet.fnpss.cd/verifier'
+  baseUrl = process.env.PUBLIC_VERIFY_BASE_URL || 'https://guichetuniquefnpss.vercel.app/verifier'
 }) {
   if (!certificateNumber || !serviceCode || !organizationName) {
     throw new Error('Métadonnées obligatoires manquantes pour le scellement de l\'acte');

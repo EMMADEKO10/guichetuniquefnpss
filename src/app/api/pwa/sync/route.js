@@ -9,11 +9,13 @@ import { offlinePwaSyncQueue } from '../../../../pwa/offline-sync-queue.mjs';
 import { applicationEngine, Roles } from '../../../../workflow/application-engine.mjs';
 import { authService } from '../../../../auth/auth-service.mjs';
 import { requireActor, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const draft = offlinePwaSyncQueue.getOfflineDraft(actor.id);
     const userQueuedItems = Array.from(offlinePwaSyncQueue.submissionsByKey.values()).filter(
@@ -32,6 +34,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (actor.role !== Roles.REQUERANT) {
       throw new HttpError(403, 'RBAC: Seul un requérant ONG/ASBL peut utiliser la file de synchronisation hors-ligne.');
@@ -42,6 +45,7 @@ export async function POST(request) {
 
     if (action === 'save-draft') {
       const draft = offlinePwaSyncQueue.saveOfflineDraft(actor.id, body.draft || body);
+      await persistToNeon();
       return Response.json({
         success: true,
         action: 'save-draft',
@@ -78,6 +82,7 @@ export async function POST(request) {
         idempotencyKey: body.idempotencyKey || rawPayload.idempotencyKey || null
       });
 
+      await persistToNeon();
       return Response.json({
         success: true,
         action: 'enqueue',
@@ -89,6 +94,7 @@ export async function POST(request) {
       const isOnline = body.isOnline !== false;
       const allResults = offlinePwaSyncQueue.syncQueuedSubmissions(applicationEngine, { isOnline });
       const userResults = allResults.filter(item => item.actor?.id === actor.id);
+      await persistToNeon();
       return Response.json({
         success: true,
         action: 'sync',

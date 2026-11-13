@@ -9,11 +9,13 @@ import {
   ONG_USER_GUIDE_MODULES
 } from '../../../../ops/production-training-manager.mjs';
 import { requireActor, isStaff, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const { searchParams } = new URL(request.url);
     const section = (searchParams.get('section') || '').toLowerCase();
 
@@ -47,6 +49,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
     const action = body.action || '';

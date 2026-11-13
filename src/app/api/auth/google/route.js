@@ -1,10 +1,12 @@
 import { authService } from '../../../../auth/auth-service.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 /**
  * Route API Google OAuth 2.0 avec Web3Auth Account Abstraction (REQ-02, BLK-02, BLK-03)
  */
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const body = await request.json();
     const { googleEmail, givenName, familyName, organizationName, province } = body;
 
@@ -23,6 +25,7 @@ export async function POST(request) {
       province
     });
 
+    await persistToNeon();
     return Response.json({
       success: true,
       sessionToken: session.sessionToken,

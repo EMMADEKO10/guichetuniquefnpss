@@ -10,11 +10,13 @@ import { paymentReconciliationLedger } from '../../../../finance/payment-reconci
 import { applicationEngine } from '../../../../workflow/application-engine.mjs';
 import { authService } from '../../../../auth/auth-service.mjs';
 import { requireActor, isStaff, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (!isStaff(actor)) {
       throw new HttpError(403, 'RBAC: Accès réservé au personnel habilité FNPSS.');
@@ -75,6 +77,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (!isStaff(actor)) {
       throw new HttpError(403, 'RBAC: Accès réservé au personnel habilité FNPSS.');
@@ -90,6 +93,7 @@ export async function POST(request) {
         serviceCode: body.serviceCode || 'S6',
         paymentReference: body.paymentReference
       });
+      await persistToNeon();
       return Response.json({
         success: true,
         action: 'register-receipt',
@@ -106,6 +110,7 @@ export async function POST(request) {
           bankNote: body.bankNote
         }
       );
+      await persistToNeon();
       return Response.json({
         success: true,
         action: 'reconcile-receipt',

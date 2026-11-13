@@ -1,4 +1,5 @@
 import { authService } from '../../../../auth/auth-service.mjs';
+import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 /**
  * Route API Confirmation de Réinitialisation de Mot de Passe (REQ-03)
@@ -6,6 +7,7 @@ import { authService } from '../../../../auth/auth-service.mjs';
  */
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const body = await request.json();
     const { token, newPassword } = body;
 
@@ -24,6 +26,7 @@ export async function POST(request) {
     }
 
     const updatedUser = authService.confirmPasswordReset(token, newPassword);
+    await persistToNeon();
 
     return Response.json({
       success: true,

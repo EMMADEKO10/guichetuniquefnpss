@@ -14,6 +14,36 @@ import { Roles, assertPermission } from '../workflow/application-engine.mjs';
 
 const MAX_FAILED_ATTEMPTS = 5;
 
+function resolveSessionSecret() {
+  return String(process.env.JWT_SECRET || 'FNPSS-DEV-SESSION-FALLBACK-KEY-2026').trim();
+}
+
+function signStatelessSessionToken(payload) {
+  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', resolveSessionSecret()).update(encoded).digest('base64url');
+  return `fnpss.${encoded}.${sig}`;
+}
+
+function verifyStatelessSessionToken(token) {
+  if (typeof token !== 'string' || !token.startsWith('fnpss.')) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [, encoded, sig] = parts;
+  const expectedSig = crypto.createHmac('sha256', resolveSessionSecret()).update(encoded).digest('base64url');
+  const sigBuf = Buffer.from(sig, 'utf8');
+  const expectedBuf = Buffer.from(expectedSig, 'utf8');
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (!parsed || !parsed.userId || !Number.isFinite(parsed.createdAt)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Dérive de manière déterministe une adresse EVM non-custodiale (0x + 40 hex) via Web3Auth MPC simulé,
  * sans que l'utilisateur final n'ait à manipuler de clé privée ni de seed phrase (BLK-02 / BLK-03).
@@ -42,9 +72,23 @@ export class AuthService {
     this.usersById = new Map();
     this.usersByEmail = new Map();
     this.sessions = new Map();
+    this.revokedTokens = new Set();
     this.resetTokens = new Map();
     this.authLogs = [];
     this.seq = 1;
+  }
+
+  _issueSessionToken(user, createdAt = Date.now()) {
+    const nonce = crypto.randomBytes(8).toString('hex');
+    const sessionToken = signStatelessSessionToken({
+      userId: user.id,
+      role: user.role,
+      email: user.email,
+      createdAt,
+      nonce,
+    });
+    this.sessions.set(sessionToken, { userId: user.id, createdAt });
+    return sessionToken;
   }
 
   _log(action, emailOrUserId, metadata = {}) {
@@ -140,8 +184,7 @@ export class AuthService {
 
     user.failedLoginAttempts = 0;
     user.lockedUntil = null;
-    const sessionToken = crypto.randomBytes(24).toString('hex');
-    this.sessions.set(sessionToken, { userId: user.id, createdAt: nowMs });
+    const sessionToken = this._issueSessionToken(user, nowMs);
     this._log('LOGIN_SUCCESS', cleanEmail, { provider: 'EMAIL_PASSWORD', walletAddress: user.walletAddress });
 
     return {
@@ -193,8 +236,7 @@ export class AuthService {
       this._log('GOOGLE_OAUTH_LINKED_LOGIN', cleanEmail, { userId: user.id });
     }
 
-    const sessionToken = crypto.randomBytes(24).toString('hex');
-    this.sessions.set(sessionToken, { userId: user.id, createdAt: Date.now() });
+    const sessionToken = this._issueSessionToken(user, Date.now());
     return {
       sessionToken,
       user: this._sanitizeUser(user)
@@ -271,7 +313,17 @@ export class AuthService {
    * expirés (durée de vie `sessionTtlMs`) ou appartenant à un compte suspendu.
    */
   authenticateSession(sessionToken, nowMs = Date.now()) {
-    const sess = this.sessions.get(sessionToken);
+    if (!sessionToken || this.revokedTokens.has(sessionToken)) {
+      throw new Error('Session invalide ou expirée');
+    }
+    let sess = this.sessions.get(sessionToken);
+    if (!sess) {
+      const stateless = verifyStatelessSessionToken(sessionToken);
+      if (stateless) {
+        sess = { userId: stateless.userId, createdAt: stateless.createdAt };
+        this.sessions.set(sessionToken, sess);
+      }
+    }
     if (!sess) {
       throw new Error('Session invalide ou expirée');
     }
@@ -292,9 +344,11 @@ export class AuthService {
    * Déconnexion d'une session active (REQ-04).
    */
   logout(sessionToken) {
-    const sess = this.sessions.get(sessionToken);
-    if (sess) {
-      this.sessions.delete(sessionToken);
+    if (!sessionToken) return { loggedOut: true };
+    const sess = this.sessions.get(sessionToken) || verifyStatelessSessionToken(sessionToken);
+    this.sessions.delete(sessionToken);
+    this.revokedTokens.add(sessionToken);
+    if (sess?.userId) {
       this._log('USER_LOGGED_OUT', sess.userId, {});
     }
     return { loggedOut: true };

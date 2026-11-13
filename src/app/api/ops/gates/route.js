@@ -15,11 +15,13 @@ import { authService } from '../../../../auth/auth-service.mjs';
 import { newsAndStatsService } from '../../../../cms/news-and-stats.mjs';
 import { registrySimulator } from '../../../../blockchain/registry-simulator.mjs';
 import { requireActor, isStaff, errorResponse, readJson, HttpError } from '../../../../server/api-auth.mjs';
+import { hydrateFromNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (!isStaff(actor)) {
       throw new HttpError(403, 'RBAC: Accès réservé au personnel habilité FNPSS.');
@@ -56,6 +58,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    await hydrateFromNeon();
     const actor = requireActor(request);
     if (actor.role !== Roles.ADMIN) {
       throw new HttpError(403, 'RBAC: Seul l\'Administrateur Système peut exécuter une sauvegarde ou restauration chiffrée.');
