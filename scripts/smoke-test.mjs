@@ -50,7 +50,7 @@ fs.cpSync(path.join(distDir, 'static'), path.join(distDir, 'standalone', distDir
 
 const server = spawn(process.execPath, [path.join(distDir, 'standalone/server.js')], {
   stdio: ['ignore', 'pipe', 'pipe'],
-  env: { ...process.env, PORT: String(PORT), HOSTNAME: '127.0.0.1', FNPSS_ENABLE_DEMO_STAFF: 'true' }
+  env: { ...process.env, PORT: String(PORT), HOSTNAME: '127.0.0.1', FNPSS_ENABLE_DEMO_STAFF: 'true', FNPSS_ALLOW_SIMULATED_GOOGLE: 'true' }
 });
 let logs = '';
 server.stdout.on('data', d => (logs += d));
