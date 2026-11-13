@@ -4,16 +4,26 @@ import Badge from './Badge.jsx';
 /**
  * Visionneuse interactive de pièces justificatives (ADM-05, REQ-07)
  * @param {Object} props
- * @param {Array<{docCode: string, name: string, fileName?: string, sha256?: string, sizeBytes?: number, status?: string}>} props.documents
+ * @param {Array<{docCode: string, name: string, fileName?: string, sha256?: string, sizeBytes?: number, stored?: boolean, status?: string}>} props.documents
  * @param {string} [props.selectedDocCode]
+ * @param {string} [props.referenceNumber]
+ * @param {string} [props.token]
  * @param {(docCode: string) => void} props.onSelect
  */
 export default function DocumentViewer({
   documents = [],
   selectedDocCode,
+  referenceNumber = '',
+  token = '',
   onSelect
 }) {
-  const activeDoc = documents.find((d) => d.docCode === selectedDocCode) || documents[0];
+  const [selectedInternal, setSelectedInternal] = React.useState('');
+  const currentCode = selectedDocCode || selectedInternal;
+  const activeDoc = documents.find((d) => d.docCode === currentCode) || documents[0];
+  const handleSelect = (code) => {
+    setSelectedInternal(code);
+    onSelect?.(code);
+  };
 
   return (
     <div className="document-viewer" style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
@@ -54,7 +64,7 @@ export default function DocumentViewer({
               <button
                 key={doc.docCode}
                 type="button"
-                onClick={() => onSelect?.(doc.docCode)}
+                onClick={() => handleSelect(doc.docCode)}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -72,7 +82,10 @@ export default function DocumentViewer({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{doc.docCode}</span>
-                  {doc.sha256 && <span style={{ color: 'var(--fnpss-green)' }}>✓</span>}
+                  <span>
+                    {doc.stored && <span title="Stocké et chiffré AES-256-GCM sur Cloudinary" style={{ marginRight: '4px' }}>☁️</span>}
+                    {doc.sha256 && <span style={{ color: 'var(--fnpss-green)' }}>✓</span>}
+                  </span>
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {doc.name}
@@ -100,10 +113,27 @@ export default function DocumentViewer({
                   </div>
                 </div>
               )}
-              <div className="flex gap-2 justify-between">
+              <div className="flex gap-2 justify-between" style={{ flexWrap: 'wrap' }}>
                 <span className="badge badge-valide">✓ Format PDF/A Conforme</span>
                 <span className="badge badge-soumis">Anti-malware vérifié</span>
               </div>
+              {referenceNumber && activeDoc.stored ? (
+                <div style={{ marginTop: '14px' }}>
+                  <a
+                    href={`/api/applications/document?ref=${encodeURIComponent(referenceNumber)}&docCode=${encodeURIComponent(activeDoc.docCode)}${token ? `&token=${encodeURIComponent(token)}` : ''}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-sm btn-primary"
+                    style={{ textDecoration: 'none', display: 'inline-block' }}
+                  >
+                    🔓 Ouvrir &amp; Déchiffrer le PDF (Cloudinary AES-256-GCM)
+                  </a>
+                </div>
+              ) : (
+                <div className="text-muted" style={{ fontSize: '11px', marginTop: '12px' }}>
+                  ℹ️ Empreinte SHA-256 enregistrée (binaire non archivé sur Cloudinary pour cet ancien dépôt).
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-muted">Aucune pièce justificative sélectionnée.</p>

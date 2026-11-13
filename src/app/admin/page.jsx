@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import DocumentViewer from '../../components/ui/DocumentViewer.jsx';
+import DossierThread from '../../components/DossierThread.jsx';
 
 const DEMO_STAFF_EMAILS = {
   AGENT: 'agent@fnpss.cd',
@@ -39,6 +40,17 @@ export default function AdminPage() {
 
   const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
   const [revokeData, setRevokeData] = useState({ reason: '', doubleConfirmed: false });
+
+  // Provisionnement des comptes agents FNPSS (ADM-01 / ADM-03)
+  const [staffList, setStaffList] = useState([]);
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [staffForm, setStaffForm] = useState({
+    email: '',
+    password: '',
+    role: 'AGENT',
+    organizationName: 'FNPSS - Direction des Opérations',
+    province: 'Kinshasa'
+  });
 
   const [statusMsg, setStatusMsg] = useState('');
   const [blockchainInfo, setBlockchainInfo] = useState({
@@ -114,6 +126,15 @@ export default function AdminPage() {
         supervision: spData || null,
         pilot: plData || null
       });
+      if (role === 'ADMIN') {
+        try {
+          const staffRes = await fetch('/api/admin/staff', { headers: authHeaders(tk) });
+          if (staffRes.ok) {
+            const staffData = await staffRes.json();
+            setStaffList(staffData.staff || []);
+          }
+        } catch {}
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -281,6 +302,34 @@ export default function AdminPage() {
       }
     } catch (err) {
       alert('Erreur réseau');
+    }
+  };
+
+  const handleCreateStaff = async (e) => {
+    e?.preventDefault();
+    try {
+      const res = await fetch('/api/admin/staff', {
+        method: 'POST',
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify(staffForm)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Création du compte agent refusée.');
+        return;
+      }
+      setStatusMsg(`Compte agent ${data.account?.email} (${data.account?.role}) créé et enregistré.`);
+      setIsStaffModalOpen(false);
+      setStaffForm({
+        email: '',
+        password: '',
+        role: 'AGENT',
+        organizationName: 'FNPSS - Direction des Opérations',
+        province: 'Kinshasa'
+      });
+      fetchApplications();
+    } catch (err) {
+      alert('Erreur réseau lors de la création du compte.');
     }
   };
 
@@ -496,6 +545,37 @@ export default function AdminPage() {
                 <div><span className="text-muted">Co-signature :</span> <strong>{selectedApp.ministryCoSigned ? '✓ Apposée' : 'Non apposée'}</strong></div>
               </div>
 
+              {selectedApp.certificate && (
+                <div style={{ background: '#eef6fc', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 12px', marginBottom: '14px', fontSize: '12px' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--fnpss-navy)', marginBottom: '4px' }}>
+                    ⛓️ Attestation Scellée : <span className="mono">{selectedApp.certificate.certificateNumber}</span>
+                  </div>
+                  <div className="mono text-muted" style={{ fontSize: '11px', wordBreak: 'break-all', marginBottom: '6px' }}>
+                    Tx Amoy : {selectedApp.certificate.txHash} ({selectedApp.certificate.onChainMode || 'LIVE_RPC'})
+                  </div>
+                  <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+                    <a
+                      href={selectedApp.certificate.explorerTxUrl || `https://amoy.polygonscan.com/tx/${selectedApp.certificate.txHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-sm btn-outline"
+                      style={{ textDecoration: 'none', fontSize: '11px' }}
+                    >
+                      🔗 Voir sur PolygonScan Amoy
+                    </a>
+                    <a
+                      href={`/api/applications/certificate.pdf?ref=${encodeURIComponent(selectedApp.referenceNumber)}&token=${encodeURIComponent(sessionToken)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-sm btn-success"
+                      style={{ textDecoration: 'none', fontSize: '11px' }}
+                    >
+                      📥 Télécharger l&apos;Attestation PDF Scellée
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* Boutons d'Action selon le Rôle */}
               <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                 {role === 'AGENT' && !selectedApp.paymentValidated && (
@@ -544,10 +624,12 @@ export default function AdminPage() {
         </div>
 
         {/* Panneau Droit : Visionneuse Documentaire Côte-à-Côte */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <Card title="Inspection Documentaire Côte-à-Côte (ADM-05)">
             {selectedApp ? (
               <DocumentViewer
+                referenceNumber={selectedApp.referenceNumber}
+                token={sessionToken}
                 documents={
                   selectedApp.attachedDocuments?.length > 0
                     ? selectedApp.attachedDocuments.map(d => ({
@@ -555,7 +637,8 @@ export default function AdminPage() {
                         name: d.docCode,
                         fileName: d.fileName,
                         sha256: d.sha256Hash,
-                        sizeBytes: d.sizeBytes
+                        sizeBytes: d.sizeBytes,
+                        stored: Boolean(d.stored || d.cloudinaryUrl)
                       }))
                     : [
                         { docCode: 'P1_REQUETE', name: 'Requête motivée FNPSS', fileName: 'p1_requete.pdf', sha256: '0x' + '11'.repeat(32) },
@@ -568,8 +651,55 @@ export default function AdminPage() {
               <p className="text-muted">Sélectionnez un dossier à gauche pour inspecter ses pièces.</p>
             )}
           </Card>
+
+          {selectedApp && (
+            <Card title={`Échanges Instructeur / Requérant (${selectedApp.referenceNumber}) — NOT-04`}>
+              <DossierThread
+                referenceNumber={selectedApp.referenceNumber}
+                tokenOverride={sessionToken}
+              />
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* Provisionnement des Comptes Agents FNPSS (ADM-01 / ADM-03) */}
+      {role === 'ADMIN' && (
+        <Card
+          title={`Gestion des Comptes Agents & Instructeurs FNPSS (${staffList.length}) — ADM-01 / ADM-03`}
+          style={{ marginTop: '20px' }}
+          actions={
+            <Button variant="primary" size="sm" onClick={() => setIsStaffModalOpen(true)}>
+              ➕ Créer un Compte Agent / Instructeur
+            </Button>
+          }
+        >
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Email Institutionnel</th>
+                  <th>Rôle RBAC</th>
+                  <th>Service / Direction</th>
+                  <th>Province</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {staffList.map((st) => (
+                  <tr key={st.id || st.email}>
+                    <td className="mono" style={{ fontWeight: 600 }}>{st.email}</td>
+                    <td><Badge status="soumis">{st.role}</Badge></td>
+                    <td>{st.organizationName}</td>
+                    <td>{st.province}</td>
+                    <td><Badge status={st.status === 'ACTIVE' ? 'valide' : 'revoque'}>{st.status}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Modale Demande de Complément (ADM-06, NOT-04) */}
       <Modal
@@ -719,6 +849,73 @@ export default function AdminPage() {
             Confirmation formelle par la Direction Générale (Alerte synchrone DGDA/DGI/DGRAD)
           </label>
         </div>
+      </Modal>
+
+      {/* Modale Création de Compte Agent / Instructeur (ADM-01 / ADM-03) */}
+      <Modal
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
+        title="Provisionner un Compte Agent / Instructeur FNPSS (ADM-01)"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsStaffModalOpen(false)}>Annuler</Button>
+            <Button variant="primary" onClick={handleCreateStaff}>Créer le Compte</Button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateStaff}>
+          <div className="form-group">
+            <label htmlFor="staff-email">Email Institutionnel (@fnpss.cd)</label>
+            <input
+              id="staff-email"
+              type="email"
+              className="form-control"
+              value={staffForm.email}
+              onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+              placeholder="Ex: inspecteur.nordkivu@fnpss.cd"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="staff-pass">Mot de passe initial (&ge; 10 caractères)</label>
+            <input
+              id="staff-pass"
+              type="password"
+              className="form-control"
+              value={staffForm.password}
+              onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+              placeholder="Mot de passe sécurisé"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="staff-role">Rôle RBAC</label>
+            <select
+              id="staff-role"
+              className="form-control"
+              value={staffForm.role}
+              onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}
+            >
+              <option value="AGENT">AGENT &bull; Instructeur FNPSS</option>
+              <option value="CHEF_DIVISION">CHEF_DIVISION &bull; Chef de Division</option>
+              <option value="DG">DG &bull; Direction Générale (Scellement)</option>
+              <option value="MINISTERE">MINISTERE &bull; Ministère de Tutelle (Co-signature)</option>
+              <option value="DOUANE">DOUANE &bull; Inspecteur DGDA / DGI / DGRAD</option>
+              <option value="ADMIN">ADMIN &bull; Administrateur Système</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="staff-org">Direction / Service</label>
+            <input
+              id="staff-org"
+              type="text"
+              className="form-control"
+              value={staffForm.organizationName}
+              onChange={(e) => setStaffForm({ ...staffForm, organizationName: e.target.value })}
+              required
+            />
+          </div>
+        </form>
       </Modal>
     </div>
   );

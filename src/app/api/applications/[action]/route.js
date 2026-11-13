@@ -87,6 +87,27 @@ export async function POST(request, { params }) {
       ? applicationEngine.applications.get(body.referenceNumber)
       : null;
 
+    // Pièce complémentaire déjà téléversée (chiffrée sur Cloudinary) : rattachée au dossier du propriétaire.
+    if (actionName === 'provide-complement' && storedApp) {
+      const keyOk = typeof body.storageKey === 'string' && body.storageKey.includes(`/${actor.id}_${body.docCode}_`);
+      const urlOk = typeof body.cloudinaryUrl === 'string' && body.cloudinaryUrl.startsWith('https://res.cloudinary.com/');
+      if (keyOk && urlOk) {
+        storedApp.attachedDocuments = [
+          ...(storedApp.attachedDocuments || []).filter(d => d.docCode !== body.docCode),
+          {
+            docCode: body.docCode,
+            fileName: body.fileName,
+            sizeBytes: body.sizeBytes,
+            sha256Hash: body.sha256Hash,
+            storageKey: body.storageKey,
+            cloudinaryUrl: body.cloudinaryUrl,
+            encryptedAtRest: true,
+            isComplement: true
+          }
+        ];
+      }
+    }
+
     // Ancrage réel Polygon Amoy/Mainnet si contrat + clé relayer configurés
     if (storedApp?.certificate && isPolygonRuntimeEnabled()) {
       const cert = storedApp.certificate;

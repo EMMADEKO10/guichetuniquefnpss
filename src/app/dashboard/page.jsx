@@ -5,6 +5,17 @@ import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
+import DossierThread from '../../components/DossierThread.jsx';
+import { getClientToken } from '../../lib/client-auth.js';
+
+const COMPLEMENT_DOC_OPTIONS = [
+  { code: 'P1_REQUETE', label: 'P1 — Requête motivée' },
+  { code: 'P2_ENROLEMENT', label: 'P2 — Attestation d\'enrôlement' },
+  { code: 'P3_PLAN_ACTION', label: 'P3 — Plan d\'action' },
+  { code: 'P4_RAPPORT', label: 'P4 — Rapport annuel certifié' },
+  { code: 'P5_PROJET', label: 'P5 — Descriptif du projet / liste des biens' },
+  { code: 'P6_QUITTANCE', label: 'P6 — Bordereau / quittance bancaire' }
+];
 
 export default function DashboardPage() {
   const [applications, setApplications] = useState([]);
@@ -17,9 +28,14 @@ export default function DashboardPage() {
   const [editFormData, setEditFormData] = useState({ projectTitle: '', goodsSummary: '' });
   const [feedbackMsg, setFeedbackMsg] = useState('');
   const [sessionToken, setSessionToken] = useState('');
+  const [threadApp, setThreadApp] = useState(null);
+  const [complementApp, setComplementApp] = useState(null);
+  const [complementDocCode, setComplementDocCode] = useState('P1_REQUETE');
+  const [complementFile, setComplementFile] = useState(null);
+  const [complementBusy, setComplementBusy] = useState(false);
+  const [complementError, setComplementError] = useState('');
 
-  const getToken = () =>
-    typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') || '' : '';
+  const getToken = () => getClientToken();
 
   const authHeaders = (extra = {}) => {
     const t = getToken();
@@ -135,6 +151,76 @@ export default function DashboardPage() {
       }
     } catch (err) {
       alert('Erreur réseau');
+    }
+  };
+
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',').pop());
+      reader.onerror = () => reject(new Error('Lecture du fichier impossible'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleProvideComplement = async () => {
+    if (!complementApp) return;
+    setComplementError('');
+    if (complementFile && !complementFile.name.toLowerCase().endsWith('.pdf')) {
+      setComplementError('Seuls les fichiers PDF sont autorisés.');
+      return;
+    }
+    if (complementFile && complementFile.size > 3 * 1024 * 1024) {
+      setComplementError('Le fichier dépasse 3 Mo.');
+      return;
+    }
+    setComplementBusy(true);
+    try {
+      const payload = { referenceNumber: complementApp.referenceNumber, docCode: complementDocCode };
+
+      if (complementFile) {
+        const buf = await complementFile.arrayBuffer();
+        const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+        const sha256Hash = '0x' + Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+        const up = await fetch('/api/applications/document', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            docCode: complementDocCode,
+            fileName: complementFile.name,
+            fileBase64: await fileToBase64(complementFile)
+          })
+        });
+        const upData = await up.json().catch(() => ({}));
+        if (!up.ok) {
+          setComplementError(upData.error || 'Stockage de la pièce refusé.');
+          return;
+        }
+        Object.assign(payload, {
+          fileName: complementFile.name,
+          sizeBytes: complementFile.size,
+          sha256Hash: upData.sha256Hash || sha256Hash,
+          ...(upData.stored ? { storageKey: upData.storageKey, cloudinaryUrl: upData.cloudinaryUrl } : {})
+        });
+      }
+
+      const res = await fetch('/api/applications/provide-complement', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setComplementError(data.error || 'Complément non enregistré.');
+        return;
+      }
+      setFeedbackMsg(`Complément déposé sur le dossier ${complementApp.referenceNumber} : l'instruction reprend.`);
+      setComplementApp(null);
+      setComplementFile(null);
+      fetchApplications();
+    } catch (err) {
+      setComplementError('Erreur réseau : complément non enregistré.');
+    } finally {
+      setComplementBusy(false);
     }
   };
 
@@ -286,7 +372,7 @@ export default function DashboardPage() {
                       </Badge>
                     </td>
                     <td>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                         {app.status === 'SOUMIS' && (
                           <>
                             <button
@@ -307,6 +393,28 @@ export default function DashboardPage() {
                             </button>
                           </>
                         )}
+                        {app.status === 'COMPLEMENT_REQUIS' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setComplementApp(app);
+                              setComplementError('');
+                              setComplementFile(null);
+                            }}
+                            className="btn btn-sm btn-accent"
+                            title="Joindre la pièce complémentaire demandée (SC-02)"
+                          >
+                            📤 Fournir Complément
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setThreadApp(app)}
+                          className="btn btn-sm btn-outline"
+                          title="Fil de discussion instructeur / requérant (NOT-04)"
+                        >
+                          💬 Échanges
+                        </button>
                         {app.certificate && (
                           <a
                             href={`/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}&token=${encodeURIComponent(sessionToken)}`}
@@ -413,6 +521,80 @@ export default function DashboardPage() {
             />
           </div>
         </form>
+      </Modal>
+
+      {/* Modale de Fourniture de Complément Documentaire (SC-02, ADM-06) */}
+      <Modal
+        isOpen={Boolean(complementApp)}
+        onClose={() => setComplementApp(null)}
+        title={`Fournir un Complément : ${complementApp?.referenceNumber || ''}`}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setComplementApp(null)}>
+              Annuler
+            </Button>
+            <Button variant="primary" onClick={handleProvideComplement} disabled={complementBusy}>
+              {complementBusy ? 'Chiffrement & Envoi...' : '📤 Déposer le Complément'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleProvideComplement}>
+          {complementError && (
+            <div style={{ background: '#fce8e6', borderLeft: '4px solid var(--fnpss-red)', padding: '10px 12px', borderRadius: '4px', marginBottom: '12px', color: '#a50e0e', fontSize: '12.5px' }}>
+              {complementError}
+            </div>
+          )}
+          <div className="form-group">
+            <label htmlFor="comp-doc-code">Pièce Justificative à Compléter ou Remplacer</label>
+            <select
+              id="comp-doc-code"
+              className="form-control"
+              value={complementDocCode}
+              onChange={(e) => setComplementDocCode(e.target.value)}
+            >
+              <option value="P1_REQUETE">P1 — Requête motivée adressée au DG du FNPSS</option>
+              <option value="P2_ENROLEMENT">P2 — Certificat d'enrôlement FNPSS ou Accord F92</option>
+              <option value="P3_PERSONNALITE_JURIDIQUE">P3 — Arrêté de Personnalité Juridique / Statuts</option>
+              <option value="P4_RAPPORT_ACTIVITES">P4 — Rapport annuel d'activités sociales</option>
+              <option value="P5_COLISAGE_PROJET">P5 — Liste de colisage / Descriptif du projet</option>
+              <option value="P6_QUITTANCE">P6 — Quittance des frais réglementaires (320 USD)</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="comp-file">Fichier PDF/A Complémentaire (&le; 3 Mo)</label>
+            <input
+              id="comp-file"
+              type="file"
+              accept="application/pdf,.pdf"
+              className="form-control"
+              onChange={(e) => setComplementFile(e.target.files?.[0] || null)}
+              required
+            />
+          </div>
+          <p className="text-muted" style={{ fontSize: '11.5px', margin: 0 }}>
+            Le fichier sera contrôlé (en-tête %PDF-, absence de script actif), chiffré en AES-256-GCM sur Cloudinary et relancera automatiquement le compteur SLA de votre dossier.
+          </p>
+        </form>
+      </Modal>
+
+      {/* Modale Fil de Discussion Dossier (NOT-04) */}
+      <Modal
+        isOpen={Boolean(threadApp)}
+        onClose={() => setThreadApp(null)}
+        title={`Fil d'Échanges — Dossier ${threadApp?.referenceNumber || ''}`}
+        footer={
+          <Button variant="outline" onClick={() => setThreadApp(null)}>
+            Fermer
+          </Button>
+        }
+      >
+        {threadApp && (
+          <DossierThread
+            referenceNumber={threadApp.referenceNumber}
+            tokenOverride={sessionToken}
+          />
+        )}
       </Modal>
     </div>
   );

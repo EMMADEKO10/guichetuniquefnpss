@@ -175,6 +175,8 @@ function applyRuntimeState(state) {
     authService.authLogs = Array.isArray(state.auth.authLogs) ? state.auth.authLogs : [];
     authService.seq = Number.isFinite(state.auth.seq) ? state.auth.seq : authService.usersById.size + 1;
 
+    authService.ensureBootstrapAdmin();
+
     if (process.env.FNPSS_ENABLE_DEMO_STAFF === 'true') {
       const staffPassword = process.env.FNPSS_DEV_STAFF_PASSWORD || 'StaffFNPSS#2026';
       for (const acc of DEV_STAFF_ACCOUNTS) {

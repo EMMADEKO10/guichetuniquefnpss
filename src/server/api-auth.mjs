@@ -25,6 +25,11 @@ export class HttpError extends Error {
   }
 }
 
+export function buildSessionCookie(sessionToken) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `fnpss_session_token=${encodeURIComponent(sessionToken)}; Path=/; Max-Age=28800; SameSite=Lax${secure}`;
+}
+
 export function extractBearerToken(request) {
   const header = request.headers.get('authorization') || '';
   if (header.startsWith('Bearer ')) {
@@ -88,14 +93,28 @@ export async function readJson(request) {
   }
 }
 
-/** Supprime les champs binaires volumineux (PDF) avant sérialisation JSON. */
-export function serializeApplication(app) {
+/**
+ * Vue publique d'un dossier : sans binaire PDF, et sans URL Cloudinary
+ * (les pièces ne se lisent que via /api/applications/document, déchiffrées et tracées).
+ */
+export function toPublicApplication(app) {
   if (!app) return app;
   const clone = { ...app };
   if (clone.certificate) {
     const { pdfBuffer, ...certMeta } = clone.certificate;
     clone.certificate = certMeta;
   }
+  if (Array.isArray(clone.attachedDocuments)) {
+    clone.attachedDocuments = clone.attachedDocuments.map(({ cloudinaryUrl, ...doc }) => ({
+      ...doc,
+      stored: Boolean(cloudinaryUrl)
+    }));
+  }
   return clone;
+}
+
+/** Supprime les champs binaires volumineux (PDF) avant sérialisation JSON. */
+export function serializeApplication(app) {
+  return toPublicApplication(app);
 }
 

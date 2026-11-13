@@ -376,6 +376,61 @@ export class AuthService {
     return this._sanitizeUser(user);
   }
 
+  /**
+   * Création d'un compte du personnel FNPSS par l'administrateur (ADM-01, ADM-03).
+   * Remplace les comptes de démonstration : mot de passe d'au moins 12 caractères exigé.
+   */
+  createStaffAccount(adminActor, { email, password, firstName, lastName, role }) {
+    assertPermission(adminActor, 'MANAGE_USERS');
+    const staffRoles = [Roles.AGENT, Roles.CHEF_DIVISION, Roles.DG, Roles.MINISTERE, Roles.DOUANE, Roles.ADMIN];
+    if (!staffRoles.includes(role)) {
+      throw new Error(`Rôle du personnel invalide : ${role}`);
+    }
+    if (!password || String(password).length < 12) {
+      throw new Error('Le mot de passe du personnel doit contenir au moins 12 caractères');
+    }
+    if (!String(firstName || '').trim() || !String(lastName || '').trim()) {
+      throw new Error('Le prénom et le nom de l\'agent sont obligatoires');
+    }
+    const user = this.registerUser({
+      email,
+      password,
+      firstName,
+      lastName,
+      organizationName: 'FNPSS',
+      role
+    });
+    this._log('STAFF_ACCOUNT_CREATED', user.email, { createdBy: adminActor.id, role });
+    return this._sanitizeUser(user);
+  }
+
+  listStaff(adminActor) {
+    assertPermission(adminActor, 'MANAGE_USERS');
+    return Array.from(this.usersById.values())
+      .filter(u => u.role !== Roles.REQUERANT)
+      .map(u => this._sanitizeUser(u));
+  }
+
+  /**
+   * Premier administrateur de production, déclaré par variables d'environnement (jamais dans le code).
+   * Ne fait rien si les variables sont absentes ou si le compte existe déjà.
+   */
+  ensureBootstrapAdmin(env = process.env) {
+    const email = String(env.FNPSS_BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
+    const password = String(env.FNPSS_BOOTSTRAP_ADMIN_PASSWORD || '');
+    if (!email || password.length < 12 || this.usersByEmail.has(email)) return null;
+    const user = this.registerUser({
+      email,
+      password,
+      firstName: 'Administrateur',
+      lastName: 'FNPSS',
+      organizationName: 'FNPSS',
+      role: Roles.ADMIN
+    });
+    this._log('BOOTSTRAP_ADMIN_CREATED', user.email, {});
+    return this._sanitizeUser(user);
+  }
+
   listApplicants() {
     return Array.from(this.usersById.values())
       .filter(u => u.role === Roles.REQUERANT)

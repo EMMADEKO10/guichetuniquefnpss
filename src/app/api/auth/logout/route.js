@@ -36,10 +36,16 @@ export async function POST(request) {
 
     const result = authService.logout(token);
     await persistToNeon();
-    return Response.json({
+    return new Response(JSON.stringify({
       success: true,
       message: 'Déconnexion réussie.',
       ...result
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': 'fnpss_session_token=; Path=/; Max-Age=0; SameSite=Lax'
+      }
     });
   } catch (err) {
     return Response.json(

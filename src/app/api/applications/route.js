@@ -6,6 +6,7 @@ import {
   errorResponse,
   readJson,
   serializeApplication,
+  toPublicApplication,
   HttpError
 } from '../../../server/api-auth.mjs';
 import { hydrateFromNeon, persistToNeon } from '../../../infra/neon-persistence.mjs';
@@ -34,7 +35,9 @@ export async function GET(request) {
       throw new HttpError(403, `RBAC: Le rôle ${actor.role} n'a pas accès à la liste des dossiers`);
     }
 
-    const applications = applicationEngine.listApplications({ serviceCode, status, ownerId });
+    const applications = applicationEngine
+      .listApplications({ serviceCode, status, ownerId })
+      .map(toPublicApplication);
     return Response.json({ success: true, total: applications.length, applications });
   } catch (err) {
     return errorResponse(err);

@@ -1,9 +1,12 @@
-'use client';
+﻿'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
+import { saveClientSession } from '../../../lib/client-auth.js';
+
+const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -12,6 +15,13 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [googleConfig, setGoogleConfig] = useState({ clientId: null, simulated: false, loaded: false });
+  const googleButtonRef = useRef(null);
+
+  const finishLogin = (data, redirectTo) => {
+    saveClientSession(data.sessionToken, data.user);
+    window.location.href = redirectTo || (data.user?.role === 'REQUERANT' ? '/dashboard' : '/admin');
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -31,14 +41,7 @@ export default function LoginPage() {
         setErrorMessage(data.error || 'Identifiants invalides. Veuillez réessayer.');
       } else {
         setSuccessMessage('Connexion réussie ! Redirection...');
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('fnpss_session_token', data.sessionToken);
-          sessionStorage.setItem('fnpss_user', JSON.stringify(data.user || {}));
-          localStorage.setItem('fnpss_session_token', data.sessionToken);
-          localStorage.setItem('fnpss_user', JSON.stringify(data.user || {}));
-          document.cookie = `fnpss_session_token=${encodeURIComponent(data.sessionToken)}; path=/; max-age=28800; SameSite=Lax`;
-          window.location.href = data.user?.role === 'REQUERANT' ? '/dashboard' : '/admin';
-        }
+        finishLogin(data);
       }
     } catch (err) {
       setErrorMessage('Erreur réseau. Si vous êtes hors-ligne, le mode PWA est actif.');
@@ -47,43 +50,22 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const postGoogle = async (payload) => {
     setErrorMessage('');
     setSuccessMessage('');
     setIsGoogleLoading(true);
-
     try {
-      // Simulation Google OAuth 2.0 avec dérivation Web3Auth MPC (REQ-02, BLK-02)
-      const mockGoogleEmail = prompt('Entrez votre adresse email Google / Gmail :', 'direction@espoir-kivu.org');
-      if (!mockGoogleEmail) {
-        setIsGoogleLoading(false);
-        return;
-      }
-
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          googleEmail: mockGoogleEmail,
-          givenName: 'Représentant',
-          familyName: 'Google OAuth',
-          organizationName: 'ONG Partenaire RDC',
-          province: 'Nord-Kivu'
-        })
+        body: JSON.stringify(payload)
       });
-
       const data = await res.json();
       if (!res.ok) {
         setErrorMessage(data.error || 'Erreur lors de la connexion Google.');
       } else {
         setSuccessMessage(`Connexion Google réussie ! Portefeuille Web3Auth rattaché : ${data.walletAddress?.slice(0, 10)}...`);
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('fnpss_session_token', data.sessionToken);
-          sessionStorage.setItem('fnpss_user', JSON.stringify(data.user || {}));
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 800);
-        }
+        setTimeout(() => finishLogin(data, '/dashboard'), 600);
       }
     } catch (err) {
       setErrorMessage('Impossible de joindre le service Google OAuth / Web3Auth.');
@@ -92,6 +74,60 @@ export default function LoginPage() {
     }
   };
 
+  // Mode développement uniquement : le serveur n'accepte l'email déclaré que si la simulation est autorisée.
+  const handleGoogleLogin = async () => {
+    const mockGoogleEmail = prompt('Mode développement — entrez une adresse email Google :', 'direction@espoir-kivu.org');
+    if (!mockGoogleEmail) return;
+    await postGoogle({
+      googleEmail: mockGoogleEmail,
+      givenName: 'Représentant',
+      familyName: 'Google OAuth',
+      organizationName: 'ONG Partenaire RDC',
+      province: 'Nord-Kivu'
+    });
+  };
+
+  // Connexion Google réelle (Google Identity Services) : le jeton est vérifié côté serveur.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/google-config')
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cancelled) return;
+        setGoogleConfig({ clientId: cfg.clientId || null, simulated: Boolean(cfg.simulated), loaded: true });
+        if (!cfg.clientId) return;
+
+        const init = () => {
+          if (!window.google?.accounts?.id || !googleButtonRef.current) return;
+          window.google.accounts.id.initialize({
+            client_id: cfg.clientId,
+            callback: (response) => postGoogle({ credential: response.credential })
+          });
+          window.google.accounts.id.renderButton(googleButtonRef.current, {
+            theme: 'outline',
+            size: 'large',
+            text: 'continue_with',
+            locale: 'fr',
+            width: 360
+          });
+        };
+
+        if (window.google?.accounts?.id) {
+          init();
+        } else {
+          const script = document.createElement('script');
+          script.src = GIS_SCRIPT_SRC;
+          script.async = true;
+          script.defer = true;
+          script.onload = init;
+          document.head.appendChild(script);
+        }
+      })
+      .catch(() => setGoogleConfig({ clientId: null, simulated: false, loaded: true }));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   return (
     <div style={{ maxWidth: '440px', margin: '40px auto' }}>
       <Card
@@ -167,21 +203,26 @@ export default function LoginPage() {
           <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          isLoading={isGoogleLoading}
-          onClick={handleGoogleLogin}
-          style={{ width: '100%', borderColor: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-          </svg>
-          Continuer avec Google (OAuth 2.0 & Web3Auth)
-        </Button>
+        {googleConfig.clientId ? (
+          <div style={{ display: 'flex', justifyContent: 'center', minHeight: '44px' }}>
+            <div ref={googleButtonRef} />
+          </div>
+        ) : googleConfig.loaded && googleConfig.simulated ? (
+          <Button
+            type="button"
+            variant="outline"
+            isLoading={isGoogleLoading}
+            onClick={handleGoogleLogin}
+            style={{ width: '100%', borderColor: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            Continuer avec Google (mode développement simulé)
+          </Button>
+        ) : googleConfig.loaded ? (
+          <p className="text-muted" style={{ fontSize: '12px', textAlign: 'center', margin: 0 }}>
+            La connexion Google n'est pas activée sur ce serveur.
+          </p>
+        ) : null}
+
 
         <div style={{ marginTop: '12px', textAlign: 'center' }}>
           <Badge variant="info">
