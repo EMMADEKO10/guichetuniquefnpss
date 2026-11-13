@@ -60,34 +60,25 @@ export async function POST(request) {
     const rawDocs = (Array.isArray(body.attachedDocuments) ? body.attachedDocuments : [])
       .filter(d => d && d.docCode && !d.isExemptedOnceOnly);
 
-    const cldCfg = resolveCloudinaryConfig();
-    const cloudinaryActive =
-      !process.env.NODE_TEST_CONTEXT &&
-      process.env.FNPSS_DISABLE_STORAGE !== 'true' &&
-      Boolean(cldCfg.cloudName && cldCfg.apiKey && cldCfg.apiSecret && cldCfg.encryptionKeyHex);
-
-    const attachedDocuments = [];
-    for (const doc of rawDocs) {
-      const { fileBase64, ...docMeta } = doc;
-      if (cloudinaryActive && typeof fileBase64 === 'string' && fileBase64.length > 0) {
-        const cleanB64 = fileBase64.includes(',') ? fileBase64.split(',').pop() : fileBase64;
-        const pdfBuffer = Buffer.from(cleanB64, 'base64');
-        const uploaded = await uploadEncryptedPdfToCloudinary(pdfBuffer, {
-          fileName: docMeta.fileName || `${docMeta.docCode}.pdf`,
-          publicId: `${actor.id}_${docMeta.docCode}_${Date.now()}`
-        });
-        attachedDocuments.push({
-          ...docMeta,
-          sizeBytes: docMeta.sizeBytes || uploaded.originalByteSize,
-          sha256Hash: uploaded.sha256Hash || docMeta.sha256Hash,
-          storageKey: uploaded.storageKey,
-          cloudinaryUrl: uploaded.secureUrl,
-          encryptedAtRest: true
-        });
-      } else {
-        attachedDocuments.push(docMeta);
+    // Les pièces sont téléversées une par une via /api/applications/document (chiffrées AES-256-GCM sur Cloudinary).
+    // Ici on ne conserve que les métadonnées ; storageKey / cloudinaryUrl ne sont acceptés que s'ils
+    // proviennent bien de l'espace de stockage de cet utilisateur (anti-falsification).
+    const attachedDocuments = rawDocs.map(doc => {
+      const meta = {
+        docCode: doc.docCode,
+        fileName: doc.fileName,
+        sizeBytes: doc.sizeBytes,
+        sha256Hash: doc.sha256Hash
+      };
+      const keyOk = typeof doc.storageKey === 'string' && doc.storageKey.includes(`/${actor.id}_${doc.docCode}_`);
+      const urlOk = typeof doc.cloudinaryUrl === 'string' && doc.cloudinaryUrl.startsWith('https://res.cloudinary.com/');
+      if (keyOk && urlOk) {
+        meta.storageKey = doc.storageKey;
+        meta.cloudinaryUrl = doc.cloudinaryUrl;
+        meta.encryptedAtRest = true;
       }
-    }
+      return meta;
+    });
 
     const user = authService.usersById.get(actor.id);
     const application = applicationEngine.submitApplication(actor, {

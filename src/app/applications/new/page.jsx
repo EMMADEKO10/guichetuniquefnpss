@@ -67,17 +67,51 @@ export default function NewApplicationPage() {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const sha256Hex = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      setAttachedDocs(prev => ({
-        ...prev,
-        [docCode]: {
-          docCode,
-          fileName: file.name,
-          sizeBytes: file.size,
-          sha256Hash: sha256Hex
-        }
-      }));
+      const meta = {
+        docCode,
+        fileName: file.name,
+        sizeBytes: file.size,
+        sha256Hash: sha256Hex
+      };
+      setAttachedDocs(prev => ({ ...prev, [docCode]: meta }));
+
+      // Téléversement chiffré (AES-256-GCM) vers Cloudinary : un fichier par requête (limite Vercel 4,5 Mo).
+      if (file.size > 3 * 1024 * 1024) {
+        alert(`${file.name} dépasse 3 Mo : seule son empreinte SHA-256 sera enregistrée, le fichier ne sera pas stocké.`);
+        return;
+      }
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      const token = getClientToken();
+      const up = await fetch('/api/applications/document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ docCode, fileName: file.name, fileBase64: btoa(binary) })
+      });
+      const upData = await up.json().catch(() => ({}));
+      if (!up.ok) {
+        alert(`Stockage de ${file.name} refusé : ${upData.error || up.status}`);
+        return;
+      }
+      if (upData.stored) {
+        setAttachedDocs(prev => ({
+          ...prev,
+          [docCode]: {
+            ...meta,
+            sha256Hash: upData.sha256Hash || sha256Hex,
+            storageKey: upData.storageKey,
+            cloudinaryUrl: upData.cloudinaryUrl
+          }
+        }));
+      }
     } catch (err) {
-      alert('Erreur lors du calcul de l\'empreinte cryptographique');
+      alert('Erreur lors du traitement du fichier PDF');
     }
   };
 
