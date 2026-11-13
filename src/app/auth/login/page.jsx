@@ -34,6 +34,9 @@ export default function LoginPage() {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('fnpss_session_token', data.sessionToken);
           sessionStorage.setItem('fnpss_user', JSON.stringify(data.user || {}));
+          localStorage.setItem('fnpss_session_token', data.sessionToken);
+          localStorage.setItem('fnpss_user', JSON.stringify(data.user || {}));
+          document.cookie = `fnpss_session_token=${encodeURIComponent(data.sessionToken)}; path=/; max-age=28800; SameSite=Lax`;
           window.location.href = data.user?.role === 'REQUERANT' ? '/dashboard' : '/admin';
         }
       }

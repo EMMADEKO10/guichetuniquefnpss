@@ -32,10 +32,17 @@ export function extractBearerToken(request) {
   }
   try {
     const url = new URL(request.url);
-    return (url.searchParams.get('token') || '').trim();
+    const param = (url.searchParams.get('token') || '').trim();
+    if (param) return param;
   } catch {
-    return '';
+    // URL parsing fallback
   }
+  const cookieHeader = request.headers.get('cookie') || '';
+  const match = cookieHeader.match(/(?:^|;\s*)fnpss_session_token=([^;]+)/);
+  if (match) {
+    return decodeURIComponent(match[1]).trim();
+  }
+  return '';
 }
 
 /**

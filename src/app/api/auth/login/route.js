@@ -23,10 +23,19 @@ export async function POST(request) {
       );
     }
 
-    return Response.json({
+    const isSecure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    const cookieVal = `fnpss_session_token=${encodeURIComponent(session.sessionToken)}; Path=/; Max-Age=28800; SameSite=Lax${isSecure}`;
+
+    return new Response(JSON.stringify({
       success: true,
       sessionToken: session.sessionToken,
       user: session.user
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': cookieVal
+      }
     });
   } catch (err) {
     return Response.json(

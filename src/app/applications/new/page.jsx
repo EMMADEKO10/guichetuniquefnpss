@@ -5,6 +5,16 @@ import Card from '../../../components/ui/Card.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import Button from '../../../components/ui/Button.jsx';
 
+function getClientToken() {
+  if (typeof window === 'undefined') return '';
+  const fromSession = sessionStorage.getItem('fnpss_session_token');
+  if (fromSession) return fromSession;
+  const fromLocal = localStorage.getItem('fnpss_session_token');
+  if (fromLocal) return fromLocal;
+  const match = document.cookie.match(/(?:^|;\s*)fnpss_session_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 export default function NewApplicationPage() {
   const [step, setStep] = useState(1);
   const [serviceCode, setServiceCode] = useState('S4');
@@ -18,7 +28,7 @@ export default function NewApplicationPage() {
   const [feedback, setFeedback] = useState(null);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') : '';
+    const token = getClientToken();
     if (!token) return;
     fetch('/api/applications?service=S1&status=VALIDE_DELIVRE', {
       headers: { Authorization: `Bearer ${token}` }
@@ -57,25 +67,13 @@ export default function NewApplicationPage() {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const sha256Hex = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      let fileBase64 = null;
-      if (file.size <= 3 * 1024 * 1024) {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-        }
-        fileBase64 = btoa(binary);
-      }
-
       setAttachedDocs(prev => ({
         ...prev,
         [docCode]: {
           docCode,
           fileName: file.name,
           sizeBytes: file.size,
-          sha256Hash: sha256Hex,
-          ...(fileBase64 ? { fileBase64 } : {})
+          sha256Hash: sha256Hex
         }
       }));
     } catch (err) {
@@ -103,7 +101,7 @@ export default function NewApplicationPage() {
     }
 
     try {
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') || '' : '';
+      const token = getClientToken();
       const res = await fetch('/api/applications', {
         method: 'POST',
         headers: {
