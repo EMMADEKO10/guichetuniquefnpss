@@ -270,7 +270,7 @@ export async function hydrateFromNeon({ force = false } = {}) {
   }
 
   const remoteVersion = Number(row.version) || 1;
-  if (force || remoteVersion !== localSyncedVersion) {
+  if (force || remoteVersion !== localSyncedVersion || applicationEngine.applications.size === 0) {
     const parsedState = typeof row.state === 'string' ? JSON.parse(row.state) : row.state;
     applyRuntimeState(parsedState);
     localSyncedVersion = remoteVersion;

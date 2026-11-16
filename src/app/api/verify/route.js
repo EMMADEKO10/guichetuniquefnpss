@@ -82,11 +82,11 @@ export async function GET(request) {
   try {
     await hydrateFromNeon();
     const { searchParams } = new URL(request.url);
-    const hash = (searchParams.get('hash') || searchParams.get('ref') || '').trim();
+    const hash = (searchParams.get('hash') || searchParams.get('ref') || searchParams.get('cert') || '').trim();
 
     if (!hash) {
       return Response.json(
-        { error: 'Paramètre hash ou ref manquant.' },
+        { error: 'Paramètre hash, ref ou cert manquant.' },
         { status: 400 }
       );
     }

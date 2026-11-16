@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    await hydrateFromNeon();
+    await hydrateFromNeon({ force: true });
     const actor = requireActor(request);
     const { searchParams } = new URL(request.url);
     const ref = searchParams.get('ref');
