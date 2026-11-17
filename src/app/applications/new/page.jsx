@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import Button from '../../../components/ui/Button.jsx';
+import AlertBanner from '../../../components/ui/AlertBanner.jsx';
 
 function getClientToken() {
   if (typeof window === 'undefined') return '';
@@ -23,6 +24,9 @@ export default function NewApplicationPage() {
   const [goodsSummary, setGoodsSummary] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [attachedDocs, setAttachedDocs] = useState({});
+  const [uploadErrors, setUploadErrors] = useState({});
+  const [uploadingDoc, setUploadingDoc] = useState('');
+  const [stepError, setStepError] = useState('');
   const [hasS1Enrollment, setHasS1Enrollment] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -56,10 +60,14 @@ export default function NewApplicationPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadErrors(prev => ({ ...prev, [docCode]: null }));
+
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Seuls les fichiers au format PDF sont autorisés.');
+      setUploadErrors(prev => ({ ...prev, [docCode]: 'Format invalide : seuls les fichiers PDF sont acceptés.' }));
       return;
     }
+
+    setUploadingDoc(docCode);
 
     try {
       const buffer = await file.arrayBuffer();
@@ -77,7 +85,11 @@ export default function NewApplicationPage() {
 
       // Téléversement chiffré (AES-256-GCM) vers Cloudinary : un fichier par requête (limite Vercel 4,5 Mo).
       if (file.size > 3 * 1024 * 1024) {
-        alert(`${file.name} dépasse 3 Mo : seule son empreinte SHA-256 sera enregistrée, le fichier ne sera pas stocké.`);
+        setUploadErrors(prev => ({
+          ...prev,
+          [docCode]: `${file.name} dépasse 3 Mo : seule son empreinte SHA-256 est calculée, le stockage cloud complet est restreint.`
+        }));
+        setUploadingDoc('');
         return;
       }
       const bytes = new Uint8Array(buffer);
@@ -96,7 +108,11 @@ export default function NewApplicationPage() {
       });
       const upData = await up.json().catch(() => ({}));
       if (!up.ok) {
-        alert(`Stockage de ${file.name} refusé : ${upData.error || up.status}`);
+        setUploadErrors(prev => ({
+          ...prev,
+          [docCode]: `Stockage refusé : ${upData.error || up.status}`
+        }));
+        setUploadingDoc('');
         return;
       }
       if (upData.stored) {
@@ -111,7 +127,12 @@ export default function NewApplicationPage() {
         }));
       }
     } catch (err) {
-      alert('Erreur lors du traitement du fichier PDF');
+      setUploadErrors(prev => ({
+        ...prev,
+        [docCode]: 'Erreur lors de l\'inspection ou du hachage cryptographique du fichier PDF.'
+      }));
+    } finally {
+      setUploadingDoc('');
     }
   };
 
@@ -208,26 +229,28 @@ export default function NewApplicationPage() {
       </div>
 
       {feedback && (
-        <div
-          style={{
-            padding: '12px 14px',
-            borderRadius: '6px',
-            marginBottom: '18px',
-            fontSize: '13px',
-            background: feedback.type === 'success' ? '#e6f4ea' : feedback.type === 'error' ? '#fce8e6' : '#fffbeb',
-            color: feedback.type === 'success' ? '#0d652d' : feedback.type === 'error' ? '#b31412' : '#b45309',
-            borderLeft: `4px solid ${feedback.type === 'success' ? 'var(--fnpss-green)' : feedback.type === 'error' ? 'var(--fnpss-red)' : '#f59e0b'}`
-          }}
-        >
-          {feedback.message}
-          {feedback.type === 'success' && (
-            <div style={{ marginTop: '8px' }}>
-              <a href="/dashboard" className="btn btn-sm btn-success" style={{ textDecoration: 'none' }}>
-                Accéder au Tableau de Bord &rarr;
-              </a>
-            </div>
+        <AlertBanner
+          variant={feedback.type}
+          title={feedback.type === 'success' ? 'Dossier Enregistré' : feedback.type === 'error' ? 'Erreur de Soumission' : 'Information'}
+          message={feedback.message}
+          action={feedback.type === 'success' && (
+            <a href="/dashboard" className="btn btn-sm btn-success" style={{ textDecoration: 'none' }}>
+              Accéder au Tableau de Bord &rarr;
+            </a>
           )}
-        </div>
+          onClose={() => setFeedback(null)}
+          style={{ marginBottom: '18px' }}
+        />
+      )}
+
+      {stepError && (
+        <AlertBanner
+          variant="warning"
+          title="Champ Requis"
+          message={stepError}
+          onClose={() => setStepError('')}
+          style={{ marginBottom: '18px' }}
+        />
       )}
 
       <Card>
@@ -264,7 +287,7 @@ export default function NewApplicationPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="primary" onClick={() => setStep(2)}>
+              <Button variant="primary" onClick={() => { setStepError(''); setStep(2); }}>
                 Continuer vers l'Étape 2 &rarr;
               </Button>
             </div>
@@ -293,7 +316,7 @@ export default function NewApplicationPage() {
                 type="text"
                 className="form-control"
                 value={projectTitle}
-                onChange={(e) => setProjectTitle(e.target.value)}
+                onChange={(e) => { setProjectTitle(e.target.value); setStepError(''); }}
                 placeholder="Ex: Distribution d'équipements médicaux aux maternités rurales"
                 required
               />
@@ -311,10 +334,20 @@ export default function NewApplicationPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-              <Button variant="outline" onClick={() => setStep(1)}>
+              <Button variant="outline" onClick={() => { setStepError(''); setStep(1); }}>
                 &larr; Retour
               </Button>
-              <Button variant="primary" onClick={() => setStep(3)}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (!projectTitle.trim()) {
+                    setStepError('Veuillez saisir un intitulé pour votre projet avant de passer à l\'étape des pièces justificatives.');
+                    return;
+                  }
+                  setStepError('');
+                  setStep(3);
+                }}
+              >
                 Continuer vers les Pièces &rarr;
               </Button>
             </div>
@@ -328,66 +361,82 @@ export default function NewApplicationPage() {
 
             {/* Notification Once-Only */}
             {hasS1Enrollment && (
-              <div style={{ background: '#e6f4ea', borderLeft: '4px solid var(--fnpss-green)', padding: '10px 14px', borderRadius: '6px', marginBottom: '16px', fontSize: '12.5px', color: '#0d652d' }}>
-                ✨ <strong>Principe Once-Only Activé :</strong> Votre organisation possède un enrôlement S1 actif. La pièce <strong>P2 (Accord de siège F92 / Statuts)</strong> est dispensée de redépôt et pré-validée automatiquement.
-              </div>
+              <AlertBanner
+                variant="success"
+                title="Principe Once-Only Activé"
+                message="Votre organisation possède un enrôlement S1 actif. La pièce P2 (Accord de siège F92 / Statuts) est dispensée de redépôt et pré-validée automatiquement."
+                style={{ marginBottom: '16px' }}
+              />
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
               {docDefinitions.map((doc) => {
                 const isExempted = doc.onceOnly && hasS1Enrollment;
                 const uploaded = attachedDocs[doc.code];
+                const isDocUploading = uploadingDoc === doc.code;
+                const docError = uploadErrors[doc.code];
 
                 return (
                   <div
                     key={doc.code}
                     style={{
-                      border: '1px solid var(--border)',
+                      border: `1px solid ${docError ? '#fca5a5' : 'var(--border)'}`,
                       borderRadius: '8px',
                       padding: '12px',
                       background: isExempted ? '#f0fdf4' : uploaded ? '#f8fafc' : '#ffffff',
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '10px'
+                      flexDirection: 'column',
+                      gap: '8px'
                     }}
                   >
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
-                        {doc.code} &bull; {doc.name}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
+                          {doc.code} &bull; {doc.name}
+                        </div>
+                        {isExempted ? (
+                          <div style={{ color: 'var(--fnpss-green)', fontSize: '11.5px', fontWeight: 600 }}>
+                            ✓ Dispensé (Once-Only validé antérieurement)
+                          </div>
+                        ) : isDocUploading ? (
+                          <div style={{ color: 'var(--fnpss-blue)', fontSize: '11.5px', fontWeight: 600 }}>
+                            ⏳ Calcul de l'empreinte SHA-256 et chiffrement en cours...
+                          </div>
+                        ) : uploaded ? (
+                          <div className="mono text-muted" style={{ fontSize: '11px' }}>
+                            📄 {uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}...
+                          </div>
+                        ) : (
+                          <div className="text-muted" style={{ fontSize: '11px' }}>
+                            Format PDF requis (max 15 Mo)
+                          </div>
+                        )}
                       </div>
-                      {isExempted ? (
-                        <div style={{ color: 'var(--fnpss-green)', fontSize: '11.5px', fontWeight: 600 }}>
-                          ✓ Dispensé (Once-Only validé antérieurement)
-                        </div>
-                      ) : uploaded ? (
-                        <div className="mono text-muted" style={{ fontSize: '11px' }}>
-                          📄 {uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}...
-                        </div>
-                      ) : (
-                        <div className="text-muted" style={{ fontSize: '11px' }}>
-                          Format PDF requis (max 15 Mo)
+
+                      {!isExempted && (
+                        <div>
+                          <input
+                            id={`upload-${doc.code}`}
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            disabled={isDocUploading}
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleFileUpload(doc.code, e)}
+                          />
+                          <label
+                            htmlFor={`upload-${doc.code}`}
+                            className="btn btn-sm btn-outline"
+                            style={{ cursor: isDocUploading ? 'wait' : 'pointer', margin: 0, opacity: isDocUploading ? 0.6 : 1 }}
+                          >
+                            {isDocUploading ? '⏳ Téléversement...' : uploaded ? '🔄 Remplacer' : '📤 Téléverser PDF'}
+                          </label>
                         </div>
                       )}
                     </div>
 
-                    {!isExempted && (
-                      <div>
-                        <input
-                          id={`upload-${doc.code}`}
-                          type="file"
-                          accept="application/pdf"
-                          style={{ display: 'none' }}
-                          onChange={(e) => handleFileUpload(doc.code, e)}
-                        />
-                        <label
-                          htmlFor={`upload-${doc.code}`}
-                          className="btn btn-sm btn-outline"
-                          style={{ cursor: 'pointer', margin: 0 }}
-                        >
-                          {uploaded ? '🔄 Remplacer' : '📤 Téléverser PDF'}
-                        </label>
+                    {docError && (
+                      <div style={{ color: '#b91c1c', fontSize: '11.5px', fontWeight: 600, background: '#fee2e2', padding: '6px 10px', borderRadius: '4px' }}>
+                        ⚠️ {docError}
                       </div>
                     )}
                   </div>
@@ -396,10 +445,20 @@ export default function NewApplicationPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Button variant="outline" onClick={() => setStep(2)}>
+              <Button variant="outline" onClick={() => { setStepError(''); setStep(2); }}>
                 &larr; Retour
               </Button>
-              <Button variant="primary" onClick={() => setStep(4)}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (!attachedDocs['P1_REQUETE']) {
+                    setStepError('La pièce P1_REQUETE (Requête motivée) est obligatoire avant de finaliser votre demande.');
+                    return;
+                  }
+                  setStepError('');
+                  setStep(4);
+                }}
+              >
                 Vérification et Paiement &rarr;
               </Button>
             </div>

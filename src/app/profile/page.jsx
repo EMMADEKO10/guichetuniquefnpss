@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import AlertBanner from '../../components/ui/AlertBanner.jsx';
 
 const PROVINCES_RDC = [
   'Kinshasa', 'Nord-Kivu', 'Sud-Kivu', 'Haut-Katanga', 'Ituri', 'Kasaï-Central',
@@ -162,20 +163,13 @@ export default function ProfilePage() {
       </div>
 
       {statusMessage.text && (
-        <div
-          style={{
-            background: statusMessage.type === 'error' ? '#fce8e6' : '#e6f4ea',
-            borderLeft: `4px solid ${statusMessage.type === 'error' ? 'var(--fnpss-red)' : 'var(--fnpss-green)'}`,
-            padding: '12px 14px',
-            borderRadius: '4px',
-            marginBottom: '20px',
-            fontSize: '13px',
-            color: statusMessage.type === 'error' ? '#b31412' : '#0d652d'
-          }}
-          role={statusMessage.type === 'error' ? 'alert' : 'status'}
-        >
-          {statusMessage.text}
-        </div>
+        <AlertBanner
+          variant={statusMessage.type === 'error' ? 'error' : 'success'}
+          title={statusMessage.type === 'error' ? 'Erreur' : 'Succès'}
+          message={statusMessage.text}
+          onClose={() => setStatusMessage({ type: '', text: '' })}
+          style={{ marginBottom: '20px' }}
+        />
       )}
 
       {/* Carte Portefeuille Web3Auth Abstraction (BLK-02, BLK-03) */}

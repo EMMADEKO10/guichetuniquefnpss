@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import DocumentViewer from '../../components/ui/DocumentViewer.jsx';
 import DossierThread from '../../components/DossierThread.jsx';
+import AlertBanner from '../../components/ui/AlertBanner.jsx';
 
 const DEMO_STAFF_EMAILS = {
   AGENT: 'agent@fnpss.cd',
@@ -52,7 +53,14 @@ export default function AdminPage() {
     province: 'Kinshasa'
   });
 
-  const [statusMsg, setStatusMsg] = useState('');
+  const [alertInfo, setAlertInfo] = useState(null); // { type, title, message, action }
+  const [modalError, setModalError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const notify = (type, message, title = '', action = null) => {
+    setAlertInfo({ type, message, title, action });
+  };
+
   const [blockchainInfo, setBlockchainInfo] = useState({
     relayer: null,
     queue: null,
@@ -143,6 +151,7 @@ export default function AdminPage() {
   };
 
   const handleFlushAnchorQueue = async () => {
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/blockchain/anchor-queue', {
         method: 'POST',
@@ -151,15 +160,21 @@ export default function AdminPage() {
       });
       if (res.ok) {
         const d = await res.json();
-        setStatusMsg(`File d'ancrage résiliente traitée (${d.queue?.confirmedCount || 0} transaction(s) confirmée(s) sur Polygon).`);
+        notify('success', `File d'ancrage résiliente traitée (${d.queue?.confirmedCount || 0} transaction(s) confirmée(s) sur Polygon).`, 'File Résiliente Synchronisée');
         fetchApplications();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        notify('error', d.error || 'Erreur lors de la synchronisation de la file.', 'Échec de synchronisation');
       }
     } catch {
-      alert('Erreur réseau');
+      notify('error', 'Erreur de communication réseau.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeployAmoy = async () => {
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/blockchain/deploy', {
         method: 'POST',
@@ -168,11 +183,16 @@ export default function AdminPage() {
       });
       if (res.ok) {
         const d = await res.json();
-        setStatusMsg(`Contrat FNPSSRegistry vérifié sur Polygon Amoy (${d.deployment?.contractAddress?.slice(0, 12)}...). Smoke test OK.`);
+        notify('success', `Contrat FNPSSRegistry vérifié sur Polygon Amoy (${d.deployment?.contractAddress?.slice(0, 12)}...). Smoke test OK.`, 'Contrat Qualifié');
         fetchApplications();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        notify('error', d.error || 'Qualification du contrat refusée.', 'Échec Qualification');
       }
     } catch {
-      alert('Erreur réseau');
+      notify('error', 'Erreur de communication réseau lors du déploiement Amoy.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -187,6 +207,7 @@ export default function AdminPage() {
   });
 
   const handleValidatePayment = async (ref) => {
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/applications/validate-payment', {
         method: 'POST',
@@ -194,19 +215,23 @@ export default function AdminPage() {
         body: JSON.stringify({ referenceNumber: ref })
       });
       if (res.ok) {
-        setStatusMsg(`Quittance de frais validée pour le dossier ${ref}. Instruction démarrée.`);
+        notify('success', `Quittance de frais validée pour le dossier ${ref}. Instruction démarrée.`, 'Paiement Validé (ADM-04)');
         fetchApplications();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Erreur lors de la validation du paiement.');
+        const d = await res.json().catch(() => ({}));
+        notify('error', d.error || 'Erreur lors de la validation du paiement.', 'Validation Refusée');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      notify('error', 'Impossible de contacter le serveur pour valider la quittance.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleRequestComplement = async () => {
     if (!selectedApp || !complementReason.trim()) return;
+    setIsSubmitting(true);
+    setModalError('');
     try {
       const res = await fetch('/api/applications/request-complement', {
         method: 'POST',
@@ -217,20 +242,26 @@ export default function AdminPage() {
         })
       });
       if (res.ok) {
-        setStatusMsg(`Complément demandé sur le dossier ${selectedApp.referenceNumber}. Requérant notifié.`);
+        notify('info', `Complément demandé sur le dossier ${selectedApp.referenceNumber}. Requérant notifié.`, 'Complément Demandé (ADM-06)');
         setIsComplementModalOpen(false);
         setComplementReason('');
         fetchApplications();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Erreur lors de la demande de complément.');
+        const d = await res.json().catch(() => ({}));
+        const msg = d.error || 'Erreur lors de la demande de complément.';
+        setModalError(msg);
+        notify('error', msg, 'Demande de Complément Refusée');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      setModalError('Erreur de communication réseau.');
+      notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleApproveSeal = async (ref) => {
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/applications/approve-seal', {
         method: 'POST',
@@ -238,19 +269,23 @@ export default function AdminPage() {
         body: JSON.stringify({ referenceNumber: ref })
       });
       if (res.ok) {
-        setStatusMsg(`Attestation ${ref} approuvée et scellée avec succès sur la blockchain Polygon.`);
+        notify('success', `Attestation ${ref} approuvée et scellée avec succès sur la blockchain Polygon Amoy.`, 'Attestation Scellée (ADM-06)');
         fetchApplications();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Erreur lors de l\'approbation et du scellement.');
+        const d = await res.json().catch(() => ({}));
+        notify('error', d.error || 'Erreur lors de l\'approbation et du scellement.', 'Approbation Refusée');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      notify('error', 'Erreur lors du scellement sur la blockchain Polygon.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleReject = async () => {
     if (!selectedApp || !rejectReason.trim()) return;
+    setIsSubmitting(true);
+    setModalError('');
     try {
       const res = await fetch('/api/applications/reject', {
         method: 'POST',
@@ -261,21 +296,28 @@ export default function AdminPage() {
         })
       });
       if (res.ok) {
-        setStatusMsg(`Dossier ${selectedApp.referenceNumber} rejeté avec motif notifié au requérant.`);
+        notify('warning', `Dossier ${selectedApp.referenceNumber} rejeté avec motif notifié au requérant.`, 'Dossier Rejeté (ADM-06)');
         setIsRejectModalOpen(false);
         setRejectReason('');
         fetchApplications();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Erreur lors du rejet du dossier.');
+        const d = await res.json().catch(() => ({}));
+        const msg = d.error || 'Erreur lors du rejet du dossier.';
+        setModalError(msg);
+        notify('error', msg, 'Rejet Refusé');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      setModalError('Erreur de communication réseau.');
+      notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDivisionOpinion = async () => {
     if (!selectedApp) return;
+    setIsSubmitting(true);
+    setModalError('');
     try {
       const res = await fetch('/api/applications/division-opinion', {
         method: 'POST',
@@ -287,20 +329,27 @@ export default function AdminPage() {
         })
       });
       if (res.ok) {
-        setStatusMsg(`Avis technique formulé pour le dossier ${selectedApp.referenceNumber}.`);
+        notify('success', `Avis technique formulé pour le dossier ${selectedApp.referenceNumber}. Transmis à la DG.`, 'Avis Technique Enregistré (ADM-08)');
         setIsOpinionModalOpen(false);
         fetchApplications();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Erreur lors de l\'émission de l\'avis technique.');
+        const d = await res.json().catch(() => ({}));
+        const msg = d.error || 'Erreur lors de l\'émission de l\'avis technique.';
+        setModalError(msg);
+        notify('error', msg, 'Avis Technique Refusé');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      setModalError('Erreur de communication réseau.');
+      notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCosignMinistry = async () => {
     if (!selectedApp) return;
+    setIsSubmitting(true);
+    setModalError('');
     try {
       const res = await fetch('/api/applications/cosign-ministry', {
         method: 'POST',
@@ -311,32 +360,41 @@ export default function AdminPage() {
         })
       });
       if (res.ok) {
-        setStatusMsg(`Co-signature ministérielle enregistrée (${cosignRef}).`);
+        notify('success', `Co-signature ministérielle enregistrée (${cosignRef}).`, 'Co-Signature Validée (ADM-06)');
         setIsCosignModalOpen(false);
         fetchApplications();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Erreur lors de l\'enregistrement de la co-signature.');
+        const d = await res.json().catch(() => ({}));
+        const msg = d.error || 'Erreur lors de l\'enregistrement de la co-signature.';
+        setModalError(msg);
+        notify('error', msg, 'Co-Signature Refusée');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      setModalError('Erreur de communication réseau.');
+      notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateStaff = async (e) => {
     e?.preventDefault();
+    setIsSubmitting(true);
+    setModalError('');
     try {
       const res = await fetch('/api/admin/staff', {
         method: 'POST',
         headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
         body: JSON.stringify(staffForm)
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Création du compte agent refusée.');
+        const msg = data.error || 'Création du compte agent refusée.';
+        setModalError(msg);
+        notify('error', msg, 'Création Refusée');
         return;
       }
-      setStatusMsg(`Compte agent ${data.account?.email} (${data.account?.role}) créé et enregistré.`);
+      notify('success', `Compte agent ${data.account?.email} (${data.account?.role}) créé et enregistré.`, 'Compte Agent Provisionné (ADM-01)');
       setIsStaffModalOpen(false);
       setStaffForm({
         email: '',
@@ -347,16 +405,21 @@ export default function AdminPage() {
       });
       fetchApplications();
     } catch (err) {
-      alert('Erreur réseau lors de la création du compte.');
+      setModalError('Erreur de communication réseau.');
+      notify('error', 'Erreur réseau lors de la création du compte.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleRevoke = async () => {
     if (!selectedApp) return;
     if (!revokeData.doubleConfirmed) {
-      alert('La case de double confirmation par la Direction Générale est obligatoire.');
+      setModalError('La case de double confirmation par la Direction Générale est obligatoire.');
       return;
     }
+    setIsSubmitting(true);
+    setModalError('');
 
     try {
       const res = await fetch('/api/applications/revoke', {
@@ -369,15 +432,20 @@ export default function AdminPage() {
         })
       });
       if (res.ok) {
-        setStatusMsg(`Attestation ${selectedApp.referenceNumber} révoquée. Régies DGDA/DGI/DGRAD alertées.`);
+        notify('warning', `Attestation ${selectedApp.referenceNumber} révoquée. Régies DGDA/DGI/DGRAD alertées en temps réel.`, 'Attestation Révoquée (VER-06)');
         setIsRevokeModalOpen(false);
         fetchApplications();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Erreur lors de la révocation');
+        const d = await res.json().catch(() => ({}));
+        const msg = d.error || 'Erreur lors de la révocation';
+        setModalError(msg);
+        notify('error', msg, 'Révocation Refusée');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      setModalError('Erreur de communication réseau.');
+      notify('error', 'Erreur réseau lors de la révocation.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -480,10 +548,15 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {statusMsg && (
-        <div style={{ background: '#e6f4ea', borderLeft: '4px solid var(--fnpss-green)', padding: '10px 14px', borderRadius: '4px', marginBottom: '18px', color: '#0d652d', fontSize: '13px' }}>
-          {statusMsg}
-        </div>
+      {alertInfo && (
+        <AlertBanner
+          variant={alertInfo.type}
+          title={alertInfo.title}
+          message={alertInfo.message}
+          action={alertInfo.action}
+          onClose={() => setAlertInfo(null)}
+          style={{ marginBottom: '18px' }}
+        />
       )}
 
       {/* Grille Double Panneau (Inspection côte-à-côte) */}
@@ -594,16 +667,144 @@ export default function AdminPage() {
                 </div>
               )}
 
+              {/* Guidance Contextuelle selon le Rôle et l'État du Dossier */}
+              {role === 'AGENT' && (
+                !selectedApp.paymentValidated ? (
+                  <AlertBanner
+                    variant="info"
+                    title="Rôle AGENT — Contrôle Financier"
+                    message="Vérifiez le bordereau P6_QUITTANCE dans la visionneuse. Cliquez sur « Valider Quittance Frais » pour enregistrer les 320 USD et démarrer le délai réglementaire SLA de 10 jours ouvrables."
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : (
+                  <AlertBanner
+                    variant="success"
+                    title="Rôle AGENT — Quittance Validée"
+                    message="La quittance de frais a été validée. Le dossier est entre les mains du Chef de Division pour examen au fond."
+                    style={{ marginBottom: '14px' }}
+                  />
+                )
+              )}
+
+              {role === 'CHEF_DIVISION' && (
+                !selectedApp.paymentValidated ? (
+                  <AlertBanner
+                    variant="warning"
+                    title="Étape Préalable Requise (Règle Métier ADM-08)"
+                    message="La quittance bancaire (320 USD) doit impérativement être validée par un Agent avant que le Chef de Division puisse formuler un avis technique."
+                    action={
+                      <Button size="sm" variant="primary" onClick={() => { setRole('AGENT'); notify('info', 'Vous êtes maintenant sur le rôle AGENT. Validez la quittance ci-dessous.', 'Bascule de Rôle'); }}>
+                        👉 Basculer sur le rôle AGENT pour valider la quittance
+                      </Button>
+                    }
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : !selectedApp.divisionOpinion ? (
+                  <AlertBanner
+                    variant="info"
+                    title="Rôle CHEF DE DIVISION — Examen au Fond"
+                    message="La quittance est validée. Inspectez les pièces P1 à P5 dans la visionneuse puis cliquez sur « Émettre Avis Technique Division »."
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : (
+                  <AlertBanner
+                    variant="success"
+                    title="Rôle CHEF DE DIVISION — Avis Technique Enregistré"
+                    message={`Avis technique ${selectedApp.divisionOpinion.favorable ? 'FAVORABLE' : 'RÉSERVÉ'} émis le ${selectedApp.divisionOpinion.signedAt ? new Date(selectedApp.divisionOpinion.signedAt).toLocaleDateString('fr-FR') : ''}. Dossier transmis à la Direction Générale.`}
+                    style={{ marginBottom: '14px' }}
+                  />
+                )
+              )}
+
+              {role === 'DG' && (
+                !selectedApp.paymentValidated ? (
+                  <AlertBanner
+                    variant="warning"
+                    title="Étape 1 Manquante — Quittance Non Validée"
+                    message="La quittance des frais bancaires n'a pas encore été validée par un Agent."
+                    action={
+                      <Button size="sm" variant="primary" onClick={() => setRole('AGENT')}>
+                        👉 Basculer sur le rôle AGENT
+                      </Button>
+                    }
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : !selectedApp.divisionOpinion?.favorable ? (
+                  <AlertBanner
+                    variant="warning"
+                    title="Étape 2 Manquante — Avis Technique Requis (Règle Métier ADM-06)"
+                    message="L'avis technique favorable du Chef de Division est exigé avant toute décision d'approbation ou de scellement blockchain."
+                    action={
+                      <Button size="sm" variant="accent" onClick={() => setRole('CHEF_DIVISION')}>
+                        👉 Basculer sur le rôle CHEF_DIVISION
+                      </Button>
+                    }
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : selectedApp.status !== 'VALIDE_DELIVRE' && selectedApp.status !== 'REVOQUE' && selectedApp.status !== 'REJETE' ? (
+                  <AlertBanner
+                    variant="success"
+                    title="Rôle DG — Dossier Prêt pour Décision"
+                    message="La recevabilité financière et technique est 100% conforme. Vous pouvez approuver et sceller l'attestation sur la Blockchain Polygon Amoy ou rejeter le dossier."
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : selectedApp.certificate ? (
+                  <AlertBanner
+                    variant="success"
+                    title="Attestation Scellée sur Blockchain"
+                    message={`Attestation ${selectedApp.certificate.certificateNumber} ancrée sur Polygon Amoy (Tx: ${selectedApp.certificate.txHash?.slice(0, 14)}...).`}
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : null
+              )}
+
+              {role === 'MINISTERE' && (
+                !selectedApp.certificate ? (
+                  <AlertBanner
+                    variant="warning"
+                    title="En Attente de Délivrance DG"
+                    message="L'attestation doit être approuvée et scellée par la Direction Générale avant l'apposition de la co-signature ministérielle."
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : !selectedApp.ministryCoSigned ? (
+                  <AlertBanner
+                    variant="info"
+                    title="Rôle MINISTÈRE — Co-Signature Requise"
+                    message="L'attestation officielle a été scellée sur Polygon. Cliquez sur « Co-Signature Ministérielle » pour enregistrer l'arrêté."
+                    style={{ marginBottom: '14px' }}
+                  />
+                ) : (
+                  <AlertBanner
+                    variant="success"
+                    title="Co-Signature Ministérielle Apposée"
+                    message="L'attestation est officiellement co-signée par le Ministère de tutelle."
+                    style={{ marginBottom: '14px' }}
+                  />
+                )
+              )}
+
               {/* Boutons d'Action selon le Rôle */}
               <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                 {role === 'AGENT' && !selectedApp.paymentValidated && (
-                  <Button variant="primary" size="sm" onClick={() => handleValidatePayment(selectedApp.referenceNumber)}>
-                    💳 Valider Quittance Frais
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={isSubmitting}
+                    onClick={() => handleValidatePayment(selectedApp.referenceNumber)}
+                  >
+                    {isSubmitting ? 'Validation en cours...' : '💳 Valider Quittance Frais'}
                   </Button>
                 )}
 
                 {(role === 'AGENT' || role === 'CHEF_DIVISION') && selectedApp.status !== 'VALIDE_DELIVRE' && selectedApp.status !== 'REVOQUE' && (
-                  <Button variant="outline" size="sm" onClick={() => setIsComplementModalOpen(true)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setModalError('');
+                      setIsComplementModalOpen(true);
+                    }}
+                  >
                     📩 Demander Complément
                   </Button>
                 )}
@@ -612,12 +813,13 @@ export default function AdminPage() {
                   <Button
                     variant="accent"
                     size="sm"
-                    disabled={!selectedApp.paymentValidated}
+                    disabled={isSubmitting || !selectedApp.paymentValidated}
                     onClick={() => {
                       if (!selectedApp.paymentValidated) {
-                        alert('ADM-08: La quittance des frais (320 USD) doit d\'abord être validée par un agent avant l\'avis du Chef de Division.');
+                        notify('warning', 'La quittance des frais (320 USD) doit d\'abord être validée par un agent (Règle ADM-08).', 'Étape Préalable Requise');
                         return;
                       }
+                      setModalError('');
                       setIsOpinionModalOpen(true);
                     }}
                     title={!selectedApp.paymentValidated ? "Quittance des frais en attente de validation par l'agent" : ""}
@@ -631,36 +833,58 @@ export default function AdminPage() {
                     <Button
                       variant="success"
                       size="sm"
-                      disabled={!selectedApp.paymentValidated || !selectedApp.divisionOpinion?.favorable}
+                      disabled={isSubmitting || !selectedApp.paymentValidated || !selectedApp.divisionOpinion?.favorable}
                       onClick={() => {
                         if (!selectedApp.paymentValidated) {
-                          alert('ADM-06: La quittance doit être validée avant approbation.');
+                          notify('warning', 'La quittance doit être validée avant approbation.', 'Préalable Requis');
                           return;
                         }
                         if (!selectedApp.divisionOpinion?.favorable) {
-                          alert('ADM-06: L\'avis technique favorable de la division est requis avant approbation DG.');
+                          notify('warning', 'L\'avis technique favorable de la division est requis avant approbation DG (Règle ADM-06).', 'Préalable Requis');
                           return;
                         }
                         handleApproveSeal(selectedApp.referenceNumber);
                       }}
                       title={!selectedApp.divisionOpinion?.favorable ? "En attente de l'avis favorable du Chef de Division" : ""}
                     >
-                      ✍️ Approuver & Sceller Blockchain {!selectedApp.divisionOpinion?.favorable && '(En attente avis division)'}
+                      {isSubmitting ? 'Scellement Polygon en cours...' : '✍️ Approuver & Sceller Blockchain'} {!selectedApp.divisionOpinion?.favorable && '(En attente avis division)'}
                     </Button>
-                    <Button variant="danger" size="sm" onClick={() => setIsRejectModalOpen(true)}>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        setModalError('');
+                        setIsRejectModalOpen(true);
+                      }}
+                    >
                       ✕ Rejeter la Demande
                     </Button>
                   </>
                 )}
 
                 {role === 'MINISTERE' && selectedApp.certificate && !selectedApp.ministryCoSigned && (
-                  <Button variant="accent" size="sm" onClick={() => setIsCosignModalOpen(true)}>
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      setModalError('');
+                      setIsCosignModalOpen(true);
+                    }}
+                  >
                     🏛️ Co-Signature Ministérielle
                   </Button>
                 )}
 
                 {(role === 'DG' || role === 'ADMIN') && selectedApp.certificate && selectedApp.status !== 'REVOQUE' && (
-                  <Button variant="danger" size="sm" onClick={() => setIsRevokeModalOpen(true)}>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => {
+                      setModalError('');
+                      setIsRevokeModalOpen(true);
+                    }}
+                  >
                     ⚠️ Révoquer l'Attestation
                   </Button>
                 )}
@@ -750,17 +974,31 @@ export default function AdminPage() {
       {/* Modale Demande de Complément (ADM-06, NOT-04) */}
       <Modal
         isOpen={isComplementModalOpen}
-        onClose={() => setIsComplementModalOpen(false)}
+        onClose={() => {
+          setIsComplementModalOpen(false);
+          setModalError('');
+        }}
         title="Demande de Complément Documentaire (ADM-06)"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsComplementModalOpen(false)}>Annuler</Button>
-            <Button variant="primary" onClick={handleRequestComplement}>Notifier le Requérant</Button>
+            <Button variant="outline" disabled={isSubmitting} onClick={() => setIsComplementModalOpen(false)}>Annuler</Button>
+            <Button variant="primary" disabled={isSubmitting || !complementReason.trim()} onClick={handleRequestComplement}>
+              {isSubmitting ? 'Notification en cours...' : 'Notifier le Requérant'}
+            </Button>
           </>
         }
       >
+        {modalError && (
+          <AlertBanner
+            variant="error"
+            title="Erreur lors de la demande de complément"
+            message={modalError}
+            onClose={() => setModalError('')}
+            style={{ marginBottom: '14px' }}
+          />
+        )}
         <div className="form-group">
-          <label htmlFor="comp-reason">Motif & Pièces Complémentaires Sollicitées</label>
+          <label htmlFor="comp-reason">Motif &amp; Pièces Complémentaires Sollicitées</label>
           <textarea
             id="comp-reason"
             rows="3"
@@ -776,15 +1014,29 @@ export default function AdminPage() {
       {/* Modale Rejet de Demande (ADM-06) */}
       <Modal
         isOpen={isRejectModalOpen}
-        onClose={() => setIsRejectModalOpen(false)}
+        onClose={() => {
+          setIsRejectModalOpen(false);
+          setModalError('');
+        }}
         title="Rejet Motivé de la Demande (ADM-06)"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsRejectModalOpen(false)}>Annuler</Button>
-            <Button variant="danger" onClick={handleReject}>Confirmer le Rejet</Button>
+            <Button variant="outline" disabled={isSubmitting} onClick={() => setIsRejectModalOpen(false)}>Annuler</Button>
+            <Button variant="danger" disabled={isSubmitting || !rejectReason.trim()} onClick={handleReject}>
+              {isSubmitting ? 'Traitement en cours...' : 'Confirmer le Rejet'}
+            </Button>
           </>
         }
       >
+        {modalError && (
+          <AlertBanner
+            variant="error"
+            title="Erreur lors du rejet du dossier"
+            message={modalError}
+            onClose={() => setModalError('')}
+            style={{ marginBottom: '14px' }}
+          />
+        )}
         <div className="form-group">
           <label htmlFor="rej-reason">Motif Officiel du Rejet</label>
           <textarea
@@ -802,15 +1054,41 @@ export default function AdminPage() {
       {/* Modale Avis Chef de Division */}
       <Modal
         isOpen={isOpinionModalOpen}
-        onClose={() => setIsOpinionModalOpen(false)}
+        onClose={() => {
+          setIsOpinionModalOpen(false);
+          setModalError('');
+        }}
         title="Avis Technique du Chef de Division (ADM-08)"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsOpinionModalOpen(false)}>Annuler</Button>
-            <Button variant="accent" onClick={handleDivisionOpinion}>Valider l'Avis</Button>
+            <Button variant="outline" disabled={isSubmitting} onClick={() => setIsOpinionModalOpen(false)}>Annuler</Button>
+            <Button
+              variant="accent"
+              disabled={isSubmitting || !selectedApp?.paymentValidated}
+              onClick={handleDivisionOpinion}
+            >
+              {isSubmitting ? 'Enregistrement en cours...' : "Valider l'Avis"}
+            </Button>
           </>
         }
       >
+        {!selectedApp?.paymentValidated && (
+          <AlertBanner
+            variant="warning"
+            title="Quittance Non Validée (Règle ADM-08)"
+            message="La quittance des frais bancaires (320 USD) doit obligatoirement être validée par un agent avant que le Chef de Division puisse formuler un avis technique. Veuillez d'abord valider la quittance en tant qu'Agent."
+            style={{ marginBottom: '14px' }}
+          />
+        )}
+        {modalError && (
+          <AlertBanner
+            variant="error"
+            title="Erreur lors de l'enregistrement de l'avis"
+            message={modalError}
+            onClose={() => setModalError('')}
+            style={{ marginBottom: '14px' }}
+          />
+        )}
         <div className="form-group">
           <label htmlFor="opinion-sel">Sens de l'Avis Technique</label>
           <select
@@ -838,15 +1116,29 @@ export default function AdminPage() {
       {/* Modale Co-Signature Ministérielle */}
       <Modal
         isOpen={isCosignModalOpen}
-        onClose={() => setIsCosignModalOpen(false)}
+        onClose={() => {
+          setIsCosignModalOpen(false);
+          setModalError('');
+        }}
         title="Co-Signature du Ministère de Tutelle (ADM-06)"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsCosignModalOpen(false)}>Annuler</Button>
-            <Button variant="accent" onClick={handleCosignMinistry}>Apposer la Co-Signature</Button>
+            <Button variant="outline" disabled={isSubmitting} onClick={() => setIsCosignModalOpen(false)}>Annuler</Button>
+            <Button variant="accent" disabled={isSubmitting || !cosignRef.trim()} onClick={handleCosignMinistry}>
+              {isSubmitting ? 'Enregistrement en cours...' : 'Apposer la Co-Signature'}
+            </Button>
           </>
         }
       >
+        {modalError && (
+          <AlertBanner
+            variant="error"
+            title="Erreur lors de la co-signature"
+            message={modalError}
+            onClose={() => setModalError('')}
+            style={{ marginBottom: '14px' }}
+          />
+        )}
         <div className="form-group">
           <label htmlFor="cosign-input">Numéro de Référence de l'Arrêté Ministériel</label>
           <input
@@ -863,15 +1155,29 @@ export default function AdminPage() {
       {/* Modale Révocation Double Confirmation */}
       <Modal
         isOpen={isRevokeModalOpen}
-        onClose={() => setIsRevokeModalOpen(false)}
+        onClose={() => {
+          setIsRevokeModalOpen(false);
+          setModalError('');
+        }}
         title="Révocation Formelle d'une Attestation (VER-06)"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsRevokeModalOpen(false)}>Annuler</Button>
-            <Button variant="danger" onClick={handleRevoke}>Confirmer la Révocation</Button>
+            <Button variant="outline" disabled={isSubmitting} onClick={() => setIsRevokeModalOpen(false)}>Annuler</Button>
+            <Button variant="danger" disabled={isSubmitting || !revokeData.reason.trim() || !revokeData.doubleConfirmed} onClick={handleRevoke}>
+              {isSubmitting ? 'Révocation en cours...' : 'Confirmer la Révocation'}
+            </Button>
           </>
         }
       >
+        {modalError && (
+          <AlertBanner
+            variant="error"
+            title="Erreur lors de la révocation"
+            message={modalError}
+            onClose={() => setModalError('')}
+            style={{ marginBottom: '14px' }}
+          />
+        )}
         <div className="form-group">
           <label htmlFor="rev-reason">Motif Impératif de la Révocation</label>
           <textarea
@@ -900,15 +1206,29 @@ export default function AdminPage() {
       {/* Modale Création de Compte Agent / Instructeur (ADM-01 / ADM-03) */}
       <Modal
         isOpen={isStaffModalOpen}
-        onClose={() => setIsStaffModalOpen(false)}
+        onClose={() => {
+          setIsStaffModalOpen(false);
+          setModalError('');
+        }}
         title="Provisionner un Compte Agent / Instructeur FNPSS (ADM-01)"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsStaffModalOpen(false)}>Annuler</Button>
-            <Button variant="primary" onClick={handleCreateStaff}>Créer le Compte</Button>
+            <Button variant="outline" disabled={isSubmitting} onClick={() => setIsStaffModalOpen(false)}>Annuler</Button>
+            <Button variant="primary" disabled={isSubmitting || !staffForm.email || !staffForm.password} onClick={handleCreateStaff}>
+              {isSubmitting ? 'Création en cours...' : 'Créer le Compte'}
+            </Button>
           </>
         }
       >
+        {modalError && (
+          <AlertBanner
+            variant="error"
+            title="Erreur lors de la création du compte"
+            message={modalError}
+            onClose={() => setModalError('')}
+            style={{ marginBottom: '14px' }}
+          />
+        )}
         <form onSubmit={handleCreateStaff}>
           <div className="form-group">
             <label htmlFor="staff-email">Email Institutionnel (@fnpss.cd)</label>

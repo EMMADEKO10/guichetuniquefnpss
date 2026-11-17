@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import DossierThread from '../../components/DossierThread.jsx';
+import AlertBanner from '../../components/ui/AlertBanner.jsx';
 import { getClientToken } from '../../lib/client-auth.js';
 
 const COMPLEMENT_DOC_OPTIONS = [
@@ -26,7 +27,9 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeModalApp, setActiveModalApp] = useState(null);
   const [editFormData, setEditFormData] = useState({ projectTitle: '', goodsSummary: '' });
-  const [feedbackMsg, setFeedbackMsg] = useState('');
+  const [editError, setEditError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [alertInfo, setAlertInfo] = useState(null); // { type, title, message }
   const [sessionToken, setSessionToken] = useState('');
   const [threadApp, setThreadApp] = useState(null);
   const [complementApp, setComplementApp] = useState(null);
@@ -34,6 +37,10 @@ export default function DashboardPage() {
   const [complementFile, setComplementFile] = useState(null);
   const [complementBusy, setComplementBusy] = useState(false);
   const [complementError, setComplementError] = useState('');
+
+  const notify = (type, message, title = '') => {
+    setAlertInfo({ type, message, title });
+  };
 
   const getToken = () => getClientToken();
 
@@ -99,6 +106,8 @@ export default function DashboardPage() {
 
   const handleOpenEdit = (app) => {
     setActiveModalApp(app);
+    setEditError('');
+    setIsSubmitting(false);
     setEditFormData({
       projectTitle: app.projectTitle || '',
       goodsSummary: app.goodsSummary || ''
@@ -108,6 +117,8 @@ export default function DashboardPage() {
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!activeModalApp) return;
+    setIsSubmitting(true);
+    setEditError('');
 
     try {
       const res = await fetch('/api/applications', {
@@ -120,14 +131,19 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setFeedbackMsg(`Dossier ${activeModalApp.referenceNumber} modifié avec succès.`);
+        notify('success', `Dossier ${activeModalApp.referenceNumber} modifié avec succès.`, 'Dossier Mis à Jour');
         setActiveModalApp(null);
         fetchApplications();
       } else {
-        alert(data.error || 'Erreur lors de la modification');
+        const msg = data.error || 'Erreur lors de la modification';
+        setEditError(msg);
+        notify('error', msg, 'Modification Refusée');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      setEditError('Erreur de communication réseau.');
+      notify('error', 'Impossible de contacter le serveur.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -135,6 +151,7 @@ export default function DashboardPage() {
     if (!confirm(`Confirmez-vous le retrait volontaire du dossier ${app.referenceNumber} ? Cette action est irréversible.`)) {
       return;
     }
+    setIsSubmitting(true);
 
     try {
       const res = await fetch('/api/applications/withdraw', {
@@ -143,14 +160,16 @@ export default function DashboardPage() {
         body: JSON.stringify({ referenceNumber: app.referenceNumber })
       });
       if (res.ok) {
-        setFeedbackMsg(`Dossier ${app.referenceNumber} retiré.`);
+        notify('warning', `Dossier ${app.referenceNumber} retiré avec succès.`, 'Dossier Retiré (REQ-08)');
         fetchApplications();
       } else {
-        const data = await res.json();
-        alert(data.error || 'Erreur lors du retrait');
+        const data = await res.json().catch(() => ({}));
+        notify('error', data.error || 'Erreur lors du retrait du dossier.', 'Retrait Refusé');
       }
     } catch (err) {
-      alert('Erreur réseau');
+      notify('error', 'Impossible de joindre le serveur pour le retrait.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -213,7 +232,7 @@ export default function DashboardPage() {
         setComplementError(data.error || 'Complément non enregistré.');
         return;
       }
-      setFeedbackMsg(`Complément déposé sur le dossier ${complementApp.referenceNumber} : l'instruction reprend.`);
+      notify('success', `Complément déposé sur le dossier ${complementApp.referenceNumber} : l'instruction reprend.`, 'Complément Enregistré (SC-02)');
       setComplementApp(null);
       setComplementFile(null);
       fetchApplications();
@@ -243,10 +262,24 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {feedbackMsg && (
-        <div style={{ background: '#e6f4ea', borderLeft: '4px solid var(--fnpss-green)', padding: '10px 14px', borderRadius: '4px', marginBottom: '18px', color: '#0d652d', fontSize: '13px' }}>
-          {feedbackMsg}
-        </div>
+      {alertInfo && (
+        <AlertBanner
+          variant={alertInfo.type}
+          title={alertInfo.title}
+          message={alertInfo.message}
+          onClose={() => setAlertInfo(null)}
+          style={{ marginBottom: '18px' }}
+        />
+      )}
+
+      {typeof window !== 'undefined' && !getToken() && (
+        <AlertBanner
+          variant="warning"
+          title="Session non identifiée"
+          message="Vous consultez actuellement l'interface sans session active. Pour déposer des demandes et suivre vos dossiers en temps réel, veuillez vous connecter."
+          action={<a href="/auth/login" className="btn btn-sm btn-primary" style={{ textDecoration: 'none' }}>🔐 Se connecter avec mon compte ONG</a>}
+          style={{ marginBottom: '18px' }}
+        />
       )}
 
       {/* Grille des KPI */}
@@ -485,19 +518,31 @@ export default function DashboardPage() {
       {/* Modale d'édition avant instruction (REQ-08) */}
       <Modal
         isOpen={Boolean(activeModalApp)}
-        onClose={() => setActiveModalApp(null)}
+        onClose={() => {
+          setActiveModalApp(null);
+          setEditError('');
+        }}
         title={`Modifier le Dossier : ${activeModalApp?.referenceNumber || ''}`}
         footer={
           <>
-            <Button variant="outline" onClick={() => setActiveModalApp(null)}>
+            <Button variant="outline" disabled={isSubmitting} onClick={() => setActiveModalApp(null)}>
               Annuler
             </Button>
-            <Button variant="primary" onClick={handleSaveEdit}>
-              Enregistrer les Modifications
+            <Button variant="primary" disabled={isSubmitting} onClick={handleSaveEdit}>
+              {isSubmitting ? 'Enregistrement...' : 'Enregistrer les Modifications'}
             </Button>
           </>
         }
       >
+        {editError && (
+          <AlertBanner
+            variant="error"
+            title="Erreur lors de la modification"
+            message={editError}
+            onClose={() => setEditError('')}
+            style={{ marginBottom: '14px' }}
+          />
+        )}
         <form onSubmit={handleSaveEdit}>
           <div className="form-group">
             <label htmlFor="edit-title">Intitulé du Projet</label>
@@ -526,11 +571,14 @@ export default function DashboardPage() {
       {/* Modale de Fourniture de Complément Documentaire (SC-02, ADM-06) */}
       <Modal
         isOpen={Boolean(complementApp)}
-        onClose={() => setComplementApp(null)}
+        onClose={() => {
+          setComplementApp(null);
+          setComplementError('');
+        }}
         title={`Fournir un Complément : ${complementApp?.referenceNumber || ''}`}
         footer={
           <>
-            <Button variant="outline" onClick={() => setComplementApp(null)}>
+            <Button variant="outline" disabled={complementBusy} onClick={() => setComplementApp(null)}>
               Annuler
             </Button>
             <Button variant="primary" onClick={handleProvideComplement} disabled={complementBusy}>
@@ -539,11 +587,15 @@ export default function DashboardPage() {
           </>
         }
       >
-        <form onSubmit={handleProvideComplement}>
+        <form onSubmit={(e) => { e.preventDefault(); handleProvideComplement(); }}>
           {complementError && (
-            <div style={{ background: '#fce8e6', borderLeft: '4px solid var(--fnpss-red)', padding: '10px 12px', borderRadius: '4px', marginBottom: '12px', color: '#a50e0e', fontSize: '12.5px' }}>
-              {complementError}
-            </div>
+            <AlertBanner
+              variant="error"
+              title="Erreur lors du dépôt du complément"
+              message={complementError}
+              onClose={() => setComplementError('')}
+              style={{ marginBottom: '14px' }}
+            />
           )}
           <div className="form-group">
             <label htmlFor="comp-doc-code">Pièce Justificative à Compléter ou Remplacer</label>
