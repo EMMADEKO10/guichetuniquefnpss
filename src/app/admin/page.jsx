@@ -196,6 +196,9 @@ export default function AdminPage() {
       if (res.ok) {
         setStatusMsg(`Quittance de frais validée pour le dossier ${ref}. Instruction démarrée.`);
         fetchApplications();
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Erreur lors de la validation du paiement.');
       }
     } catch (err) {
       alert('Erreur réseau');
@@ -218,6 +221,9 @@ export default function AdminPage() {
         setIsComplementModalOpen(false);
         setComplementReason('');
         fetchApplications();
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Erreur lors de la demande de complément.');
       }
     } catch (err) {
       alert('Erreur réseau');
@@ -234,6 +240,9 @@ export default function AdminPage() {
       if (res.ok) {
         setStatusMsg(`Attestation ${ref} approuvée et scellée avec succès sur la blockchain Polygon.`);
         fetchApplications();
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Erreur lors de l\'approbation et du scellement.');
       }
     } catch (err) {
       alert('Erreur réseau');
@@ -256,6 +265,9 @@ export default function AdminPage() {
         setIsRejectModalOpen(false);
         setRejectReason('');
         fetchApplications();
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Erreur lors du rejet du dossier.');
       }
     } catch (err) {
       alert('Erreur réseau');
@@ -278,6 +290,9 @@ export default function AdminPage() {
         setStatusMsg(`Avis technique formulé pour le dossier ${selectedApp.referenceNumber}.`);
         setIsOpinionModalOpen(false);
         fetchApplications();
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Erreur lors de l\'émission de l\'avis technique.');
       }
     } catch (err) {
       alert('Erreur réseau');
@@ -299,6 +314,9 @@ export default function AdminPage() {
         setStatusMsg(`Co-signature ministérielle enregistrée (${cosignRef}).`);
         setIsCosignModalOpen(false);
         fetchApplications();
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Erreur lors de l\'enregistrement de la co-signature.');
       }
     } catch (err) {
       alert('Erreur réseau');
@@ -591,15 +609,43 @@ export default function AdminPage() {
                 )}
 
                 {role === 'CHEF_DIVISION' && (
-                  <Button variant="accent" size="sm" onClick={() => setIsOpinionModalOpen(true)}>
-                    📝 Émettre Avis Technique Division
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    disabled={!selectedApp.paymentValidated}
+                    onClick={() => {
+                      if (!selectedApp.paymentValidated) {
+                        alert('ADM-08: La quittance des frais (320 USD) doit d\'abord être validée par un agent avant l\'avis du Chef de Division.');
+                        return;
+                      }
+                      setIsOpinionModalOpen(true);
+                    }}
+                    title={!selectedApp.paymentValidated ? "Quittance des frais en attente de validation par l'agent" : ""}
+                  >
+                    📝 Émettre Avis Technique Division {!selectedApp.paymentValidated && '(En attente validation quittance)'}
                   </Button>
                 )}
 
                 {role === 'DG' && selectedApp.status !== 'VALIDE_DELIVRE' && selectedApp.status !== 'REVOQUE' && selectedApp.status !== 'REJETE' && (
                   <>
-                    <Button variant="success" size="sm" onClick={() => handleApproveSeal(selectedApp.referenceNumber)}>
-                      ✍️ Approuver & Sceller Blockchain
+                    <Button
+                      variant="success"
+                      size="sm"
+                      disabled={!selectedApp.paymentValidated || !selectedApp.divisionOpinion?.favorable}
+                      onClick={() => {
+                        if (!selectedApp.paymentValidated) {
+                          alert('ADM-06: La quittance doit être validée avant approbation.');
+                          return;
+                        }
+                        if (!selectedApp.divisionOpinion?.favorable) {
+                          alert('ADM-06: L\'avis technique favorable de la division est requis avant approbation DG.');
+                          return;
+                        }
+                        handleApproveSeal(selectedApp.referenceNumber);
+                      }}
+                      title={!selectedApp.divisionOpinion?.favorable ? "En attente de l'avis favorable du Chef de Division" : ""}
+                    >
+                      ✍️ Approuver & Sceller Blockchain {!selectedApp.divisionOpinion?.favorable && '(En attente avis division)'}
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => setIsRejectModalOpen(true)}>
                       ✕ Rejeter la Demande
