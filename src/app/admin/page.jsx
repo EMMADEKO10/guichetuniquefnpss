@@ -114,10 +114,15 @@ export default function AdminPage() {
       ]);
       const data = await res.json();
       if (data.success) {
-        setApplications(data.applications || []);
-        if (!selectedApp && data.applications?.length > 0) {
-          setSelectedApp(data.applications[0]);
-        }
+        const list = data.applications || [];
+        setApplications(list);
+        setSelectedApp((prev) => {
+          if (prev) {
+            const refreshed = list.find((a) => a.referenceNumber === prev.referenceNumber);
+            if (refreshed) return refreshed;
+          }
+          return list.length > 0 ? list[0] : null;
+        });
       }
       const qData = queueRes.ok ? await queueRes.json() : {};
       const dData = deployRes.ok ? await deployRes.json() : {};
