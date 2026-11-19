@@ -3,6 +3,8 @@ import { requireActor, errorResponse, HttpError } from '../../../../server/api-a
 import { hydrateFromNeon, persistToNeon } from '../../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 /**
  * GET /api/applications/certificate.pdf?ref=FNPSS/DEM/2026/00001 (REQ-09)
@@ -14,9 +16,18 @@ export async function GET(request) {
     await hydrateFromNeon({ force: true });
     const actor = requireActor(request);
     const { searchParams } = new URL(request.url);
-    const ref = searchParams.get('ref');
+    let ref = (searchParams.get('ref') || searchParams.get('cert') || '').trim();
     if (!ref) {
       throw new HttpError(400, 'Référence du dossier (?ref=...) requise.');
+    }
+
+    if (!applicationEngine.applications.has(ref)) {
+      for (const [appRef, app] of applicationEngine.applications.entries()) {
+        if (app?.certificate?.certificateNumber === ref) {
+          ref = appRef;
+          break;
+        }
+      }
     }
 
     const { fileName, pdfBuffer, certificateStatus } = applicationEngine.downloadCertificate(actor, ref);

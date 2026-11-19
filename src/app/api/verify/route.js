@@ -14,6 +14,8 @@ import { hydrateFromNeon } from '../../../infra/neon-persistence.mjs';
 import { verifyDocumentOnChain } from '../../../infra/polygon-client.mjs';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 function enrichVerificationPayload(verification) {
   const rec = verification?.record;

@@ -16,6 +16,8 @@ import {
 import { REQUIRED_DOCUMENTS_METADATA } from '../../../../domain/services-catalog.mjs';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 const MAX_RAW_BYTES = 3 * 1024 * 1024;
 

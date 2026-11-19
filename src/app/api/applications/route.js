@@ -13,6 +13,10 @@ import { hydrateFromNeon, persistToNeon } from '../../../infra/neon-persistence.
 import { resolveCloudinaryConfig, uploadEncryptedPdfToCloudinary } from '../../../storage/cloudinary-storage.mjs';
 import { sendTransactionalWorkflowEmail } from '../../../infra/smtp-mailer.mjs';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 /**
  * GET /api/applications — liste des dossiers (REQ-05, ADM-04).
  * - Requérant : uniquement ses propres dossiers (anti-IDOR).

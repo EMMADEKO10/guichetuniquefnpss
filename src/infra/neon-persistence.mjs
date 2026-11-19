@@ -57,8 +57,10 @@ export async function neonSql(query, params = []) {
   const dbHost = new URL(rawDbUrl).hostname;
   const res = await fetch(`https://${dbHost}/sql`, {
     method: 'POST',
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Neon-Connection-String': rawDbUrl
     },
     body: JSON.stringify({ query, params })
@@ -252,7 +254,7 @@ export async function hydrateFromNeon({ force = false } = {}) {
 
   await ensureNeonReady();
   const res = await neonSql(
-    'SELECT state, version FROM fnpss_runtime_snapshot WHERE id = 1'
+    'SELECT state, version, updated_at FROM fnpss_runtime_snapshot WHERE id = 1'
   );
   const row = res?.rows?.[0];
 
