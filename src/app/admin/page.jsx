@@ -8,6 +8,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import DocumentViewer from '../../components/ui/DocumentViewer.jsx';
 import DossierThread from '../../components/DossierThread.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
+import { getClientToken, getClientUser, saveClientSession } from '../../lib/client-auth.js';
 
 const DEMO_STAFF_EMAILS = {
   AGENT: 'agent@fnpss.cd',
@@ -18,7 +19,13 @@ const DEMO_STAFF_EMAILS = {
 };
 
 export default function AdminPage() {
-  const [role, setRole] = useState('AGENT');
+  const [role, setRole] = useState(() => {
+    const u = getClientUser();
+    if (u && ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'].includes(u.role)) {
+      return u.role;
+    }
+    return 'AGENT';
+  });
   const [sessionToken, setSessionToken] = useState('');
   const [applications, setApplications] = useState([]);
   const [selectedApp, setSelectedApp] = useState(null);
@@ -72,6 +79,12 @@ export default function AdminPage() {
   });
 
   const ensureStaffSession = async (targetRole = role) => {
+    const existingToken = getClientToken();
+    const existingUser = getClientUser();
+    if (existingToken && existingUser && existingUser.role === targetRole) {
+      setSessionToken(existingToken);
+      return existingToken;
+    }
     const email = DEMO_STAFF_EMAILS[targetRole];
     if (!email) return sessionToken;
     try {
@@ -84,14 +97,12 @@ export default function AdminPage() {
         const d = await res.json();
         if (d.sessionToken) {
           setSessionToken(d.sessionToken);
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('fnpss_session_token', d.sessionToken);
-          }
+          saveClientSession(d.sessionToken, d.user || { email, role: targetRole, organizationName: 'FNPSS' });
           return d.sessionToken;
         }
       }
     } catch {}
-    return typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') || '' : '';
+    return getClientToken();
   };
 
   const authHeaders = (tokenOverride = sessionToken, extra = {}) => ({

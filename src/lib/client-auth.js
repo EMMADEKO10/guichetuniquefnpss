@@ -29,6 +29,7 @@ export function saveClientSession(token, user) {
   sessionStorage.setItem('fnpss_user', JSON.stringify(user || {}));
   localStorage.setItem('fnpss_session_token', token);
   localStorage.setItem('fnpss_user', JSON.stringify(user || {}));
+  window.dispatchEvent(new Event('fnpss-auth-change'));
 }
 
 export function clearClientSession() {
@@ -37,5 +38,7 @@ export function clearClientSession() {
   sessionStorage.removeItem('fnpss_user');
   localStorage.removeItem('fnpss_session_token');
   localStorage.removeItem('fnpss_user');
+  document.cookie = 'fnpss_session_token=; Path=/; Max-Age=0; SameSite=Lax';
+  window.dispatchEvent(new Event('fnpss-auth-change'));
 }
 
