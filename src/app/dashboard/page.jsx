@@ -379,6 +379,11 @@ export default function DashboardPage() {
                     <td>
                       <div style={{ fontWeight: 600, fontSize: '13px' }}>{app.projectTitle || 'Non renseigné'}</div>
                       <div className="text-muted" style={{ fontSize: '11px' }}>{app.goodsSummary || ''}</div>
+                      {app.status === 'COMPLEMENT_REQUIS' && app.complementReason && (
+                        <div style={{ color: '#b91c1c', fontSize: '11.5px', fontWeight: 600, marginTop: '4px' }}>
+                          📩 Motif instructeur : {app.complementReason}
+                        </div>
+                      )}
                     </td>
                     <td style={{ fontSize: '12px' }}>
                       {app.createdAt ? new Date(app.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui'}
@@ -399,6 +404,8 @@ export default function DashboardPage() {
                           ? '✓ Délivré'
                           : app.status === 'REVOQUE'
                           ? '✕ Révoqué'
+                          : app.status === 'COMPLEMENT_REQUIS'
+                          ? '⚠️ Complément requis'
                           : app.status === 'SOUMIS'
                           ? 'En attente'
                           : 'En instruction'}
@@ -597,6 +604,14 @@ export default function DashboardPage() {
               style={{ marginBottom: '14px' }}
             />
           )}
+          {complementApp?.complementReason && (
+            <AlertBanner
+              variant="warning"
+              title="Motif de la demande de complément (Instructeur FNPSS)"
+              message={complementApp.complementReason}
+              style={{ marginBottom: '14px' }}
+            />
+          )}
           <div className="form-group">
             <label htmlFor="comp-doc-code">Pièce Justificative à Compléter ou Remplacer</label>
             <select
@@ -605,12 +620,11 @@ export default function DashboardPage() {
               value={complementDocCode}
               onChange={(e) => setComplementDocCode(e.target.value)}
             >
-              <option value="P1_REQUETE">P1 — Requête motivée adressée au DG du FNPSS</option>
-              <option value="P2_ENROLEMENT">P2 — Certificat d'enrôlement FNPSS ou Accord F92</option>
-              <option value="P3_PERSONNALITE_JURIDIQUE">P3 — Arrêté de Personnalité Juridique / Statuts</option>
-              <option value="P4_RAPPORT_ACTIVITES">P4 — Rapport annuel d'activités sociales</option>
-              <option value="P5_COLISAGE_PROJET">P5 — Liste de colisage / Descriptif du projet</option>
-              <option value="P6_QUITTANCE">P6 — Quittance des frais réglementaires (320 USD)</option>
+              {COMPLEMENT_DOC_OPTIONS.map((opt) => (
+                <option key={opt.code} value={opt.code}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="form-group">
