@@ -1,14 +1,17 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import Badge from './Badge.jsx';
 
 /**
  * Visionneuse interactive de pièces justificatives (ADM-05, REQ-07)
+ * Responsive mobile-first (.doc-viewer-grid) avec liste de contrôle visuelle par pièce.
  * @param {Object} props
  * @param {Array<{docCode: string, name: string, fileName?: string, sha256?: string, sizeBytes?: number, stored?: boolean, status?: string}>} props.documents
  * @param {string} [props.selectedDocCode]
  * @param {string} [props.referenceNumber]
  * @param {string} [props.token]
- * @param {(docCode: string) => void} props.onSelect
+ * @param {(docCode: string) => void} [props.onSelect]
  */
 export default function DocumentViewer({
   documents = [],
@@ -17,12 +20,22 @@ export default function DocumentViewer({
   token = '',
   onSelect
 }) {
-  const [selectedInternal, setSelectedInternal] = React.useState('');
+  const [selectedInternal, setSelectedInternal] = useState('');
+  const [verifiedMap, setVerifiedMap] = useState({});
   const currentCode = selectedDocCode || selectedInternal;
   const activeDoc = documents.find((d) => d.docCode === currentCode) || documents[0];
+
   const handleSelect = (code) => {
     setSelectedInternal(code);
     onSelect?.(code);
+  };
+
+  const docKey = (code) => `${referenceNumber || 'global'}::${code}`;
+  const checkedCount = documents.filter((d) => Boolean(verifiedMap[docKey(d.docCode)])).length;
+
+  const toggleChecked = (code) => {
+    const k = docKey(code);
+    setVerifiedMap((prev) => ({ ...prev, [k]: !prev[k] }));
   };
 
   return (
@@ -40,11 +53,18 @@ export default function DocumentViewer({
           gap: '8px'
         }}
       >
-        <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
-          📑 Pièces Justificatives ({documents.length})
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
+            📑 Pièces Justificatives ({documents.length})
+          </span>
+          {documents.length > 0 && (
+            <Badge status={checkedCount === documents.length ? 'valide' : 'info'}>
+              Contrôle : {checkedCount}/{documents.length}
+            </Badge>
+          )}
+        </div>
         {activeDoc && (
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap' }}>
             <span className="mono text-muted" style={{ fontSize: '11px' }}>
               SHA-256: {activeDoc.sha256 ? `${activeDoc.sha256.substring(0, 16)}...` : 'Non calculé'}
             </span>
@@ -55,11 +75,12 @@ export default function DocumentViewer({
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', minHeight: '320px' }}>
+      <div className="doc-viewer-grid">
         {/* Liste des pièces */}
-        <div style={{ borderRight: '1px solid var(--border)', background: '#fafbfc', padding: '8px' }}>
+        <div className="doc-viewer-sidebar" style={{ borderRight: '1px solid var(--border)', background: '#fafbfc', padding: '8px' }}>
           {documents.map((doc) => {
             const isSelected = activeDoc?.docCode === doc.docCode;
+            const isVerified = Boolean(verifiedMap[docKey(doc.docCode)]);
             return (
               <button
                 key={doc.docCode}
@@ -83,8 +104,12 @@ export default function DocumentViewer({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{doc.docCode}</span>
                   <span>
-                    {doc.stored && <span title="Stocké et chiffré AES-256-GCM sur Cloudinary" style={{ marginRight: '4px' }}>☁️</span>}
-                    {doc.sha256 && <span style={{ color: 'var(--fnpss-green)' }}>✓</span>}
+                    {doc.stored && <span title="Stocké et chiffré AES-256-GCM sur Cloudinary" style={{ marginRight: '4px' }}>🔒</span>}
+                    {isVerified ? (
+                      <span title="Marquée vérifiée" style={{ color: 'var(--fnpss-green)', fontWeight: 800 }}>☑</span>
+                    ) : doc.sha256 ? (
+                      <span style={{ color: 'var(--fnpss-green)' }}>✓</span>
+                    ) : null}
                   </span>
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -98,39 +123,51 @@ export default function DocumentViewer({
         {/* Aperçu du document */}
         <div style={{ padding: '20px', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           {activeDoc ? (
-            <div style={{ width: '100%', maxWidth: '480px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '28px 16px' }}>
-              <div style={{ fontSize: '38px', marginBottom: '10px' }}>📄</div>
+            <div style={{ width: '100%', maxWidth: '480px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '24px 16px' }}>
+              <div style={{ fontSize: '36px', marginBottom: '10px' }}>📄</div>
               <h4 style={{ fontSize: '14px', marginBottom: '6px' }}>{activeDoc.name}</h4>
               <p className="text-muted" style={{ fontSize: '12px', marginBottom: '12px' }}>
                 Fichier : <strong>{activeDoc.fileName || `${activeDoc.docCode}.pdf`}</strong>
                 {activeDoc.sizeBytes && ` (${Math.round(activeDoc.sizeBytes / 1024)} Ko)`}
               </p>
               {activeDoc.sha256 && (
-                <div style={{ background: '#f8fafc', padding: '8px', borderRadius: '4px', border: '1px solid #eef2f6', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Empreinte d'intégrité Web Crypto SHA-256 :</div>
+                <div style={{ background: '#f8fafc', padding: '8px', borderRadius: '4px', border: '1px solid #eef2f6', marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Empreinte d&apos;intégrité Web Crypto SHA-256 :</div>
                   <div className="mono" style={{ fontSize: '11px', wordBreak: 'break-all', color: 'var(--fnpss-navy)' }}>
                     {activeDoc.sha256}
                   </div>
                 </div>
               )}
-              <div className="flex gap-2 justify-between" style={{ flexWrap: 'wrap' }}>
+              <div className="flex gap-2 justify-between" style={{ flexWrap: 'wrap', marginBottom: '12px' }}>
                 <span className="badge badge-valide">✓ Format PDF/A Conforme</span>
                 <span className="badge badge-soumis">Anti-malware vérifié</span>
               </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: 'var(--fnpss-navy)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(verifiedMap[docKey(activeDoc.docCode)])}
+                    onChange={() => toggleChecked(activeDoc.docCode)}
+                  />
+                  <span>Pièce {activeDoc.docCode} contrôlée conforme</span>
+                </label>
+              </div>
+
               {referenceNumber && activeDoc.stored ? (
-                <div style={{ marginTop: '14px' }}>
+                <div>
                   <a
                     href={`/api/applications/document?ref=${encodeURIComponent(referenceNumber)}&docCode=${encodeURIComponent(activeDoc.docCode)}${token ? `&token=${encodeURIComponent(token)}` : ''}`}
                     target="_blank"
                     rel="noreferrer"
                     className="btn btn-sm btn-primary"
-                    style={{ textDecoration: 'none', display: 'inline-block' }}
+                    style={{ textDecoration: 'none', display: 'inline-flex' }}
                   >
                     🔓 Ouvrir &amp; Déchiffrer le PDF (Cloudinary AES-256-GCM)
                   </a>
                 </div>
               ) : (
-                <div className="text-muted" style={{ fontSize: '11px', marginTop: '12px' }}>
+                <div className="text-muted" style={{ fontSize: '11px' }}>
                   ℹ️ Empreinte SHA-256 enregistrée (binaire non archivé sur Cloudinary pour cet ancien dépôt).
                 </div>
               )}
@@ -143,4 +180,3 @@ export default function DocumentViewer({
     </div>
   );
 }
-

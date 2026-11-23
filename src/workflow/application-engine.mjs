@@ -136,6 +136,15 @@ export class GuichetUniqueEngine {
       referenceNumber,
       details: { organizationName, serviceCode }
     });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.AGENT, Roles.ADMIN],
+      eventType: 'NEW_APPLICATION_FOR_AGENT',
+      title: `Nouveau dossier déposé : ${referenceNumber}`,
+      message: `${organizationName} a soumis une démarche ${serviceCode}. Quittance à contrôler.`,
+      referenceNumber,
+      link: '/admin',
+      severity: 'info'
+    });
     return { ...app };
   }
 
@@ -220,6 +229,15 @@ export class GuichetUniqueEngine {
       referenceNumber,
       details: { organizationName: app.organizationName, slaDueAt: app.slaDueAt.toISOString().slice(0, 10) }
     });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.CHEF_DIVISION],
+      eventType: 'PAYMENT_VALIDATED_FOR_DIVISION',
+      title: `Dossier prêt pour examen au fond : ${referenceNumber}`,
+      message: `Quittance validée pour ${app.organizationName} (${app.serviceCode}). Avis technique de division attendu.`,
+      referenceNumber,
+      link: '/admin',
+      severity: 'info'
+    });
     return { ...app };
   }
 
@@ -255,6 +273,15 @@ export class GuichetUniqueEngine {
     this._logAudit(actor, 'DIVISION_CHIEF_OPINION_EMITTED', referenceNumber, {
       favorable: app.divisionOpinion.favorable,
       opinionNote: app.divisionOpinion.opinionNote
+    });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.DG],
+      eventType: 'OPINION_EMITTED_FOR_DG',
+      title: `Avis technique émis (${app.divisionOpinion.favorable ? 'Favorable' : 'Réservé'}) : ${referenceNumber}`,
+      message: `${app.organizationName} — Dossier prêt pour décision finale et scellement Blockchain DG.`,
+      referenceNumber,
+      link: '/admin',
+      severity: app.divisionOpinion.favorable ? 'info' : 'warning'
     });
     return { ...app };
   }
@@ -311,6 +338,15 @@ export class GuichetUniqueEngine {
       authorRole: actor.role,
       message: `Pièce complémentaire déposée : ${additionalDocType}`,
       attachmentDocType: additionalDocType
+    });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.AGENT, Roles.CHEF_DIVISION],
+      eventType: 'COMPLEMENT_RECEIVED',
+      title: `Complément reçu sur ${referenceNumber}`,
+      message: `${app.organizationName} a déposé la pièce ${additionalDocType}. Reprise du délai SLA.`,
+      referenceNumber,
+      link: '/admin',
+      severity: 'info'
     });
     return { ...app };
   }
@@ -400,6 +436,15 @@ export class GuichetUniqueEngine {
         docHash: sealed.docHash
       }
     });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.MINISTERE],
+      eventType: 'CERTIFICATE_SEALED_FOR_MINISTRY',
+      title: `Attestation scellée à co-signer : ${certificateNumber}`,
+      message: `${app.organizationName} (${referenceNumber}) — Scellée sur Polygon, co-signature ministérielle attendue.`,
+      referenceNumber,
+      link: '/admin',
+      severity: 'info'
+    });
 
     return { ...app };
   }
@@ -430,6 +475,15 @@ export class GuichetUniqueEngine {
       docHash: app.certificate.docHash,
       ministryReference,
       txHash: tx.txHash
+    });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.DG, Roles.ADMIN],
+      eventType: 'MINISTRY_COSIGNED',
+      title: `Co-signature ministérielle apposée (${referenceNumber})`,
+      message: `Référence ${ministryReference} enregistrée on-chain pour ${app.organizationName}.`,
+      referenceNumber,
+      link: '/admin',
+      severity: 'info'
     });
     return { ...app };
   }
@@ -479,6 +533,15 @@ export class GuichetUniqueEngine {
         reason
       }
     });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.AGENT, Roles.CHEF_DIVISION, Roles.ADMIN],
+      eventType: 'CERTIFICATE_REVOKED_ALERT',
+      title: `ALERTE Révocation : ${app.certificate.certificateNumber}`,
+      message: `${app.organizationName} (${referenceNumber}) révoquée par la DG. Régies DGDA/DGRAD/DGI alertées.`,
+      referenceNumber,
+      link: '/admin',
+      severity: 'warning'
+    });
     return { ...app };
   }
 
@@ -512,6 +575,15 @@ export class GuichetUniqueEngine {
       eventType: 'APPLICATION_REJECTED',
       referenceNumber,
       details: { organizationName: app.organizationName, reason: app.rejectionReason }
+    });
+    this.notifications?.notifyRoleEvent?.({
+      targetRoles: [Roles.AGENT, Roles.CHEF_DIVISION, Roles.ADMIN],
+      eventType: 'APPLICATION_REJECTED_ALERT',
+      title: `Dossier rejeté par la DG : ${referenceNumber}`,
+      message: `${app.organizationName} — Motif : ${app.rejectionReason}`,
+      referenceNumber,
+      link: '/admin',
+      severity: 'warning'
     });
     return { ...app };
   }

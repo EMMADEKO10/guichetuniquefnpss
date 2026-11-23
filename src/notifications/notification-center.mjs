@@ -94,6 +94,41 @@ export class NotificationCenter {
   }
 
   /**
+   * Génère une notification in-app ciblée par rôles (AGENT, CHEF_DIVISION, DG, MINISTERE, ADMIN).
+   */
+  notifyRoleEvent({
+    targetRoles = [],
+    eventType = 'WORKFLOW_ROLE_ALERT',
+    title,
+    message,
+    referenceNumber = null,
+    link = '/admin',
+    severity = 'info'
+  }) {
+    if (!Array.isArray(targetRoles) || targetRoles.length === 0 || !title || !message) {
+      return null;
+    }
+    const id = `notif-role-${String(this.seq++).padStart(5, '0')}`;
+    const timestamp = new Date().toISOString();
+    const entry = {
+      id,
+      userId: null,
+      targetRoles: [...targetRoles],
+      eventType,
+      title,
+      message,
+      referenceNumber,
+      link,
+      severity,
+      read: false,
+      readBy: [],
+      createdAt: timestamp
+    };
+    this.inAppNotifications.unshift(entry);
+    return { ...entry };
+  }
+
+  /**
    * Reprise sur échec de la file d'envoi d'emails transactionnels (NOT-01).
    */
   flushEmailRetryQueue(smtpAvailable = true) {
@@ -110,35 +145,95 @@ export class NotificationCenter {
     return sentCount;
   }
 
+  _isNotificationVisibleFor(n, userId, userRole) {
+    if (!userId) return true;
+    if (n.userId === userId || n.userId === 'ALL') return true;
+    if (userRole && userRole !== 'REQUERANT' && Array.isArray(n.targetRoles) && n.targetRoles.includes(userRole)) {
+      return true;
+    }
+    return false;
+  }
+
+  _isNotificationReadFor(n, userId) {
+    if (Array.isArray(n.targetRoles) && n.targetRoles.length > 0 && userId) {
+      return Boolean(n.read || (Array.isArray(n.readBy) && n.readBy.includes(userId)));
+    }
+    return Boolean(n.read);
+  }
+
   /**
-   * Récupère les notifications in-app d'un utilisateur et le compteur de non-lus (NOT-02).
+   * Récupère les notifications in-app d'un utilisateur (et de son rôle staff éventuel) + compteur de non-lus (NOT-02).
    */
-  getUserNotifications(userId) {
+  getUserNotifications(userId, userRole = null) {
     const list = userId
-      ? this.inAppNotifications.filter(n => n.userId === userId || n.userId === 'ALL')
+      ? this.inAppNotifications.filter(n => this._isNotificationVisibleFor(n, userId, userRole))
       : this.inAppNotifications;
-    const unreadCount = list.filter(n => !n.read).length;
+    const mapped = list.map(n => ({
+      ...n,
+      read: this._isNotificationReadFor(n, userId)
+    }));
+    const unreadCount = mapped.filter(n => !n.read).length;
     return {
       unreadCount,
-      notifications: list.map(n => ({ ...n }))
+      notifications: mapped
     };
   }
 
   /**
    * Marque une notification comme lue ou non-lue (NOT-02).
-   * Si `ownerUserId` est fourni, refuse de modifier la notification d'un autre utilisateur (anti-IDOR).
+   * Refuse de modifier la notification d'un autre utilisateur ou d'un rôle non détenu (anti-IDOR).
    */
-  markNotificationRead(notificationId, isRead = true, ownerUserId = null) {
+  markNotificationRead(notificationId, isRead = true, ownerUserId = null, ownerRole = null) {
     const found = this.inAppNotifications.find(n => n.id === notificationId);
     if (!found) {
       throw new Error(`Notification introuvable : ${notificationId}`);
     }
+    const isRoleTargeted = Array.isArray(found.targetRoles) && found.targetRoles.length > 0;
+    if (isRoleTargeted) {
+      if (ownerRole && !found.targetRoles.includes(ownerRole)) {
+        throw new Error(`Notification introuvable : ${notificationId}`);
+      }
+      if (!ownerRole && ownerUserId) {
+        throw new Error(`Notification introuvable : ${notificationId}`);
+      }
+      if (ownerUserId) {
+        if (!Array.isArray(found.readBy)) found.readBy = [];
+        if (isRead) {
+          if (!found.readBy.includes(ownerUserId)) found.readBy.push(ownerUserId);
+        } else {
+          found.readBy = found.readBy.filter(id => id !== ownerUserId);
+        }
+        return { ...found, read: this._isNotificationReadFor(found, ownerUserId) };
+      }
+      found.read = Boolean(isRead);
+      return { ...found };
+    }
+
     if (ownerUserId && found.userId !== ownerUserId && found.userId !== 'ALL') {
       // Même message que « introuvable » : ne révèle pas l'existence de la notification d'autrui.
       throw new Error(`Notification introuvable : ${notificationId}`);
     }
     found.read = Boolean(isRead);
     return { ...found };
+  }
+
+  /**
+   * Marque toutes les notifications visibles pour cet acteur comme lues.
+   */
+  markAllNotificationsRead(userId, userRole = null) {
+    let updated = 0;
+    for (const n of this.inAppNotifications) {
+      if (!this._isNotificationVisibleFor(n, userId, userRole)) continue;
+      if (this._isNotificationReadFor(n, userId)) continue;
+      if (Array.isArray(n.targetRoles) && n.targetRoles.length > 0 && userId) {
+        if (!Array.isArray(n.readBy)) n.readBy = [];
+        if (!n.readBy.includes(userId)) n.readBy.push(userId);
+      } else {
+        n.read = true;
+      }
+      updated += 1;
+    }
+    return updated;
   }
 
   /**

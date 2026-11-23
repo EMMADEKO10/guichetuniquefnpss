@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -8,17 +8,63 @@ import Modal from '../../components/ui/Modal.jsx';
 import DocumentViewer from '../../components/ui/DocumentViewer.jsx';
 import DossierThread from '../../components/DossierThread.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
+import StatusStepper from '../../components/ui/StatusStepper.jsx';
+import SlaIndicator from '../../components/ui/SlaIndicator.jsx';
+import BlockchainSignal from '../../components/ui/BlockchainSignal.jsx';
+import EmptyState from '../../components/ui/EmptyState.jsx';
+import { SkeletonKpiGrid, SkeletonCard } from '../../components/ui/Skeleton.jsx';
+import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken, getClientUser, saveClientSession, clearClientSession } from '../../lib/client-auth.js';
 
 const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
 
+const OPINION_TEMPLATES = [
+  {
+    label: '✓ Conforme Loi 004/2001',
+    favorable: true,
+    note: 'Statuts, personnalité juridique et pièces P1 à P6 conformes aux dispositions de la Loi n°004/2001 et aux critères du FNPSS.'
+  },
+  {
+    label: '✓ Exonération humanitaire justifiée',
+    favorable: true,
+    note: 'Colisage cohérent avec l\'objet social et le plan d\'action validé. Avis technique favorable pour octroi d\'exonération.'
+  },
+  {
+    label: '⚠️ Réserves — précisions requises',
+    favorable: false,
+    note: 'Avis avec réserves : incohérence partielle relevée entre les pièces techniques P3/P5 et l\'objet de la requête.'
+  }
+];
+
+function isPendingForRole(app, role) {
+  if (!app || !role) return false;
+  if (app.status === 'REJETE' || app.status === 'REVOQUE') return false;
+  if (role === 'AGENT') return !app.paymentValidated || app.status === 'SOUMIS';
+  if (role === 'CHEF_DIVISION') return Boolean(app.paymentValidated && !app.divisionOpinion && app.status !== 'VALIDE_DELIVRE');
+  if (role === 'DG') return Boolean(app.paymentValidated && app.divisionOpinion?.favorable && app.status !== 'VALIDE_DELIVRE');
+  if (role === 'MINISTERE') return Boolean(app.certificate && !app.ministryCoSigned);
+  if (role === 'ADMIN') return app.status !== 'VALIDE_DELIVRE';
+  return false;
+}
+
+function compareBySlaUrgency(a, b) {
+  if (a.status === 'COMPLEMENT_REQUIS' && b.status !== 'COMPLEMENT_REQUIS') return -1;
+  if (b.status === 'COMPLEMENT_REQUIS' && a.status !== 'COMPLEMENT_REQUIS') return 1;
+  const da = a.slaDueAt ? new Date(a.slaDueAt).getTime() : Number.MAX_SAFE_INTEGER;
+  const db = b.slaDueAt ? new Date(b.slaDueAt).getTime() : Number.MAX_SAFE_INTEGER;
+  return da - db;
+}
+
 export default function AdminPage() {
+  const toast = useToast();
   const [role, setRole] = useState('');
   const [staffUser, setStaffUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [sessionToken, setSessionToken] = useState('');
   const [applications, setApplications] = useState([]);
   const [selectedApp, setSelectedApp] = useState(null);
+  const [workQueueTab, setWorkQueueTab] = useState('TODO'); // 'TODO' | 'COMPLEMENTS' | 'DELIVERED' | 'ALL'
   const [selectedService, setSelectedService] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
@@ -39,8 +85,16 @@ export default function AdminPage() {
   const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
   const [revokeData, setRevokeData] = useState({ reason: '', doubleConfirmed: false });
 
-  // Provisionnement des comptes agents FNPSS (ADM-01 / ADM-03)
+  const [sealConfirmApp, setSealConfirmApp] = useState(null);
+
+  // Administration (ADM-01 / ADM-03 / ADM-07)
+  const [adminTab, setAdminTab] = useState('STAFF'); // 'STAFF' | 'APPLICANTS' | 'AUDIT'
   const [staffList, setStaffList] = useState([]);
+  const [applicantsList, setApplicantsList] = useState([]);
+  const [applicantQuery, setApplicantQuery] = useState('');
+  const [applicantToggleTarget, setApplicantToggleTarget] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditActionFilter, setAuditActionFilter] = useState('');
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [staffForm, setStaffForm] = useState({
     email: '',
@@ -50,12 +104,16 @@ export default function AdminPage() {
     province: 'Kinshasa'
   });
 
-  const [alertInfo, setAlertInfo] = useState(null); // { type, title, message, action }
+  const [alertInfo, setAlertInfo] = useState(null);
   const [modalError, setModalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const notify = (type, message, title = '', action = null) => {
     setAlertInfo({ type, message, title, action });
+    if (type === 'success') toast.success(message, title || 'Succès');
+    else if (type === 'error') toast.error(message, title || 'Erreur');
+    else if (type === 'warning') toast.warning(message, title || 'Attention');
+    else toast.info(message, title || 'Information');
   };
 
   const [blockchainInfo, setBlockchainInfo] = useState({
@@ -68,7 +126,7 @@ export default function AdminPage() {
     pilot: null
   });
 
-  const ensureStaffSession = async () => {
+  const ensureStaffSession = useCallback(async () => {
     const existingToken = getClientToken();
     if (!existingToken) {
       setStaffUser(null);
@@ -107,7 +165,7 @@ export default function AdminPage() {
     setAuthChecked(true);
     setIsLoading(false);
     return '';
-  };
+  }, []);
 
   const switchStaffAccount = () => {
     clearClientSession();
@@ -116,12 +174,12 @@ export default function AdminPage() {
     }
   };
 
-  const authHeaders = (tokenOverride = sessionToken, extra = {}) => ({
+  const authHeaders = useCallback((tokenOverride = sessionToken, extra = {}) => ({
     ...(tokenOverride ? { Authorization: `Bearer ${tokenOverride}` } : {}),
     ...extra
-  });
+  }), [sessionToken]);
 
-  const fetchApplications = async (tokenOverride) => {
+  const fetchApplications = useCallback(async (tokenOverride, roleOverride) => {
     setIsLoading(true);
     try {
       const tk = tokenOverride || sessionToken || (await ensureStaffSession());
@@ -129,25 +187,28 @@ export default function AdminPage() {
         setIsLoading(false);
         return;
       }
+      const hdrs = { Authorization: `Bearer ${tk}` };
       const [res, queueRes, deployRes, gatesRes, statsRes, supRes, pilotRes] = await Promise.all([
-        fetch('/api/applications', { headers: authHeaders(tk) }),
-        fetch('/api/blockchain/anchor-queue', { headers: authHeaders(tk) }),
-        fetch('/api/blockchain/deploy', { headers: authHeaders(tk) }),
-        fetch('/api/ops/gates', { headers: authHeaders(tk) }),
-        fetch('/api/admin/stats', { headers: authHeaders(tk) }),
-        fetch('/api/ops/supervision', { headers: authHeaders(tk) }),
-        fetch('/api/ops/pilot', { headers: authHeaders(tk) })
+        fetch('/api/applications', { headers: hdrs }),
+        fetch('/api/blockchain/anchor-queue', { headers: hdrs }),
+        fetch('/api/blockchain/deploy', { headers: hdrs }),
+        fetch('/api/ops/gates', { headers: hdrs }),
+        fetch('/api/admin/stats', { headers: hdrs }),
+        fetch('/api/ops/supervision', { headers: hdrs }),
+        fetch('/api/ops/pilot', { headers: hdrs })
       ]);
       const data = await res.json();
       if (data.success) {
-        const list = data.applications || [];
+        const list = (data.applications || []).slice().sort(compareBySlaUrgency);
         setApplications(list);
         setSelectedApp((prev) => {
           if (prev) {
             const refreshed = list.find((a) => a.referenceNumber === prev.referenceNumber);
             if (refreshed) return refreshed;
           }
-          return list.length > 0 ? list[0] : null;
+          const activeRole = roleOverride || getClientUser()?.role || '';
+          const firstTodo = list.find((a) => isPendingForRole(a, activeRole));
+          return firstTodo || (list.length > 0 ? list[0] : null);
         });
       }
       const qData = queueRes.ok ? await queueRes.json() : {};
@@ -165,20 +226,43 @@ export default function AdminPage() {
         supervision: spData || null,
         pilot: plData || null
       });
-      if (role === 'ADMIN') {
-        try {
-          const staffRes = await fetch('/api/admin/staff', { headers: authHeaders(tk) });
-          if (staffRes.ok) {
-            const staffData = await staffRes.json();
-            setStaffList(staffData.staff || []);
-          }
-        } catch {}
+      const activeRole = roleOverride || getClientUser()?.role || '';
+      if (activeRole === 'ADMIN') {
+        const [staffRes, applicantsRes, auditRes] = await Promise.all([
+          fetch('/api/admin/staff', { headers: hdrs }).catch(() => null),
+          fetch('/api/admin/applicants', { headers: hdrs }).catch(() => null),
+          fetch('/api/admin/audit', { headers: hdrs }).catch(() => null)
+        ]);
+        if (staffRes?.ok) {
+          const staffData = await staffRes.json();
+          setStaffList(staffData.staff || []);
+        }
+        if (applicantsRes?.ok) {
+          const appData = await applicantsRes.json();
+          setApplicantsList(appData.applicants || []);
+        }
+        if (auditRes?.ok) {
+          const audData = await auditRes.json();
+          setAuditLogs(audData.logs || []);
+        }
       }
     } catch (err) {
       console.error(err);
+      toast.error('Impossible de charger la console back-office.', 'Erreur Réseau');
     } finally {
       setIsLoading(false);
     }
+  }, [sessionToken, ensureStaffSession, toast]);
+
+  useEffect(() => {
+    ensureStaffSession().then((tk) => {
+      if (tk) fetchApplications(tk, getClientUser()?.role);
+    });
+  }, [ensureStaffSession, fetchApplications]);
+
+  const refreshAll = () => {
+    window.dispatchEvent(new Event('fnpss-notif-refresh'));
+    fetchApplications();
   };
 
   const handleFlushAnchorQueue = async () => {
@@ -192,7 +276,7 @@ export default function AdminPage() {
       if (res.ok) {
         const d = await res.json();
         notify('success', `File d'ancrage résiliente traitée (${d.queue?.confirmedCount || 0} transaction(s) confirmée(s) sur Polygon).`, 'File Résiliente Synchronisée');
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         notify('error', d.error || 'Erreur lors de la synchronisation de la file.', 'Échec de synchronisation');
@@ -215,7 +299,7 @@ export default function AdminPage() {
       if (res.ok) {
         const d = await res.json();
         notify('success', `Contrat FNPSSRegistry vérifié sur Polygon Amoy (${d.deployment?.contractAddress?.slice(0, 12)}...). Smoke test OK.`, 'Contrat Qualifié');
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         notify('error', d.error || 'Qualification du contrat refusée.', 'Échec Qualification');
@@ -227,18 +311,6 @@ export default function AdminPage() {
     }
   };
 
-  useEffect(() => {
-    ensureStaffSession().then((tk) => {
-      if (tk) fetchApplications(tk);
-    });
-  }, []);
-
-  const filteredApps = applications.filter((app) => {
-    if (selectedService !== 'ALL' && app.serviceCode !== selectedService) return false;
-    if (selectedStatus !== 'ALL' && app.status !== selectedStatus) return false;
-    return true;
-  });
-
   const handleValidatePayment = async (ref) => {
     setIsSubmitting(true);
     try {
@@ -249,12 +321,12 @@ export default function AdminPage() {
       });
       if (res.ok) {
         notify('success', `Quittance de frais validée pour le dossier ${ref}. Instruction démarrée.`, 'Paiement Validé (ADM-04)');
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         notify('error', d.error || 'Erreur lors de la validation du paiement.', 'Validation Refusée');
       }
-    } catch (err) {
+    } catch {
       notify('error', 'Impossible de contacter le serveur pour valider la quittance.', 'Erreur Réseau');
     } finally {
       setIsSubmitting(false);
@@ -278,14 +350,14 @@ export default function AdminPage() {
         notify('info', `Complément demandé sur le dossier ${selectedApp.referenceNumber}. Requérant notifié.`, 'Complément Demandé (ADM-06)');
         setIsComplementModalOpen(false);
         setComplementReason('');
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         const msg = d.error || 'Erreur lors de la demande de complément.';
         setModalError(msg);
         notify('error', msg, 'Demande de Complément Refusée');
       }
-    } catch (err) {
+    } catch {
       setModalError('Erreur de communication réseau.');
       notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
     } finally {
@@ -303,12 +375,13 @@ export default function AdminPage() {
       });
       if (res.ok) {
         notify('success', `Attestation ${ref} approuvée et scellée avec succès sur la blockchain Polygon Amoy.`, 'Attestation Scellée (ADM-06)');
-        fetchApplications();
+        setSealConfirmApp(null);
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         notify('error', d.error || 'Erreur lors de l\'approbation et du scellement.', 'Approbation Refusée');
       }
-    } catch (err) {
+    } catch {
       notify('error', 'Erreur lors du scellement sur la blockchain Polygon.', 'Erreur Réseau');
     } finally {
       setIsSubmitting(false);
@@ -332,14 +405,14 @@ export default function AdminPage() {
         notify('warning', `Dossier ${selectedApp.referenceNumber} rejeté avec motif notifié au requérant.`, 'Dossier Rejeté (ADM-06)');
         setIsRejectModalOpen(false);
         setRejectReason('');
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         const msg = d.error || 'Erreur lors du rejet du dossier.';
         setModalError(msg);
         notify('error', msg, 'Rejet Refusé');
       }
-    } catch (err) {
+    } catch {
       setModalError('Erreur de communication réseau.');
       notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
     } finally {
@@ -364,14 +437,14 @@ export default function AdminPage() {
       if (res.ok) {
         notify('success', `Avis technique formulé pour le dossier ${selectedApp.referenceNumber}. Transmis à la DG.`, 'Avis Technique Enregistré (ADM-08)');
         setIsOpinionModalOpen(false);
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         const msg = d.error || 'Erreur lors de l\'émission de l\'avis technique.';
         setModalError(msg);
         notify('error', msg, 'Avis Technique Refusé');
       }
-    } catch (err) {
+    } catch {
       setModalError('Erreur de communication réseau.');
       notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
     } finally {
@@ -395,14 +468,14 @@ export default function AdminPage() {
       if (res.ok) {
         notify('success', `Co-signature ministérielle enregistrée (${cosignRef}).`, 'Co-Signature Validée (ADM-06)');
         setIsCosignModalOpen(false);
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         const msg = d.error || 'Erreur lors de l\'enregistrement de la co-signature.';
         setModalError(msg);
         notify('error', msg, 'Co-Signature Refusée');
       }
-    } catch (err) {
+    } catch {
       setModalError('Erreur de communication réseau.');
       notify('error', 'Impossible de joindre le serveur.', 'Erreur Réseau');
     } finally {
@@ -436,10 +509,39 @@ export default function AdminPage() {
         organizationName: 'FNPSS - Direction des Opérations',
         province: 'Kinshasa'
       });
-      fetchApplications();
-    } catch (err) {
+      refreshAll();
+    } catch {
       setModalError('Erreur de communication réseau.');
       notify('error', 'Erreur réseau lors de la création du compte.', 'Erreur Réseau');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleApplicantStatus = async () => {
+    if (!applicantToggleTarget) return;
+    const nextStatus = applicantToggleTarget.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/applicants', {
+        method: 'PUT',
+        headers: authHeaders(sessionToken, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          userId: applicantToggleTarget.id,
+          status: nextStatus,
+          reason: nextStatus === 'SUSPENDED' ? 'Suspension administrative depuis console ADMIN' : 'Réactivation administrative'
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify('error', data.error || 'Action refusée sur le compte requérant.', 'Erreur ADM-03');
+      } else {
+        notify('success', `Compte ${applicantToggleTarget.email} passé à ${nextStatus}.`, 'Statut Requérant Mis à Jour');
+        setApplicantToggleTarget(null);
+        refreshAll();
+      }
+    } catch {
+      notify('error', 'Erreur réseau lors de la mise à jour du requérant.', 'Erreur Réseau');
     } finally {
       setIsSubmitting(false);
     }
@@ -467,14 +569,14 @@ export default function AdminPage() {
       if (res.ok) {
         notify('warning', `Attestation ${selectedApp.referenceNumber} révoquée. Régies DGDA/DGI/DGRAD alertées en temps réel.`, 'Attestation Révoquée (VER-06)');
         setIsRevokeModalOpen(false);
-        fetchApplications();
+        refreshAll();
       } else {
         const d = await res.json().catch(() => ({}));
         const msg = d.error || 'Erreur lors de la révocation';
         setModalError(msg);
         notify('error', msg, 'Révocation Refusée');
       }
-    } catch (err) {
+    } catch {
       setModalError('Erreur de communication réseau.');
       notify('error', 'Erreur réseau lors de la révocation.', 'Erreur Réseau');
     } finally {
@@ -494,9 +596,9 @@ export default function AdminPage() {
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <a href="/" className="btn btn-outline" style={{ textDecoration: 'none' }}>
-              &larr; Retour à l'accueil
+              &larr; Retour à l&apos;accueil
             </a>
-            <Button variant="primary" onClick={switchStaffAccount}>
+            <Button variant="brand" onClick={switchStaffAccount}>
               🔐 Se connecter avec un Compte Instructeur (@fnpss.cd)
             </Button>
           </div>
@@ -505,40 +607,82 @@ export default function AdminPage() {
     );
   }
 
+  const todoCount = applications.filter((a) => isPendingForRole(a, role)).length;
+  const complementsCount = applications.filter((a) => a.status === 'COMPLEMENT_REQUIS').length;
+  const deliveredCount = applications.filter((a) => a.status === 'VALIDE_DELIVRE').length;
+  const activeInstructionCount = applications.filter((a) => a.status === 'EN_COURS_INSTRUCTION' || a.status === 'SOUMIS').length;
+
+  const filteredApps = applications.filter((app) => {
+    if (selectedService !== 'ALL' && app.serviceCode !== selectedService) return false;
+    if (selectedStatus !== 'ALL' && app.status !== selectedStatus) return false;
+    if (workQueueTab === 'TODO' && !isPendingForRole(app, role)) return false;
+    if (workQueueTab === 'COMPLEMENTS' && app.status !== 'COMPLEMENT_REQUIS') return false;
+    if (workQueueTab === 'DELIVERED' && app.status !== 'VALIDE_DELIVRE') return false;
+    return true;
+  });
+
+  const filteredApplicants = applicantsList.filter((u) => {
+    if (!applicantQuery.trim()) return true;
+    const q = applicantQuery.toLowerCase();
+    return `${u.organizationName || ''} ${u.email || ''} ${u.province || ''}`.toLowerCase().includes(q);
+  });
+
+  const filteredAuditLogs = auditLogs.filter((l) => {
+    if (!auditActionFilter) return true;
+    return String(l.action || '').includes(auditActionFilter);
+  });
+
   return (
     <div>
       {/* Bandeau d'Identité & Rôle Instructeur Authentifié */}
-      <div style={{ background: '#ffffff', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ background: '#ffffff', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--border)', borderLeft: '4px solid var(--fnpss-orange)', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <strong style={{ color: 'var(--fnpss-navy)', fontSize: '14px' }}>Console d'Instruction Back-Office FNPSS</strong>
-          <div className="text-muted" style={{ fontSize: '12px' }}>Circuit multi-niveaux d'approbation et contrôle de recevabilité</div>
+          <strong style={{ color: 'var(--fnpss-navy)', fontSize: '15px' }}>Console d&apos;Instruction Back-Office FNPSS</strong>
+          <div className="text-muted" style={{ fontSize: '12px' }}>Circuit multi-niveaux d&apos;approbation et contrôle de recevabilité</div>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             Agent connecté : <strong style={{ color: 'var(--fnpss-navy)' }}>{staffUser?.email || 'Session active'}</strong>
           </span>
-          <span
-            style={{
-              padding: '5px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: 700,
-              background: 'var(--fnpss-navy)',
-              color: '#ffffff'
-            }}
-          >
-            Rôle RBAC : {role || 'Vérification...'}
-          </span>
+          <Badge status="brand">Rôle RBAC : {role || 'Vérification...'}</Badge>
           <Button variant="outline" size="sm" onClick={switchStaffAccount}>
             🔄 Changer de Compte
           </Button>
         </div>
       </div>
 
+      {/* KPI Back-Office adaptés au rôle */}
+      {isLoading && applications.length === 0 ? (
+        <SkeletonKpiGrid count={4} />
+      ) : (
+        <div className="kpi-grid" style={{ marginBottom: '18px' }}>
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-orange)' }}>
+            <div className="lbl">À traiter ({role || 'Rôle'})</div>
+            <div className="val">{todoCount}</div>
+            <div className="sub">Dossiers attendant votre action</div>
+          </div>
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-blue)' }}>
+            <div className="lbl">Instruction &amp; Dépôts</div>
+            <div className="val">{activeInstructionCount}</div>
+            <div className="sub">{complementsCount} complément(s) en attente</div>
+          </div>
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-green)' }}>
+            <div className="lbl">Attestations Délivrées</div>
+            <div className="val">{deliveredCount}</div>
+            <div className="sub">Ancrées Polygon Amoy</div>
+          </div>
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-navy)' }}>
+            <div className="lbl">Recettes Validées (ADM-09)</div>
+            <div className="val">{blockchainInfo.stats?.financials?.totalCollectedFeesUsd ?? 0} $</div>
+            <div className="sub">Quittances contrôlées FNPSS</div>
+          </div>
+        </div>
+      )}
+
       {/* Bandeau Relayer Blockchain Polygon Amoy, File Résiliente & Jalon G2 Alpha (BLK-09..11, GOV-12) */}
       <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', fontSize: '12px' }}>
-        <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
           <span>
             <strong>Réseau :</strong> {blockchainInfo.deployment?.network?.name || 'Polygon Amoy Testnet (80002)'}
           </span>
@@ -551,35 +695,19 @@ export default function AdminPage() {
           <span>
             <strong>File résiliente (BLK-10) :</strong> {blockchainInfo.queue?.queuedCount ?? 0} en attente / {blockchainInfo.queue?.confirmedCount ?? 0} confirmé(s)
           </span>
-          <Badge status="valide">
-            Jalon G2 Alpha : {blockchainInfo.milestoneG2?.status || 'VALIDATED'}
-          </Badge>
-          <Badge status="valide">
-            Jalon G3 Beta : {blockchainInfo.supervision?.milestoneG3Beta?.status || 'VALIDATED'}
-          </Badge>
+          <Badge status="valide">Jalon G2 Alpha : {blockchainInfo.milestoneG2?.status || 'VALIDATED'}</Badge>
+          <Badge status="valide">Jalon G3 Beta : {blockchainInfo.supervision?.milestoneG3Beta?.status || 'VALIDATED'}</Badge>
           <span>
             <strong>Budget 3G (REQ-12) :</strong> {blockchainInfo.supervision?.req12PerformanceBudget?.estimated3gLoadSeconds ?? '1.64'}s (&lt; 3,0s)
           </span>
-          <span>
-            <strong>Recettes validées (ADM-09) :</strong> {blockchainInfo.stats?.financials?.totalCollectedFeesUsd ?? 0} USD
-          </span>
-          <span>
-            <strong>Cohorte Pilote (DEP-06) :</strong> {blockchainInfo.pilot?.pilotCohortSize ?? 5} ONG accompagnées ({blockchainInfo.pilot?.averagePilotSatisfactionOn5 ?? '4.8'}/5)
-          </span>
-          <span>
-            <strong>SLA Hypercare (DEP-07) :</strong> {blockchainInfo.pilot?.hypercareSlaCompliancePct ?? 100}% conforme
-          </span>
-          <Badge status="valide">
-            Contrat TMA V3 (DEP-08) : {blockchainInfo.pilot?.tmaContractAndRetrospective?.status || 'ACTIVE_SIGNED'}
-          </Badge>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleFlushAnchorQueue}>
+        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+          <Button variant="outline" size="sm" isLoading={isSubmitting} onClick={handleFlushAnchorQueue}>
             🔄 Synchroniser File d&apos;Ancrage
           </Button>
           {(role === 'DG' || role === 'ADMIN') && (
             <>
-              <Button variant="primary" size="sm" onClick={handleDeployAmoy}>
+              <Button variant="primary" size="sm" isLoading={isSubmitting} onClick={handleDeployAmoy}>
                 ⛓️ Qualifier Contrat Amoy (BLK-11)
               </Button>
               <a
@@ -612,16 +740,17 @@ export default function AdminPage() {
         />
       )}
 
-      {/* Grille Double Panneau (Inspection côte-à-côte) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: '18px' }}>
-        {/* Panneau Gauche : Liste & Fiche d'Instruction */}
+      {/* Grille Double Panneau Responsive (Inspection côte-à-côte) */}
+      <div className="admin-split-grid">
+        {/* Panneau Gauche : File de Travail & Fiche d'Instruction */}
         <div>
           <Card
             title="Dossiers en File d'Attente"
             actions={
-              <div className="flex gap-2">
+              <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                 <select
                   className="form-control"
+                  aria-label="Filtrer par service"
                   style={{ width: 'auto', padding: '4px 8px', fontSize: '11.5px' }}
                   value={selectedService}
                   onChange={(e) => setSelectedService(e.target.value)}
@@ -636,6 +765,7 @@ export default function AdminPage() {
                 </select>
                 <select
                   className="form-control"
+                  aria-label="Filtrer par statut"
                   style={{ width: 'auto', padding: '4px 8px', fontSize: '11.5px' }}
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
@@ -643,45 +773,104 @@ export default function AdminPage() {
                   <option value="ALL">Tous Statuts</option>
                   <option value="SOUMIS">Soumis</option>
                   <option value="EN_COURS_INSTRUCTION">En instruction</option>
+                  <option value="COMPLEMENT_REQUIS">Complément requis</option>
                   <option value="VALIDE_DELIVRE">Validé</option>
+                  <option value="REJETE">Rejeté</option>
                   <option value="REVOQUE">Révoqué</option>
                 </select>
               </div>
             }
           >
+            {/* Onglets File de travail priorisée */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              {[
+                { key: 'TODO', label: `À traiter (${todoCount})` },
+                { key: 'COMPLEMENTS', label: `Compléments (${complementsCount})` },
+                { key: 'DELIVERED', label: `Délivrés (${deliveredCount})` },
+                { key: 'ALL', label: `Tous (${applications.length})` }
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setWorkQueueTab(t.key)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '999px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    border: '1px solid',
+                    cursor: 'pointer',
+                    background: workQueueTab === t.key ? 'var(--fnpss-navy)' : '#f8fafc',
+                    color: workQueueTab === t.key ? '#ffffff' : 'var(--text-main)',
+                    borderColor: workQueueTab === t.key ? 'var(--fnpss-navy)' : 'var(--border)'
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
             <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-              {filteredApps.map((app) => {
-                const isSelected = selectedApp?.referenceNumber === app.referenceNumber;
-                return (
-                  <div
-                    key={app.referenceNumber}
-                    onClick={() => setSelectedApp(app)}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '6px',
-                      border: `1px solid ${isSelected ? 'var(--fnpss-blue)' : 'var(--border)'}`,
-                      background: isSelected ? '#eef6fc' : '#ffffff',
-                      marginBottom: '8px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div className="flex justify-between items-center" style={{ marginBottom: '4px' }}>
-                      <span className="mono" style={{ fontWeight: 700, color: 'var(--fnpss-navy)', fontSize: '12.5px' }}>
-                        {app.referenceNumber}
-                      </span>
-                      <Badge status="soumis">{app.serviceCode}</Badge>
+              {isLoading ? (
+                <SkeletonCard rows={3} />
+              ) : filteredApps.length === 0 ? (
+                <EmptyState
+                  icon="✅"
+                  title="Aucun dossier dans cette file"
+                  description={workQueueTab === 'TODO' ? 'Aucun dossier en attente de votre rôle actuellement. Consultez l\'onglet « Tous » pour l\'historique.' : 'Modifiez vos filtres pour voir les autres dossiers.'}
+                  action={workQueueTab !== 'ALL' ? <Button size="sm" variant="outline" onClick={() => setWorkQueueTab('ALL')}>Voir tous les dossiers</Button> : null}
+                />
+              ) : (
+                filteredApps.map((app) => {
+                  const isSelected = selectedApp?.referenceNumber === app.referenceNumber;
+                  const urgentForMe = isPendingForRole(app, role);
+                  return (
+                    <div
+                      key={app.referenceNumber}
+                      onClick={() => setSelectedApp(app)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedApp(app); }}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: `1px solid ${isSelected ? 'var(--fnpss-blue)' : 'var(--border)'}`,
+                        borderLeft: `4px solid ${urgentForMe ? 'var(--fnpss-orange)' : isSelected ? 'var(--fnpss-blue)' : 'var(--border)'}`,
+                        background: isSelected ? '#eef6fc' : '#ffffff',
+                        marginBottom: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div className="flex justify-between items-center" style={{ marginBottom: '4px', flexWrap: 'wrap', gap: '4px' }}>
+                        <span className="mono" style={{ fontWeight: 700, color: 'var(--fnpss-navy)', fontSize: '12.5px' }}>
+                          {app.referenceNumber}
+                        </span>
+                        <div className="flex gap-2 items-center">
+                          <Badge status="soumis">{app.serviceCode}</Badge>
+                          <SlaIndicator application={app} />
+                        </div>
+                      </div>
+                      <div style={{ fontWeight: 600, fontSize: '13px' }}>{app.organizationName}</div>
+                      <div className="text-muted" style={{ fontSize: '11.5px' }}>{app.projectTitle}</div>
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: '13px' }}>{app.organizationName}</div>
-                    <div className="text-muted" style={{ fontSize: '11.5px' }}>{app.projectTitle}</div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </Card>
 
           {/* Fiche d'Instruction & Actions */}
           {selectedApp && (
             <Card title={`Fiche d'Instruction : ${selectedApp.referenceNumber}`}>
+              <div style={{ marginBottom: '14px' }}>
+                <StatusStepper application={selectedApp} compact />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                <SlaIndicator application={selectedApp} />
+                <BlockchainSignal application={selectedApp} showLink />
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px', marginBottom: '16px' }}>
                 <div><span className="text-muted">Statut :</span> <strong>{selectedApp.status}</strong></div>
                 <div><span className="text-muted">Frais :</span> <strong>{selectedApp.paymentValidated ? '✓ Quittance Validée' : '⏳ En attente'}</strong></div>
@@ -840,12 +1029,13 @@ export default function AdminPage() {
               <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                 {role === 'AGENT' && !selectedApp.paymentValidated && (
                   <Button
-                    variant="primary"
+                    variant="brand"
                     size="sm"
-                    disabled={isSubmitting}
+                    isLoading={isSubmitting}
+                    loadingText="Validation..."
                     onClick={() => handleValidatePayment(selectedApp.referenceNumber)}
                   >
-                    {isSubmitting ? 'Validation en cours...' : '💳 Valider Quittance Frais'}
+                    💳 Valider Quittance Frais
                   </Button>
                 )}
 
@@ -864,18 +1054,14 @@ export default function AdminPage() {
 
                 {role === 'CHEF_DIVISION' && (
                   <Button
-                    variant="accent"
+                    variant="brand"
                     size="sm"
                     disabled={isSubmitting || !selectedApp.paymentValidated}
+                    disabledReason="Quittance des frais en attente de validation par l'agent (ADM-08)"
                     onClick={() => {
-                      if (!selectedApp.paymentValidated) {
-                        notify('warning', 'La quittance des frais (320 USD) doit d\'abord être validée par un agent (Règle ADM-08).', 'Étape Préalable Requise');
-                        return;
-                      }
                       setModalError('');
                       setIsOpinionModalOpen(true);
                     }}
-                    title={!selectedApp.paymentValidated ? "Quittance des frais en attente de validation par l'agent" : ""}
                   >
                     📝 Émettre Avis Technique Division {!selectedApp.paymentValidated && '(En attente validation quittance)'}
                   </Button>
@@ -887,18 +1073,8 @@ export default function AdminPage() {
                       variant="success"
                       size="sm"
                       disabled={isSubmitting || !selectedApp.paymentValidated || !selectedApp.divisionOpinion?.favorable}
-                      onClick={() => {
-                        if (!selectedApp.paymentValidated) {
-                          notify('warning', 'La quittance doit être validée avant approbation.', 'Préalable Requis');
-                          return;
-                        }
-                        if (!selectedApp.divisionOpinion?.favorable) {
-                          notify('warning', 'L\'avis technique favorable de la division est requis avant approbation DG (Règle ADM-06).', 'Préalable Requis');
-                          return;
-                        }
-                        handleApproveSeal(selectedApp.referenceNumber);
-                      }}
-                      title={!selectedApp.divisionOpinion?.favorable ? "En attente de l'avis favorable du Chef de Division" : ""}
+                      disabledReason={!selectedApp.paymentValidated ? 'Quittance non validée' : 'Avis technique favorable de la division requis (ADM-06)'}
+                      onClick={() => setSealConfirmApp(selectedApp)}
                     >
                       {isSubmitting ? 'Scellement Polygon en cours...' : '✍️ Approuver & Sceller Blockchain'} {!selectedApp.divisionOpinion?.favorable && '(En attente avis division)'}
                     </Button>
@@ -917,7 +1093,7 @@ export default function AdminPage() {
 
                 {role === 'MINISTERE' && selectedApp.certificate && !selectedApp.ministryCoSigned && (
                   <Button
-                    variant="accent"
+                    variant="brand"
                     size="sm"
                     disabled={isSubmitting}
                     onClick={() => {
@@ -938,7 +1114,7 @@ export default function AdminPage() {
                       setIsRevokeModalOpen(true);
                     }}
                   >
-                    ⚠️ Révoquer l'Attestation
+                    ⚠️ Révoquer l&apos;Attestation
                   </Button>
                 )}
               </div>
@@ -971,7 +1147,7 @@ export default function AdminPage() {
                 }
               />
             ) : (
-              <p className="text-muted">Sélectionnez un dossier à gauche pour inspecter ses pièces.</p>
+              <EmptyState icon="📑" title="Aucun dossier sélectionné" description="Sélectionnez un dossier à gauche pour inspecter ses pièces justificatives." />
             )}
           </Card>
 
@@ -986,43 +1162,194 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Provisionnement des Comptes Agents FNPSS (ADM-01 / ADM-03) */}
+      {/* Panneau d'Administration Système (ADM-01 / ADM-03 / ADM-07) */}
       {role === 'ADMIN' && (
         <Card
-          title={`Gestion des Comptes Agents & Instructeurs FNPSS (${staffList.length}) — ADM-01 / ADM-03`}
+          title="Administration Système & Gouvernance FNPSS (ADM-01 / ADM-03 / ADM-07)"
           style={{ marginTop: '20px' }}
           actions={
-            <Button variant="primary" size="sm" onClick={() => setIsStaffModalOpen(true)}>
-              ➕ Créer un Compte Agent / Instructeur
-            </Button>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <Button size="sm" variant={adminTab === 'STAFF' ? 'primary' : 'outline'} onClick={() => setAdminTab('STAFF')}>
+                👤 Agents ({staffList.length})
+              </Button>
+              <Button size="sm" variant={adminTab === 'APPLICANTS' ? 'primary' : 'outline'} onClick={() => setAdminTab('APPLICANTS')}>
+                🏢 Requérants ONG ({applicantsList.length})
+              </Button>
+              <Button size="sm" variant={adminTab === 'AUDIT' ? 'primary' : 'outline'} onClick={() => setAdminTab('AUDIT')}>
+                📜 Journal d&apos;Audit ({auditLogs.length})
+              </Button>
+            </div>
           }
         >
-          <div className="table-responsive">
-            <table>
-              <thead>
-                <tr>
-                  <th>Email Institutionnel</th>
-                  <th>Rôle RBAC</th>
-                  <th>Service / Direction</th>
-                  <th>Province</th>
-                  <th>Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {staffList.map((st) => (
-                  <tr key={st.id || st.email}>
-                    <td className="mono" style={{ fontWeight: 600 }}>{st.email}</td>
-                    <td><Badge status="soumis">{st.role}</Badge></td>
-                    <td>{st.organizationName}</td>
-                    <td>{st.province}</td>
-                    <td><Badge status={st.status === 'ACTIVE' ? 'valide' : 'revoque'}>{st.status}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {adminTab === 'STAFF' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                <Button variant="brand" size="sm" onClick={() => { setModalError(''); setIsStaffModalOpen(true); }}>
+                  ➕ Créer un Compte Agent / Instructeur
+                </Button>
+              </div>
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Email Institutionnel</th>
+                      <th>Rôle RBAC</th>
+                      <th>Service / Direction</th>
+                      <th>Province</th>
+                      <th>Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffList.map((st) => (
+                      <tr key={st.id || st.email}>
+                        <td className="mono" style={{ fontWeight: 600 }}>{st.email}</td>
+                        <td><Badge status="soumis">{st.role}</Badge></td>
+                        <td>{st.organizationName}</td>
+                        <td>{st.province}</td>
+                        <td><Badge status={st.status === 'ACTIVE' ? 'valide' : 'revoque'}>{st.status}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {adminTab === 'APPLICANTS' && (
+            <div>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  style={{ maxWidth: '320px' }}
+                  placeholder="Rechercher organisation, email, province..."
+                  value={applicantQuery}
+                  onChange={(e) => setApplicantQuery(e.target.value)}
+                />
+              </div>
+              {filteredApplicants.length === 0 ? (
+                <EmptyState icon="🏢" title="Aucun compte requérant trouvé" />
+              ) : (
+                <div className="table-responsive">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Organisation</th>
+                        <th>Email</th>
+                        <th>Province</th>
+                        <th>Dossiers</th>
+                        <th>Statut</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredApplicants.map((u) => (
+                        <tr key={u.id}>
+                          <td style={{ fontWeight: 700 }}>{u.organizationName || 'N/A'}</td>
+                          <td className="mono">{u.email}</td>
+                          <td>{u.province || 'N/A'}</td>
+                          <td>{u.applicationsCount ?? 0}</td>
+                          <td><Badge status={u.status === 'ACTIVE' ? 'valide' : 'danger'}>{u.status}</Badge></td>
+                          <td>
+                            <Button
+                              size="sm"
+                              variant={u.status === 'ACTIVE' ? 'danger' : 'success'}
+                              onClick={() => setApplicantToggleTarget(u)}
+                            >
+                              {u.status === 'ACTIVE' ? 'Suspendre' : 'Réactiver'}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {adminTab === 'AUDIT' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  style={{ maxWidth: '300px' }}
+                  placeholder="Filtrer par action (ex: CERTIFICATE)..."
+                  value={auditActionFilter}
+                  onChange={(e) => setAuditActionFilter(e.target.value.toUpperCase())}
+                />
+                <a
+                  href={`/api/admin/audit?format=csv&token=${encodeURIComponent(sessionToken)}`}
+                  className="btn btn-sm btn-outline"
+                  style={{ textDecoration: 'none' }}
+                >
+                  📥 Exporter Audit CSV (ADM-07)
+                </a>
+              </div>
+              {filteredAuditLogs.length === 0 ? (
+                <EmptyState icon="📜" title="Aucune trace d'audit correspondante" />
+              ) : (
+                <div className="table-responsive" style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Horodatage</th>
+                        <th>Acteur / Rôle</th>
+                        <th>Action</th>
+                        <th>Dossier Cible</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAuditLogs.slice(0, 40).map((log) => (
+                        <tr key={log.id}>
+                          <td style={{ fontSize: '11.5px' }}>{log.timestamp ? new Date(log.timestamp).toLocaleString('fr-FR') : ''}</td>
+                          <td><Badge status="neutral">{log.actorRole}</Badge> <span className="mono" style={{ fontSize: '11px' }}>{log.actorId}</span></td>
+                          <td className="mono" style={{ fontWeight: 700, fontSize: '11.5px' }}>{log.action}</td>
+                          <td className="mono" style={{ fontSize: '12px' }}>{log.targetId || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
       )}
+
+      {/* Confirmation DG avant scellement Blockchain */}
+      <ConfirmDialog
+        isOpen={Boolean(sealConfirmApp)}
+        onClose={() => setSealConfirmApp(null)}
+        onConfirm={() => sealConfirmApp && handleApproveSeal(sealConfirmApp.referenceNumber)}
+        title="Confirmer l'Approbation & le Scellement Blockchain"
+        message={`Vous êtes sur le point d'approuver officiellement le dossier ${sealConfirmApp?.referenceNumber || ''} et d'inscrire son empreinte SHA-256 de manière irréversible sur la Blockchain Polygon Amoy.`}
+        details={
+          sealConfirmApp && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div><strong>Organisation :</strong> {sealConfirmApp.organizationName}</div>
+              <div><strong>Service :</strong> {sealConfirmApp.serviceCode} &bull; <strong>Projet :</strong> {sealConfirmApp.projectTitle}</div>
+              <div><strong>Préalables :</strong> ✓ Quittance validée &bull; ✓ Avis division favorable</div>
+            </div>
+          )
+        }
+        confirmLabel="✍️ Approuver & Sceller sur Polygon"
+        variant="success"
+        isLoading={isSubmitting}
+      />
+
+      {/* Confirmation Admin suspension / réactivation Requérant */}
+      <ConfirmDialog
+        isOpen={Boolean(applicantToggleTarget)}
+        onClose={() => setApplicantToggleTarget(null)}
+        onConfirm={handleToggleApplicantStatus}
+        title={applicantToggleTarget?.status === 'ACTIVE' ? 'Suspendre le compte requérant' : 'Réactiver le compte requérant'}
+        message={`Confirmez-vous le changement de statut du compte ${applicantToggleTarget?.email || ''} (${applicantToggleTarget?.organizationName || ''}) ?`}
+        confirmLabel={applicantToggleTarget?.status === 'ACTIVE' ? 'Confirmer la suspension' : 'Confirmer la réactivation'}
+        variant={applicantToggleTarget?.status === 'ACTIVE' ? 'danger' : 'success'}
+        isLoading={isSubmitting}
+      />
 
       {/* Modale Demande de Complément (ADM-06, NOT-04) */}
       <Modal
@@ -1035,20 +1362,14 @@ export default function AdminPage() {
         footer={
           <>
             <Button variant="outline" disabled={isSubmitting} onClick={() => setIsComplementModalOpen(false)}>Annuler</Button>
-            <Button variant="primary" disabled={isSubmitting || !complementReason.trim()} onClick={handleRequestComplement}>
-              {isSubmitting ? 'Notification en cours...' : 'Notifier le Requérant'}
+            <Button variant="primary" isLoading={isSubmitting} loadingText="Notification en cours..." disabled={!complementReason.trim()} onClick={handleRequestComplement}>
+              Notifier le Requérant
             </Button>
           </>
         }
       >
         {modalError && (
-          <AlertBanner
-            variant="error"
-            title="Erreur lors de la demande de complément"
-            message={modalError}
-            onClose={() => setModalError('')}
-            style={{ marginBottom: '14px' }}
-          />
+          <AlertBanner variant="error" title="Erreur lors de la demande de complément" message={modalError} onClose={() => setModalError('')} style={{ marginBottom: '14px' }} />
         )}
         <div className="form-group">
           <label htmlFor="comp-reason">Motif &amp; Pièces Complémentaires Sollicitées</label>
@@ -1075,20 +1396,14 @@ export default function AdminPage() {
         footer={
           <>
             <Button variant="outline" disabled={isSubmitting} onClick={() => setIsRejectModalOpen(false)}>Annuler</Button>
-            <Button variant="danger" disabled={isSubmitting || !rejectReason.trim()} onClick={handleReject}>
-              {isSubmitting ? 'Traitement en cours...' : 'Confirmer le Rejet'}
+            <Button variant="danger" isLoading={isSubmitting} loadingText="Traitement..." disabled={!rejectReason.trim()} onClick={handleReject}>
+              Confirmer le Rejet
             </Button>
           </>
         }
       >
         {modalError && (
-          <AlertBanner
-            variant="error"
-            title="Erreur lors du rejet du dossier"
-            message={modalError}
-            onClose={() => setModalError('')}
-            style={{ marginBottom: '14px' }}
-          />
+          <AlertBanner variant="error" title="Erreur lors du rejet du dossier" message={modalError} onClose={() => setModalError('')} style={{ marginBottom: '14px' }} />
         )}
         <div className="form-group">
           <label htmlFor="rej-reason">Motif Officiel du Rejet</label>
@@ -1116,11 +1431,13 @@ export default function AdminPage() {
           <>
             <Button variant="outline" disabled={isSubmitting} onClick={() => setIsOpinionModalOpen(false)}>Annuler</Button>
             <Button
-              variant="accent"
-              disabled={isSubmitting || !selectedApp?.paymentValidated}
+              variant="brand"
+              isLoading={isSubmitting}
+              loadingText="Enregistrement..."
+              disabled={!selectedApp?.paymentValidated}
               onClick={handleDivisionOpinion}
             >
-              {isSubmitting ? 'Enregistrement en cours...' : "Valider l'Avis"}
+              Valider l&apos;Avis
             </Button>
           </>
         }
@@ -1129,21 +1446,33 @@ export default function AdminPage() {
           <AlertBanner
             variant="warning"
             title="Quittance Non Validée (Règle ADM-08)"
-            message="La quittance des frais bancaires (320 USD) doit obligatoirement être validée par un agent avant que le Chef de Division puisse formuler un avis technique. Veuillez d'abord valider la quittance en tant qu'Agent."
+            message="La quittance des frais bancaires (320 USD) doit obligatoirement être validée par un agent avant que le Chef de Division puisse formuler un avis technique."
             style={{ marginBottom: '14px' }}
           />
         )}
         {modalError && (
-          <AlertBanner
-            variant="error"
-            title="Erreur lors de l'enregistrement de l'avis"
-            message={modalError}
-            onClose={() => setModalError('')}
-            style={{ marginBottom: '14px' }}
-          />
+          <AlertBanner variant="error" title="Erreur lors de l'enregistrement de l'avis" message={modalError} onClose={() => setModalError('')} style={{ marginBottom: '14px' }} />
         )}
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--fnpss-navy)', marginBottom: '6px' }}>
+            Modèles de motivation rapide :
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {OPINION_TEMPLATES.map((tpl) => (
+              <button
+                key={tpl.label}
+                type="button"
+                onClick={() => setOpinionData({ favorable: tpl.favorable, note: tpl.note })}
+                className="btn btn-sm btn-outline"
+                style={{ fontSize: '11px' }}
+              >
+                {tpl.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="form-group">
-          <label htmlFor="opinion-sel">Sens de l'Avis Technique</label>
+          <label htmlFor="opinion-sel">Sens de l&apos;Avis Technique</label>
           <select
             id="opinion-sel"
             className="form-control"
@@ -1177,23 +1506,17 @@ export default function AdminPage() {
         footer={
           <>
             <Button variant="outline" disabled={isSubmitting} onClick={() => setIsCosignModalOpen(false)}>Annuler</Button>
-            <Button variant="accent" disabled={isSubmitting || !cosignRef.trim()} onClick={handleCosignMinistry}>
-              {isSubmitting ? 'Enregistrement en cours...' : 'Apposer la Co-Signature'}
+            <Button variant="brand" isLoading={isSubmitting} loadingText="Enregistrement..." disabled={!cosignRef.trim()} onClick={handleCosignMinistry}>
+              Apposer la Co-Signature
             </Button>
           </>
         }
       >
         {modalError && (
-          <AlertBanner
-            variant="error"
-            title="Erreur lors de la co-signature"
-            message={modalError}
-            onClose={() => setModalError('')}
-            style={{ marginBottom: '14px' }}
-          />
+          <AlertBanner variant="error" title="Erreur lors de la co-signature" message={modalError} onClose={() => setModalError('')} style={{ marginBottom: '14px' }} />
         )}
         <div className="form-group">
-          <label htmlFor="cosign-input">Numéro de Référence de l'Arrêté Ministériel</label>
+          <label htmlFor="cosign-input">Numéro de Référence de l&apos;Arrêté Ministériel</label>
           <input
             id="cosign-input"
             type="text"
@@ -1216,20 +1539,14 @@ export default function AdminPage() {
         footer={
           <>
             <Button variant="outline" disabled={isSubmitting} onClick={() => setIsRevokeModalOpen(false)}>Annuler</Button>
-            <Button variant="danger" disabled={isSubmitting || !revokeData.reason.trim() || !revokeData.doubleConfirmed} onClick={handleRevoke}>
-              {isSubmitting ? 'Révocation en cours...' : 'Confirmer la Révocation'}
+            <Button variant="danger" isLoading={isSubmitting} loadingText="Révocation..." disabled={!revokeData.reason.trim() || !revokeData.doubleConfirmed} onClick={handleRevoke}>
+              Confirmer la Révocation
             </Button>
           </>
         }
       >
         {modalError && (
-          <AlertBanner
-            variant="error"
-            title="Erreur lors de la révocation"
-            message={modalError}
-            onClose={() => setModalError('')}
-            style={{ marginBottom: '14px' }}
-          />
+          <AlertBanner variant="error" title="Erreur lors de la révocation" message={modalError} onClose={() => setModalError('')} style={{ marginBottom: '14px' }} />
         )}
         <div className="form-group">
           <label htmlFor="rev-reason">Motif Impératif de la Révocation</label>
@@ -1267,20 +1584,14 @@ export default function AdminPage() {
         footer={
           <>
             <Button variant="outline" disabled={isSubmitting} onClick={() => setIsStaffModalOpen(false)}>Annuler</Button>
-            <Button variant="primary" disabled={isSubmitting || !staffForm.email || !staffForm.password} onClick={handleCreateStaff}>
-              {isSubmitting ? 'Création en cours...' : 'Créer le Compte'}
+            <Button variant="primary" isLoading={isSubmitting} loadingText="Création..." disabled={!staffForm.email || !staffForm.password} onClick={handleCreateStaff}>
+              Créer le Compte
             </Button>
           </>
         }
       >
         {modalError && (
-          <AlertBanner
-            variant="error"
-            title="Erreur lors de la création du compte"
-            message={modalError}
-            onClose={() => setModalError('')}
-            style={{ marginBottom: '14px' }}
-          />
+          <AlertBanner variant="error" title="Erreur lors de la création du compte" message={modalError} onClose={() => setModalError('')} style={{ marginBottom: '14px' }} />
         )}
         <form onSubmit={handleCreateStaff}>
           <div className="form-group">
@@ -1339,4 +1650,3 @@ export default function AdminPage() {
     </div>
   );
 }
-

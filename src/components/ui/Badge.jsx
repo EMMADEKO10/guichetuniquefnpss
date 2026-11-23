@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Composant Badge accessible du Design System FNPSS (UX-05)
  * @param {Object} props
- * @param {'soumis'|'instruction'|'valide'|'revoque'|'danger'|'default'} [props.status='default']
+ * @param {'soumis'|'instruction'|'valide'|'revoque'|'danger'|'brand'|'warning'|'info'|'neutral'|'default'} [props.status='default']
  * @param {React.ReactNode} props.children
  */
 export default function Badge({
@@ -18,6 +18,10 @@ export default function Badge({
     valide: 'badge-valide',
     revoque: 'badge-revoque',
     danger: 'badge-danger',
+    brand: 'badge-brand',
+    warning: 'badge-warning',
+    info: 'badge-info',
+    neutral: 'badge-neutral',
     default: 'badge-soumis'
   };
 
@@ -29,4 +33,3 @@ export default function Badge({
     </span>
   );
 }
-

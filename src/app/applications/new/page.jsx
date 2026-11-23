@@ -5,18 +5,13 @@ import Card from '../../../components/ui/Card.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import AlertBanner from '../../../components/ui/AlertBanner.jsx';
+import { useToast } from '../../../components/ui/ToastProvider.jsx';
+import { getClientToken, getClientUser } from '../../../lib/client-auth.js';
 
-function getClientToken() {
-  if (typeof window === 'undefined') return '';
-  const fromSession = sessionStorage.getItem('fnpss_session_token');
-  if (fromSession) return fromSession;
-  const fromLocal = localStorage.getItem('fnpss_session_token');
-  if (fromLocal) return fromLocal;
-  const match = document.cookie.match(/(?:^|;\s*)fnpss_session_token=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : '';
-}
+const DRAFT_STORAGE_KEY = 'fnpss_new_app_draft_v1';
 
 export default function NewApplicationPage() {
+  const toast = useToast();
   const [step, setStep] = useState(1);
   const [serviceCode, setServiceCode] = useState('S4');
   const [organizationName, setOrganizationName] = useState('ONG Espoir du Nord-Kivu');
@@ -28,10 +23,39 @@ export default function NewApplicationPage() {
   const [uploadingDoc, setUploadingDoc] = useState('');
   const [stepError, setStepError] = useState('');
   const [hasS1Enrollment, setHasS1Enrollment] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   useEffect(() => {
+    const user = getClientUser();
+    if (user?.organizationName) {
+      setOrganizationName(user.organizationName);
+    }
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlSvc = params.get('service');
+      if (urlSvc && ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'].includes(urlSvc.toUpperCase())) {
+        setServiceCode(urlSvc.toUpperCase());
+      } else {
+        try {
+          const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+          if (rawDraft) {
+            const parsed = JSON.parse(rawDraft);
+            if (parsed.serviceCode) setServiceCode(parsed.serviceCode);
+            if (parsed.organizationName) setOrganizationName(parsed.organizationName);
+            if (parsed.projectTitle) setProjectTitle(parsed.projectTitle);
+            if (parsed.goodsSummary) setGoodsSummary(parsed.goodsSummary);
+            if (parsed.paymentReference) setPaymentReference(parsed.paymentReference);
+            setDraftRestored(true);
+          }
+        } catch {
+          // Ignore invalid draft
+        }
+      }
+    }
+
     const token = getClientToken();
     if (!token) return;
     fetch('/api/applications?service=S1&status=VALIDE_DELIVRE', {
@@ -46,6 +70,29 @@ export default function NewApplicationPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({ serviceCode, organizationName, projectTitle, goodsSummary, paymentReference, savedAt: Date.now() })
+      );
+    } catch {
+      // Ignore quota errors
+    }
+  }, [serviceCode, organizationName, projectTitle, goodsSummary, paymentReference]);
+
+  const clearDraft = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+    }
+    setProjectTitle('');
+    setGoodsSummary('');
+    setPaymentReference('');
+    setDraftRestored(false);
+    toast.info('Brouillon local effacé.');
+  };
+
   const docDefinitions = [
     { code: 'P1_REQUETE', name: 'Requête motivée adressée au DG FNPSS' },
     { code: 'P2_ENROLEMENT', name: 'Certificat d\'enrôlement ou Accord de siège F92', onceOnly: true },
@@ -55,6 +102,10 @@ export default function NewApplicationPage() {
     { code: 'P6_QUITTANCE', name: 'Bordereau bancaire ou Mobile Money (20$ + 300$)' }
   ];
 
+  const readyDocsCount = docDefinitions.filter(
+    (d) => (d.onceOnly && hasS1Enrollment) || Boolean(attachedDocs[d.code])
+  ).length;
+
   // Calcul SHA-256 Web Crypto
   const handleFileUpload = async (docCode, e) => {
     const file = e.target.files?.[0];
@@ -63,7 +114,9 @@ export default function NewApplicationPage() {
     setUploadErrors(prev => ({ ...prev, [docCode]: null }));
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setUploadErrors(prev => ({ ...prev, [docCode]: 'Format invalide : seuls les fichiers PDF sont acceptés.' }));
+      const msg = 'Format invalide : seuls les fichiers PDF sont acceptés.';
+      setUploadErrors(prev => ({ ...prev, [docCode]: msg }));
+      toast.error(msg, 'Format non autorisé');
       return;
     }
 
@@ -83,12 +136,12 @@ export default function NewApplicationPage() {
       };
       setAttachedDocs(prev => ({ ...prev, [docCode]: meta }));
 
-      // Téléversement chiffré (AES-256-GCM) vers Cloudinary : un fichier par requête (limite Vercel 4,5 Mo).
       if (file.size > 3 * 1024 * 1024) {
         setUploadErrors(prev => ({
           ...prev,
           [docCode]: `${file.name} dépasse 3 Mo : seule son empreinte SHA-256 est calculée, le stockage cloud complet est restreint.`
         }));
+        toast.warning('Fichier supérieur à 3 Mo : empreinte seule enregistrée.', docCode);
         setUploadingDoc('');
         return;
       }
@@ -108,10 +161,9 @@ export default function NewApplicationPage() {
       });
       const upData = await up.json().catch(() => ({}));
       if (!up.ok) {
-        setUploadErrors(prev => ({
-          ...prev,
-          [docCode]: `Stockage refusé : ${upData.error || up.status}`
-        }));
+        const errMsg = `Stockage refusé : ${upData.error || up.status}`;
+        setUploadErrors(prev => ({ ...prev, [docCode]: errMsg }));
+        toast.error(errMsg, docCode);
         setUploadingDoc('');
         return;
       }
@@ -126,11 +178,11 @@ export default function NewApplicationPage() {
           }
         }));
       }
-    } catch (err) {
-      setUploadErrors(prev => ({
-        ...prev,
-        [docCode]: 'Erreur lors de l\'inspection ou du hachage cryptographique du fichier PDF.'
-      }));
+      toast.success(`Pièce ${docCode} vérifiée (SHA-256) et chiffrée AES-256-GCM.`, 'Pièce enregistrée');
+    } catch {
+      const msg = 'Erreur lors de l\'inspection ou du hachage cryptographique du fichier PDF.';
+      setUploadErrors(prev => ({ ...prev, [docCode]: msg }));
+      toast.error(msg, docCode);
     } finally {
       setUploadingDoc('');
     }
@@ -144,7 +196,6 @@ export default function NewApplicationPage() {
     const idempotencyKey = 'IDEM-' + Math.random().toString(36).substring(2, 12);
     const documentsArray = Object.values(attachedDocs);
 
-    // Si Once-Only actif pour P2, on injecte l'exemption
     if (hasS1Enrollment && !attachedDocs['P2_ENROLEMENT']) {
       documentsArray.push({
         docCode: 'P2_ENROLEMENT',
@@ -176,34 +227,48 @@ export default function NewApplicationPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setFeedback({ type: 'error', message: data.error || 'Erreur lors de la soumission.' });
+        const msg = data.error || 'Erreur lors de la soumission.';
+        setFeedback({ type: 'error', message: msg });
+        toast.error(msg, 'Soumission refusée');
       } else {
-        setFeedback({
-          type: 'success',
-          message: `Dossier créé avec succès ! Référence : ${data.application?.referenceNumber}`
-        });
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
+        }
+        const okMsg = `Dossier créé avec succès ! Référence : ${data.application?.referenceNumber}`;
+        setFeedback({ type: 'success', message: okMsg });
+        toast.success(okMsg, 'Demande enregistrée');
+        window.dispatchEvent(new Event('fnpss-notif-refresh'));
       }
-    } catch (err) {
-      setFeedback({
-        type: 'warning',
-        message: 'Connexion interrompue. Votre demande est sauvegardée dans la file d\'attente PWA et sera synchronisée dès le retour du réseau.'
-      });
+    } catch {
+      const warnMsg = 'Connexion interrompue. Votre brouillon reste sauvegardé localement et sera prêt dès le retour du réseau.';
+      setFeedback({ type: 'warning', message: warnMsg });
+      toast.warning(warnMsg, 'Mode hors-ligne PWA');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: '820px', margin: '20px auto' }}>
-      <div style={{ marginBottom: '20px' }}>
-        <h2>Nouvelle Demande de Démarche FNPSS</h2>
-        <p className="text-muted" style={{ fontSize: '13px' }}>
-          Formulaire dynamique S1–S6 avec principe Once-Only et calcul d'intégrité SHA-256 (REQ-06)
-        </p>
+    <div style={{ maxWidth: '840px', margin: '12px auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '18px' }}>
+        <div>
+          <h2>Nouvelle Demande de Démarche FNPSS</h2>
+          <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
+            Formulaire dynamique S1–S6 avec principe Once-Only et calcul d&apos;intégrité SHA-256 (REQ-06)
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Badge status="info">💾 Brouillon auto</Badge>
+          {draftRestored && (
+            <Button variant="outline" size="sm" onClick={clearDraft}>
+              Effacer brouillon
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Étapes du Wizard */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
           { num: 1, title: '1. Démarche' },
           { num: 2, title: '2. Projet' },
@@ -214,16 +279,18 @@ export default function NewApplicationPage() {
             key={s.num}
             style={{
               flex: 1,
+              minWidth: '120px',
               padding: '10px',
               textAlign: 'center',
-              borderRadius: '6px',
+              borderRadius: '8px',
               fontWeight: 700,
               fontSize: '12px',
-              background: step === s.num ? 'var(--fnpss-blue)' : step > s.num ? '#e6f4ea' : '#f1f5f9',
+              border: step === s.num ? '2px solid var(--fnpss-orange)' : '1px solid var(--border)',
+              background: step === s.num ? 'var(--fnpss-navy)' : step > s.num ? '#e6f4ea' : '#f1f5f9',
               color: step === s.num ? '#ffffff' : step > s.num ? 'var(--fnpss-green)' : 'var(--text-muted)'
             }}
           >
-            {s.title}
+            {step > s.num ? `✓ ${s.title}` : s.title}
           </div>
         ))}
       </div>
@@ -258,27 +325,30 @@ export default function NewApplicationPage() {
         {step === 1 && (
           <div>
             <h3 style={{ marginBottom: '14px' }}>Étape 1 : Sélectionnez le Service Dématérialisé</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               {[
-                { code: 'S1', title: 'S1 &bull; Enrôlement Initial ONG', sla: '5j', fee: '20 USD' },
-                { code: 'S2', title: 'S2 &bull; Accord de Partenariat', sla: '10j', fee: 'Inclus' },
-                { code: 'S3', title: 'S3 &bull; Avis Technique Projet', sla: '7j', fee: 'Inclus' },
-                { code: 'S4', title: 'S4 &bull; Exonération Douanière', sla: '10j', fee: '20$ + 300$' },
-                { code: 'S5', title: 'S5 &bull; Philanthropie & Dons', sla: '7j', fee: '20 USD' },
-                { code: 'S6', title: 'S6 &bull; Arrêté Interministériel', sla: '15j', fee: 'Sur dossier' }
+                { code: 'S1', title: 'S1 • Enrôlement Initial ONG', sla: '5j', fee: '20 USD' },
+                { code: 'S2', title: 'S2 • Accord de Partenariat', sla: '10j', fee: 'Inclus' },
+                { code: 'S3', title: 'S3 • Avis Technique Projet', sla: '7j', fee: 'Inclus' },
+                { code: 'S4', title: 'S4 • Exonération Douanière', sla: '10j', fee: '20$ + 300$' },
+                { code: 'S5', title: 'S5 • Philanthropie & Dons', sla: '7j', fee: '20 USD' },
+                { code: 'S6', title: 'S6 • Arrêté Interministériel', sla: '15j', fee: 'Sur dossier' }
               ].map((s) => (
                 <div
                   key={s.code}
                   onClick={() => setServiceCode(s.code)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setServiceCode(s.code); }}
                   style={{
-                    border: `2px solid ${serviceCode === s.code ? 'var(--fnpss-blue)' : 'var(--border)'}`,
-                    background: serviceCode === s.code ? '#eef6fc' : '#ffffff',
+                    border: `2px solid ${serviceCode === s.code ? 'var(--fnpss-orange-accessible)' : 'var(--border)'}`,
+                    background: serviceCode === s.code ? 'var(--fnpss-orange-soft)' : '#ffffff',
                     padding: '14px',
                     borderRadius: '8px',
                     cursor: 'pointer'
                   }}
                 >
-                  <strong style={{ color: 'var(--fnpss-navy)' }} dangerouslySetInnerHTML={{ __html: s.title }} />
+                  <strong style={{ color: 'var(--fnpss-navy)' }}>{s.title}</strong>
                   <div className="text-muted" style={{ fontSize: '11.5px', marginTop: '4px' }}>
                     SLA : {s.sla} &bull; Frais : {s.fee}
                   </div>
@@ -287,8 +357,8 @@ export default function NewApplicationPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="primary" onClick={() => { setStepError(''); setStep(2); }}>
-                Continuer vers l'Étape 2 &rarr;
+              <Button variant="brand" onClick={() => { setStepError(''); setStep(2); }}>
+                Continuer vers l&apos;Étape 2 &rarr;
               </Button>
             </div>
           </div>
@@ -338,7 +408,7 @@ export default function NewApplicationPage() {
                 &larr; Retour
               </Button>
               <Button
-                variant="primary"
+                variant="brand"
                 onClick={() => {
                   if (!projectTitle.trim()) {
                     setStepError('Veuillez saisir un intitulé pour votre projet avant de passer à l\'étape des pièces justificatives.');
@@ -357,9 +427,13 @@ export default function NewApplicationPage() {
         {/* Étape 3 : Pièces Justificatives & Once-Only */}
         {step === 3 && (
           <div>
-            <h3 style={{ marginBottom: '14px' }}>Étape 3 : Téléversement des Pièces Justificatives (P1 à P6)</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0 }}>Étape 3 : Téléversement des Pièces Justificatives (P1 à P6)</h3>
+              <Badge status={readyDocsCount === 6 ? 'valide' : 'info'}>
+                {readyDocsCount}/6 pièces prêtes
+              </Badge>
+            </div>
 
-            {/* Notification Once-Only */}
             {hasS1Enrollment && (
               <AlertBanner
                 variant="success"
@@ -380,7 +454,7 @@ export default function NewApplicationPage() {
                   <div
                     key={doc.code}
                     style={{
-                      border: `1px solid ${docError ? '#fca5a5' : 'var(--border)'}`,
+                      border: `1px solid ${docError ? '#fca5a5' : uploaded || isExempted ? '#bbf7d0' : 'var(--border)'}`,
                       borderRadius: '8px',
                       padding: '12px',
                       background: isExempted ? '#f0fdf4' : uploaded ? '#f8fafc' : '#ffffff',
@@ -400,15 +474,15 @@ export default function NewApplicationPage() {
                           </div>
                         ) : isDocUploading ? (
                           <div style={{ color: 'var(--fnpss-blue)', fontSize: '11.5px', fontWeight: 600 }}>
-                            ⏳ Calcul de l'empreinte SHA-256 et chiffrement en cours...
+                            ⏳ Calcul de l&apos;empreinte SHA-256 et chiffrement en cours...
                           </div>
                         ) : uploaded ? (
                           <div className="mono text-muted" style={{ fontSize: '11px' }}>
-                            📄 {uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}...
+                            📄 {uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}... {uploaded.cloudinaryUrl ? '• 🔒 AES-256' : ''}
                           </div>
                         ) : (
                           <div className="text-muted" style={{ fontSize: '11px' }}>
-                            Format PDF requis (max 15 Mo)
+                            Format PDF requis (max 3 Mo pour archivage cloud complet)
                           </div>
                         )}
                       </div>
@@ -449,7 +523,7 @@ export default function NewApplicationPage() {
                 &larr; Retour
               </Button>
               <Button
-                variant="primary"
+                variant="brand"
                 onClick={() => {
                   if (!attachedDocs['P1_REQUETE']) {
                     setStepError('La pièce P1_REQUETE (Requête motivée) est obligatoire avant de finaliser votre demande.');
@@ -490,21 +564,17 @@ export default function NewApplicationPage() {
               <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
                 <li>Démarche : <strong>{serviceCode}</strong></li>
                 <li>Organisation : <strong>{organizationName}</strong></li>
-                <li>Objet du projet : <strong>{projectTitle || 'Non renseigné'}</strong></li>
-                <li>Pièces jointes attachées : <strong>{Object.keys(attachedDocs).length + (hasS1Enrollment ? 1 : 0)} / 6</strong></li>
+                <li>Projet : <strong>{projectTitle || 'Non spécifié'}</strong></li>
+                <li>Pièces prêtes : <strong>{readyDocsCount}/6</strong> {hasS1Enrollment && '(Once-Only actif)'}</li>
               </ul>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
               <Button variant="outline" onClick={() => setStep(3)}>
-                &larr; Retour
+                &larr; Retour aux Pièces
               </Button>
-              <Button
-                variant="success"
-                onClick={handleSubmit}
-                isLoading={isLoading}
-              >
-                🚀 Confirmer et Déposer le Dossier
+              <Button variant="success" isLoading={isLoading} loadingText="Soumission en cours..." onClick={handleSubmit}>
+                ✅ Soumettre la Demande au FNPSS
               </Button>
             </div>
           </div>
@@ -513,4 +583,3 @@ export default function NewApplicationPage() {
     </div>
   );
 }
-

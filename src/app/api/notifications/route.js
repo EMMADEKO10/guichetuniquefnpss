@@ -9,10 +9,12 @@ import {
 import { hydrateFromNeon, persistToNeon } from '../../../infra/neon-persistence.mjs';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 /**
  * GET /api/notifications (NOT-01, NOT-02, NOT-04)
- * - Sans ?ref : centre de notifications in-app de l'utilisateur connecté + compteur de non-lus.
+ * - Sans ?ref : centre de notifications in-app de l'utilisateur connecté (et de son rôle staff) + compteur de non-lus.
  * - Avec ?ref=FNPSS/DEM/... : fil de discussion rattaché au dossier (propriétaire ou agent FNPSS).
  */
 export async function GET(request) {
@@ -31,7 +33,7 @@ export async function GET(request) {
       return Response.json({ success: true, referenceNumber: ref, messages });
     }
 
-    const { unreadCount, notifications } = applicationEngine.notifications.getUserNotifications(actor.id);
+    const { unreadCount, notifications } = applicationEngine.notifications.getUserNotifications(actor.id, actor.role);
     const payload = { success: true, unreadCount, notifications };
     if (isStaff(actor)) {
       payload.emailOutboxTotal = applicationEngine.notifications.emailOutbox.length;
@@ -47,20 +49,26 @@ export async function GET(request) {
 
 /**
  * PUT /api/notifications (NOT-02)
- * Marque une notification comme lue ou non-lue (anti-IDOR : uniquement la sienne).
+ * Marque une notification comme lue/non-lue ou tout comme lu (anti-IDOR : uniquement les siennes ou celles de son rôle).
  */
 export async function PUT(request) {
   try {
     await hydrateFromNeon();
     const actor = requireActor(request);
     const body = await readJson(request);
+    if (body.markAllRead === true) {
+      const updatedCount = applicationEngine.notifications.markAllNotificationsRead(actor.id, actor.role);
+      await persistToNeon();
+      return Response.json({ success: true, markAllRead: true, updatedCount });
+    }
     if (!body.notificationId) {
       throw new HttpError(400, 'Identifiant de notification requis.');
     }
     const notification = applicationEngine.notifications.markNotificationRead(
       body.notificationId,
       body.read !== false,
-      actor.id
+      actor.id,
+      actor.role
     );
     await persistToNeon();
     return Response.json({ success: true, notification });

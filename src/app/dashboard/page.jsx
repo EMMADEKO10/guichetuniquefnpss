@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import DossierThread from '../../components/DossierThread.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
+import StatusStepper from '../../components/ui/StatusStepper.jsx';
+import SlaIndicator from '../../components/ui/SlaIndicator.jsx';
+import BlockchainSignal from '../../components/ui/BlockchainSignal.jsx';
+import EmptyState from '../../components/ui/EmptyState.jsx';
+import { SkeletonKpiGrid, SkeletonCard } from '../../components/ui/Skeleton.jsx';
+import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken } from '../../lib/client-auth.js';
 
 const COMPLEMENT_DOC_OPTIONS = [
@@ -18,20 +25,38 @@ const COMPLEMENT_DOC_OPTIONS = [
   { code: 'P6_QUITTANCE', label: 'P6 — Bordereau / quittance bancaire' }
 ];
 
+function getNextStepText(app) {
+  if (app.status === 'REVOQUE') return 'Attestation révoquée par la Direction Générale — vérifiez le motif.';
+  if (app.status === 'REJETE') return `Demande rejetée : ${app.rejectionReason || 'consultez le détail'}.`;
+  if (app.status === 'COMPLEMENT_REQUIS') return 'Action requise : déposez la pièce justificative demandée pour relancer le SLA.';
+  if (app.status === 'VALIDE_DELIVRE') {
+    return app.ministryCoSigned
+      ? 'Acte délivré, scellé sur Polygon et co-signé par le Ministère.'
+      : 'Attestation délivrée et scellée sur Polygon — téléchargeable en PDF.';
+  }
+  if (!app.paymentValidated) return 'En attente de contrôle de votre quittance bancaire par un agent FNPSS.';
+  if (!app.divisionOpinion) return 'En cours d\'examen technique par la Division compétente du FNPSS.';
+  return 'Avis technique émis — en attente de signature finale et scellement par la Direction Générale.';
+}
+
 export default function DashboardPage() {
+  const toast = useToast();
   const [applications, setApplications] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedService, setSelectedService] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
   const [isLoading, setIsLoading] = useState(true);
+  const [authExpired, setAuthExpired] = useState(false);
   const [activeModalApp, setActiveModalApp] = useState(null);
   const [editFormData, setEditFormData] = useState({ projectTitle: '', goodsSummary: '' });
   const [editError, setEditError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [alertInfo, setAlertInfo] = useState(null); // { type, title, message }
+  const [alertInfo, setAlertInfo] = useState(null);
   const [sessionToken, setSessionToken] = useState('');
   const [threadApp, setThreadApp] = useState(null);
+  const [withdrawTarget, setWithdrawTarget] = useState(null);
   const [complementApp, setComplementApp] = useState(null);
   const [complementDocCode, setComplementDocCode] = useState('P1_REQUETE');
   const [complementFile, setComplementFile] = useState(null);
@@ -44,22 +69,33 @@ export default function DashboardPage() {
 
   const getToken = () => getClientToken();
 
-  const authHeaders = (extra = {}) => {
+  const authHeaders = useCallback((extra = {}) => {
     const t = getToken();
     return t ? { Authorization: `Bearer ${t}`, ...extra } : { ...extra };
-  };
+  }, []);
 
-  const fetchApplications = async () => {
+  const fetchApplications = useCallback(async () => {
     setIsLoading(true);
     try {
       const t = getToken();
       setSessionToken(t);
-      const res = await fetch('/api/applications', { headers: authHeaders() });
+      if (!t) {
+        setApplications([]);
+        setIsLoading(false);
+        return;
+      }
+      const res = await fetch('/api/applications', { headers: { Authorization: `Bearer ${t}` } });
+      if (res.status === 401) {
+        setAuthExpired(true);
+        setApplications([]);
+        return;
+      }
+      setAuthExpired(false);
       const data = await res.json();
       if (data.success) {
         setApplications(data.applications || []);
       }
-      const nRes = await fetch('/api/notifications', { headers: authHeaders() });
+      const nRes = await fetch('/api/notifications', { headers: { Authorization: `Bearer ${t}` } });
       if (nRes.ok) {
         const nData = await nRes.json();
         setNotifications(nData.notifications || []);
@@ -67,10 +103,11 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error('Erreur chargement demandes', err);
+      toast.error('Impossible de charger vos dossiers pour le moment.', 'Connexion instable');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleMarkNotificationRead = async (notificationId) => {
     try {
@@ -80,6 +117,7 @@ export default function DashboardPage() {
         body: JSON.stringify({ notificationId, read: true })
       });
       if (res.ok) {
+        window.dispatchEvent(new Event('fnpss-notif-refresh'));
         fetchApplications();
       }
     } catch (err) {
@@ -87,9 +125,26 @@ export default function DashboardPage() {
     }
   };
 
+  const handleMarkAllRead = async () => {
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ markAllRead: true })
+      });
+      if (res.ok) {
+        toast.success('Toutes vos notifications ont été marquées comme lues.');
+        window.dispatchEvent(new Event('fnpss-notif-refresh'));
+        fetchApplications();
+      }
+    } catch {
+      toast.error('Erreur lors de la mise à jour des notifications.');
+    }
+  };
+
   useEffect(() => {
     fetchApplications();
-  }, []);
+  }, [fetchApplications]);
 
   const filteredApps = applications.filter((app) => {
     if (selectedService !== 'ALL' && app.serviceCode !== selectedService) return false;
@@ -103,6 +158,8 @@ export default function DashboardPage() {
     instruction: applications.filter((a) => a.status === 'EN_COURS_INSTRUCTION' || a.status === 'SOUMIS').length,
     complements: applications.filter((a) => a.status === 'COMPLEMENT_REQUIS').length
   };
+
+  const firstComplementApp = applications.find((a) => a.status === 'COMPLEMENT_REQUIS');
 
   const handleOpenEdit = (app) => {
     setActiveModalApp(app);
@@ -131,7 +188,9 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        notify('success', `Dossier ${activeModalApp.referenceNumber} modifié avec succès.`, 'Dossier Mis à Jour');
+        const msg = `Dossier ${activeModalApp.referenceNumber} modifié avec succès.`;
+        notify('success', msg, 'Dossier Mis à Jour');
+        toast.success(msg, 'Dossier Mis à Jour');
         setActiveModalApp(null);
         fetchApplications();
       } else {
@@ -139,35 +198,41 @@ export default function DashboardPage() {
         setEditError(msg);
         notify('error', msg, 'Modification Refusée');
       }
-    } catch (err) {
+    } catch {
       setEditError('Erreur de communication réseau.');
-      notify('error', 'Impossible de contacter le serveur.', 'Erreur Réseau');
+      toast.error('Impossible de contacter le serveur.', 'Erreur Réseau');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleWithdraw = async (app) => {
-    if (!confirm(`Confirmez-vous le retrait volontaire du dossier ${app.referenceNumber} ? Cette action est irréversible.`)) {
-      return;
-    }
-    setIsSubmitting(true);
+  const handleWithdraw = (app) => {
+    setWithdrawTarget(app);
+  };
 
+  const confirmWithdraw = async () => {
+    if (!withdrawTarget) return;
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/applications/withdraw', {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ referenceNumber: app.referenceNumber })
+        body: JSON.stringify({ referenceNumber: withdrawTarget.referenceNumber })
       });
       if (res.ok) {
-        notify('warning', `Dossier ${app.referenceNumber} retiré avec succès.`, 'Dossier Retiré (REQ-08)');
+        const msg = `Dossier ${withdrawTarget.referenceNumber} retiré avec succès.`;
+        notify('warning', msg, 'Dossier Retiré (REQ-08)');
+        toast.warning(msg, 'Dossier Retiré');
+        setWithdrawTarget(null);
         fetchApplications();
       } else {
         const data = await res.json().catch(() => ({}));
-        notify('error', data.error || 'Erreur lors du retrait du dossier.', 'Retrait Refusé');
+        const errMsg = data.error || 'Erreur lors du retrait du dossier.';
+        notify('error', errMsg, 'Retrait Refusé');
+        toast.error(errMsg, 'Retrait Refusé');
       }
-    } catch (err) {
-      notify('error', 'Impossible de joindre le serveur pour le retrait.', 'Erreur Réseau');
+    } catch {
+      toast.error('Impossible de joindre le serveur pour le retrait.', 'Erreur Réseau');
     } finally {
       setIsSubmitting(false);
     }
@@ -232,31 +297,62 @@ export default function DashboardPage() {
         setComplementError(data.error || 'Complément non enregistré.');
         return;
       }
-      notify('success', `Complément déposé sur le dossier ${complementApp.referenceNumber} : l'instruction reprend.`, 'Complément Enregistré (SC-02)');
+      const okMsg = `Complément déposé sur le dossier ${complementApp.referenceNumber} : l'instruction reprend.`;
+      notify('success', okMsg, 'Complément Enregistré (SC-02)');
+      toast.success(okMsg, 'Complément Enregistré');
+      window.dispatchEvent(new Event('fnpss-notif-refresh'));
       setComplementApp(null);
       setComplementFile(null);
       fetchApplications();
-    } catch (err) {
+    } catch {
       setComplementError('Erreur réseau : complément non enregistré.');
     } finally {
       setComplementBusy(false);
     }
   };
 
+  const renderStatusBadge = (app) => (
+    <Badge
+      status={
+        app.status === 'VALIDE_DELIVRE'
+          ? 'valide'
+          : app.status === 'REVOQUE'
+          ? 'revoque'
+          : app.status === 'COMPLEMENT_REQUIS'
+          ? 'danger'
+          : app.status === 'REJETE'
+          ? 'danger'
+          : 'instruction'
+      }
+    >
+      {app.status === 'VALIDE_DELIVRE'
+        ? '✓ Délivré'
+        : app.status === 'REVOQUE'
+        ? '✕ Révoqué'
+        : app.status === 'REJETE'
+        ? '✕ Rejeté'
+        : app.status === 'COMPLEMENT_REQUIS'
+        ? '⚠️ Complément requis'
+        : app.status === 'SOUMIS'
+        ? 'En attente'
+        : 'En instruction'}
+    </Badge>
+  );
+
   return (
     <div>
-      <div className="flex justify-between items-center" style={{ marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="flex justify-between items-center" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2>Tableau de Bord Requérant</h2>
           <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
-            Suivi en temps réel de vos dossiers et téléchargement des attestations scellées
+            Suivi en temps réel de vos dossiers, échéances SLA et téléchargement des attestations scellées
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <a href="/profile" className="btn btn-outline" style={{ textDecoration: 'none' }}>
             👤 Mon Profil ONG
           </a>
-          <a href="/applications/new" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+          <a href="/applications/new" className="btn btn-brand" style={{ textDecoration: 'none' }}>
             ➕ Déposer une Nouvelle Demande
           </a>
         </div>
@@ -272,87 +368,252 @@ export default function DashboardPage() {
         />
       )}
 
-      {typeof window !== 'undefined' && !getToken() && (
+      {(authExpired || (typeof window !== 'undefined' && !getToken())) && (
         <AlertBanner
           variant="warning"
-          title="Session non identifiée"
-          message="Vous consultez actuellement l'interface sans session active. Pour déposer des demandes et suivre vos dossiers en temps réel, veuillez vous connecter."
-          action={<a href="/auth/login" className="btn btn-sm btn-primary" style={{ textDecoration: 'none' }}>🔐 Se connecter avec mon compte ONG</a>}
+          title={authExpired ? 'Session expirée' : 'Session non identifiée'}
+          message={
+            authExpired
+              ? 'Votre session a expiré par mesure de sécurité. Veuillez vous reconnecter pour accéder à vos dossiers.'
+              : 'Vous consultez actuellement l\'interface sans session active. Connectez-vous avec votre compte ONG pour suivre vos dossiers.'
+          }
+          action={<a href="/auth/login" className="btn btn-sm btn-brand" style={{ textDecoration: 'none' }}>🔐 Se connecter</a>}
+          style={{ marginBottom: '18px' }}
+        />
+      )}
+
+      {firstComplementApp && (
+        <AlertBanner
+          variant="warning"
+          title={`Action requise : ${kpis.complements} dossier${kpis.complements > 1 ? 's' : ''} en attente de complément`}
+          message={`Le dossier ${firstComplementApp.referenceNumber} attend une pièce complémentaire (${firstComplementApp.complementReason || 'consultez le motif'}). Le délai SLA est suspendu jusqu'au dépôt.`}
+          action={
+            <Button
+              size="sm"
+              variant="brand"
+              onClick={() => {
+                setComplementApp(firstComplementApp);
+                setComplementError('');
+                setComplementFile(null);
+              }}
+            >
+              📤 Fournir le complément maintenant
+            </Button>
+          }
           style={{ marginBottom: '18px' }}
         />
       )}
 
       {/* Grille des KPI */}
-      <div className="kpi-grid">
-        <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-blue)' }}>
-          <div className="lbl">Dossiers Déposés</div>
-          <div className="val">{kpis.total}</div>
-          <div className="sub">Toutes démarches confondues</div>
+      {isLoading ? (
+        <SkeletonKpiGrid count={4} />
+      ) : (
+        <div className="kpi-grid">
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-blue)' }}>
+            <div className="lbl">Dossiers Déposés</div>
+            <div className="val">{kpis.total}</div>
+            <div className="sub">Toutes démarches confondues</div>
+          </div>
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-green)' }}>
+            <div className="lbl">Attestations Délivrées</div>
+            <div className="val">{kpis.valides}</div>
+            <div className="sub">Scellées sur Blockchain Polygon</div>
+          </div>
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-gold)' }}>
+            <div className="lbl">En Cours d&apos;Instruction</div>
+            <div className="val">{kpis.instruction}</div>
+            <div className="sub">Instruction FNPSS &bull; SLA 10j</div>
+          </div>
+          <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-orange)' }}>
+            <div className="lbl">Compléments Requis</div>
+            <div className="val">{kpis.complements}</div>
+            <div className="sub">Action usager requise</div>
+          </div>
         </div>
-        <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-green)' }}>
-          <div className="lbl">Attestations Délivrées</div>
-          <div className="val">{kpis.valides}</div>
-          <div className="sub">Scellées sur Blockchain Polygon</div>
-        </div>
-        <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-gold)' }}>
-          <div className="lbl">En Cours d'Instruction</div>
-          <div className="val">{kpis.instruction}</div>
-          <div className="sub">Instruction FNPSS &bull; SLA 10j</div>
-        </div>
-        <div className="kpi-box" style={{ borderLeftColor: 'var(--fnpss-red)' }}>
-          <div className="lbl">Compléments Requis</div>
-          <div className="val">{kpis.complements}</div>
-          <div className="sub">Action usager requise</div>
-        </div>
-      </div>
+      )}
 
       {/* Liste des Demandes */}
       <Card
         title="Mes Demandes au FNPSS (REQ-05)"
         actions={
           <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap' }}>
+            <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: viewMode === 'cards' ? 'var(--fnpss-navy)' : '#ffffff',
+                  color: viewMode === 'cards' ? '#ffffff' : 'var(--text-main)'
+                }}
+              >
+                🗂️ Cartes
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: viewMode === 'table' ? 'var(--fnpss-navy)' : '#ffffff',
+                  color: viewMode === 'table' ? '#ffffff' : 'var(--text-main)'
+                }}
+              >
+                📋 Tableau
+              </button>
+            </div>
             <select
               className="form-control"
+              aria-label="Filtrer par service"
               style={{ width: 'auto', padding: '6px 10px', fontSize: '12px' }}
               value={selectedService}
               onChange={(e) => setSelectedService(e.target.value)}
             >
               <option value="ALL">Tous les Services</option>
-              <option value="S1">S1 &bull; Enrôlement</option>
-              <option value="S2">S2 &bull; Partenariat</option>
-              <option value="S3">S3 &bull; Avis Technique</option>
-              <option value="S4">S4 &bull; Exonération Douanière</option>
-              <option value="S5">S5 &bull; Philanthropie</option>
-              <option value="S6">S6 &bull; Arrêté Ministériel</option>
+              <option value="S1">S1 — Enrôlement ONG</option>
+              <option value="S2">S2 — Partenariat</option>
+              <option value="S3">S3 — Avis Technique</option>
+              <option value="S4">S4 — Exonération Douanière</option>
+              <option value="S5">S5 — Philanthropie</option>
+              <option value="S6">S6 — Arrêté Ministériel</option>
             </select>
-
             <select
               className="form-control"
+              aria-label="Filtrer par statut"
               style={{ width: 'auto', padding: '6px 10px', fontSize: '12px' }}
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
             >
               <option value="ALL">Tous les Statuts</option>
-              <option value="SOUMIS">Soumis</option>
+              <option value="SOUMIS">En attente</option>
               <option value="EN_COURS_INSTRUCTION">En instruction</option>
-              <option value="VALIDE_DELIVRE">Validé & Délivré</option>
+              <option value="COMPLEMENT_REQUIS">Complément requis</option>
+              <option value="VALIDE_DELIVRE">Validé &amp; Délivré</option>
+              <option value="REJETE">Rejeté</option>
               <option value="REVOQUE">Révoqué</option>
             </select>
           </div>
         }
       >
         {isLoading ? (
-          <p className="text-muted text-center" style={{ padding: '30px' }}>Chargement des dossiers...</p>
+          <SkeletonCard rows={4} />
         ) : filteredApps.length === 0 ? (
-          <div className="text-center" style={{ padding: '40px 20px' }}>
-            <div style={{ fontSize: '36px', marginBottom: '10px' }}>📂</div>
-            <h4>Aucun dossier trouvé pour ces critères</h4>
-            <p className="text-muted" style={{ fontSize: '13px' }}>
-              Commencez par initier une démarche auprès du Guichet Unique.
-            </p>
-            <a href="/applications/new" className="btn btn-accent btn-sm" style={{ marginTop: '10px', textDecoration: 'none' }}>
-              Initier une demande
-            </a>
+          <EmptyState
+            icon="📂"
+            title="Aucun dossier trouvé pour ces critères"
+            description="Commencez par initier une démarche dématérialisée auprès du Guichet Unique FNPSS."
+            action={
+              <a href="/applications/new" className="btn btn-brand btn-sm" style={{ textDecoration: 'none' }}>
+                ➕ Initier une demande
+              </a>
+            }
+          />
+        ) : viewMode === 'cards' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {filteredApps.map((app) => (
+              <div
+                key={app.referenceNumber}
+                style={{
+                  border: `1px solid ${app.status === 'COMPLEMENT_REQUIS' ? '#fca5a5' : 'var(--border)'}`,
+                  borderLeft: `4px solid ${
+                    app.status === 'VALIDE_DELIVRE'
+                      ? 'var(--fnpss-green)'
+                      : app.status === 'COMPLEMENT_REQUIS' || app.status === 'REJETE'
+                      ? 'var(--fnpss-red)'
+                      : 'var(--fnpss-blue)'
+                  }`,
+                  borderRadius: '10px',
+                  padding: '16px',
+                  background: '#ffffff'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span className="mono" style={{ fontWeight: 800, color: 'var(--fnpss-navy)', fontSize: '14px' }}>
+                        {app.referenceNumber}
+                      </span>
+                      <Badge status="soumis">{app.serviceCode}</Badge>
+                      {renderStatusBadge(app)}
+                    </div>
+                    <h4 style={{ margin: '6px 0 2px', fontSize: '15px', color: 'var(--fnpss-navy)' }}>
+                      {app.projectTitle || 'Projet sans intitulé'}
+                    </h4>
+                    {app.goodsSummary && (
+                      <div className="text-muted" style={{ fontSize: '12px' }}>{app.goodsSummary}</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <SlaIndicator application={app} />
+                    <BlockchainSignal application={app} showLink />
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #eef2f6', marginBottom: '12px' }}>
+                  <StatusStepper application={app} compact />
+                  <div style={{ fontSize: '12px', color: 'var(--text-main)', marginTop: '8px' }}>
+                    <strong>Prochaine étape :</strong> {getNextStepText(app)}
+                  </div>
+                  {app.status === 'COMPLEMENT_REQUIS' && app.complementReason && (
+                    <div style={{ color: '#b91c1c', fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
+                      📩 Motif instructeur : {app.complementReason}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 justify-between items-center" style={{ flexWrap: 'wrap' }}>
+                  <span className="text-muted" style={{ fontSize: '11.5px' }}>
+                    Déposé le {app.createdAt ? new Date(app.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui'}
+                  </span>
+                  <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+                    {app.status === 'SOUMIS' && (
+                      <>
+                        <button type="button" onClick={() => handleOpenEdit(app)} className="btn btn-sm btn-outline">
+                          ✏️ Éditer
+                        </button>
+                        <button type="button" onClick={() => handleWithdraw(app)} className="btn btn-sm btn-danger">
+                          🗑️ Retirer
+                        </button>
+                      </>
+                    )}
+                    {app.status === 'COMPLEMENT_REQUIS' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setComplementApp(app);
+                          setComplementError('');
+                          setComplementFile(null);
+                        }}
+                        className="btn btn-sm btn-brand"
+                      >
+                        📤 Fournir Complément
+                      </button>
+                    )}
+                    <button type="button" onClick={() => setThreadApp(app)} className="btn btn-sm btn-outline">
+                      💬 Échanges
+                    </button>
+                    {app.certificate && (
+                      <a
+                        href={`/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}&token=${encodeURIComponent(sessionToken)}`}
+                        className="btn btn-sm btn-success"
+                        style={{ textDecoration: 'none' }}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        📥 PDF Scellé
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="table-responsive">
@@ -362,7 +623,7 @@ export default function DashboardPage() {
                   <th>Référence</th>
                   <th>Service</th>
                   <th>Objet du Projet</th>
-                  <th>Date Dépôt</th>
+                  <th>Délai SLA &amp; Blockchain</th>
                   <th>Statut</th>
                   <th>Actions</th>
                 </tr>
@@ -385,32 +646,13 @@ export default function DashboardPage() {
                         </div>
                       )}
                     </td>
-                    <td style={{ fontSize: '12px' }}>
-                      {app.createdAt ? new Date(app.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui'}
-                    </td>
                     <td>
-                      <Badge
-                        status={
-                          app.status === 'VALIDE_DELIVRE'
-                            ? 'valide'
-                            : app.status === 'REVOQUE'
-                            ? 'revoque'
-                            : app.status === 'COMPLEMENT_REQUIS'
-                            ? 'danger'
-                            : 'instruction'
-                        }
-                      >
-                        {app.status === 'VALIDE_DELIVRE'
-                          ? '✓ Délivré'
-                          : app.status === 'REVOQUE'
-                          ? '✕ Révoqué'
-                          : app.status === 'COMPLEMENT_REQUIS'
-                          ? '⚠️ Complément requis'
-                          : app.status === 'SOUMIS'
-                          ? 'En attente'
-                          : 'En instruction'}
-                      </Badge>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                        <SlaIndicator application={app} />
+                        <BlockchainSignal application={app} />
+                      </div>
                     </td>
+                    <td>{renderStatusBadge(app)}</td>
                     <td>
                       <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                         {app.status === 'SOUMIS' && (
@@ -441,7 +683,7 @@ export default function DashboardPage() {
                               setComplementError('');
                               setComplementFile(null);
                             }}
-                            className="btn btn-sm btn-accent"
+                            className="btn btn-sm btn-brand"
                             title="Joindre la pièce complémentaire demandée (SC-02)"
                           >
                             📤 Fournir Complément
@@ -480,6 +722,13 @@ export default function DashboardPage() {
       <Card
         title={`Centre de Notifications (${unreadCount} non lue${unreadCount > 1 ? 's' : ''}) — NOT-02`}
         style={{ marginTop: '20px' }}
+        actions={
+          unreadCount > 0 && (
+            <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
+              ✓ Tout marquer comme lu
+            </Button>
+          )
+        }
       >
         {notifications.length === 0 ? (
           <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
@@ -535,8 +784,8 @@ export default function DashboardPage() {
             <Button variant="outline" disabled={isSubmitting} onClick={() => setActiveModalApp(null)}>
               Annuler
             </Button>
-            <Button variant="primary" disabled={isSubmitting} onClick={handleSaveEdit}>
-              {isSubmitting ? 'Enregistrement...' : 'Enregistrer les Modifications'}
+            <Button variant="primary" isLoading={isSubmitting} loadingText="Enregistrement..." onClick={handleSaveEdit}>
+              Enregistrer les Modifications
             </Button>
           </>
         }
@@ -588,8 +837,8 @@ export default function DashboardPage() {
             <Button variant="outline" disabled={complementBusy} onClick={() => setComplementApp(null)}>
               Annuler
             </Button>
-            <Button variant="primary" onClick={handleProvideComplement} disabled={complementBusy}>
-              {complementBusy ? 'Chiffrement & Envoi...' : '📤 Déposer le Complément'}
+            <Button variant="brand" onClick={handleProvideComplement} isLoading={complementBusy} loadingText="Chiffrement & Envoi...">
+              📤 Déposer le Complément
             </Button>
           </>
         }
@@ -662,6 +911,19 @@ export default function DashboardPage() {
           />
         )}
       </Modal>
+
+      {/* Confirmation standardisée de retrait avant instruction (REQ-08) */}
+      <ConfirmDialog
+        isOpen={Boolean(withdrawTarget)}
+        onClose={() => setWithdrawTarget(null)}
+        onConfirm={confirmWithdraw}
+        title="Confirmer le retrait volontaire"
+        message={`Confirmez-vous le retrait définitif du dossier ${withdrawTarget?.referenceNumber || ''} avant le démarrage de son instruction ?`}
+        details={withdrawTarget ? <strong>{withdrawTarget.projectTitle || withdrawTarget.serviceCode}</strong> : null}
+        confirmLabel="Oui, retirer ce dossier"
+        variant="danger"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

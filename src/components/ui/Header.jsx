@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getClientToken, getClientUser, clearClientSession } from '../../lib/client-auth.js';
+import NotificationBell from './NotificationBell.jsx';
 
 /**
  * En-tête officiel souverain FNPSS (UX-05, WCAG AA)
@@ -15,13 +16,14 @@ import { getClientToken, getClientUser, clearClientSession } from '../../lib/cli
  */
 export default function Header({
   currentRole = 'requerant',
-  isOnline = true,
+  isOnline: isOnlineProp,
   user: userProp,
   onRoleChange,
   onLoginClick,
   onLogoutClick
 }) {
   const [clientUser, setClientUser] = useState(null);
+  const [networkOnline, setNetworkOnline] = useState(true);
 
   useEffect(() => {
     const syncUser = () => {
@@ -33,15 +35,27 @@ export default function Header({
         setClientUser(null);
       }
     };
+    const syncOnline = () => {
+      if (typeof navigator !== 'undefined') {
+        setNetworkOnline(navigator.onLine !== false);
+      }
+    };
+
     syncUser();
+    syncOnline();
     window.addEventListener('fnpss-auth-change', syncUser);
     window.addEventListener('storage', syncUser);
+    window.addEventListener('online', syncOnline);
+    window.addEventListener('offline', syncOnline);
     return () => {
       window.removeEventListener('fnpss-auth-change', syncUser);
       window.removeEventListener('storage', syncUser);
+      window.removeEventListener('online', syncOnline);
+      window.removeEventListener('offline', syncOnline);
     };
   }, []);
 
+  const isOnline = isOnlineProp !== undefined ? isOnlineProp : networkOnline;
   const activeUser = userProp || clientUser;
   const displayName = activeUser
     ? activeUser.name || activeUser.organizationName || [activeUser.firstName, activeUser.lastName].filter(Boolean).join(' ') || activeUser.email
@@ -90,13 +104,14 @@ export default function Header({
         style={{
           background: 'var(--fnpss-navy)',
           color: '#ffffff',
-          padding: '12px 24px',
+          padding: '10px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '12px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.18)'
+          borderBottom: '2px solid var(--fnpss-orange)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
         }}
       >
         <a
@@ -105,48 +120,61 @@ export default function Header({
         >
           <div
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #007fff, #065a82)',
-              border: '2px solid #f7d618',
+              width: '46px',
+              height: '46px',
+              borderRadius: '10px',
+              background: '#ffffff',
+              border: '2px solid var(--fnpss-orange)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '14px',
-              letterSpacing: '0.5px',
-              color: '#ffffff'
+              padding: '3px',
+              flexShrink: 0
             }}
-            aria-hidden="true"
           >
-            FNPSS
+            <img
+              src="/brand/logo-fnpss.png"
+              alt="Logo officiel FNPSS"
+              width={38}
+              height={38}
+              style={{ objectFit: 'contain', display: 'block' }}
+            />
           </div>
           <div>
-            <h1 style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
+            <h1 style={{ fontSize: '16.5px', fontWeight: 800, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
               Guichet Unique Dématérialisé
             </h1>
-            <p style={{ fontSize: '11.5px', color: '#b0c4de', margin: 0, lineHeight: 1.2 }}>
-              Fonds National de Promotion et de Service Social &bull; RDC
+            <p style={{ fontSize: '11.5px', color: '#cbd5e1', margin: 0, lineHeight: 1.2 }}>
+              FNPSS &bull; <span style={{ color: '#fdba74', fontWeight: 600 }}>Le social dans la solidarité</span> &bull; RDC
             </p>
           </div>
         </a>
 
-        {/* Contrôles statut & réseau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        {/* Navigation & Contrôles statut */}
+        <nav aria-label="Navigation principale" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           {activeUser && (
-            <a
-              href={isStaffUser ? '/admin' : '/dashboard'}
-              style={{ color: '#f7d618', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}
-            >
-              {isStaffUser ? '🏛️ Console Back-Office' : '📋 Mon Tableau de Bord'}
-            </a>
+            <>
+              <a
+                href={isStaffUser ? '/admin' : '/dashboard'}
+                style={{ color: '#f7d618', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}
+              >
+                {isStaffUser ? '🏛️ Console Back-Office' : '📋 Mon Tableau de Bord'}
+              </a>
+              {!isStaffUser && (
+                <a
+                  href="/applications/new"
+                  style={{ color: '#fed7aa', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}
+                >
+                  ➕ Déposer un dossier
+                </a>
+              )}
+            </>
           )}
           <a
             href="/guide"
             style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
           >
-            📘 Guide ONG &amp; Formations
+            📘 Guide ONG
           </a>
           <a
             href="/verifier"
@@ -156,23 +184,30 @@ export default function Header({
           </a>
           <span
             className="net-pill"
+            role="status"
             style={{
               padding: '4px 10px',
               borderRadius: '999px',
               fontSize: '11.5px',
               fontWeight: 600,
               background: isOnline ? '#e6f4ea' : '#fef7e0',
-              color: isOnline ? '#137333' : '#b06000'
+              color: isOnline ? '#137333' : '#92400e'
             }}
           >
-            {isOnline ? '🟢 En ligne (Sync active)' : '🟠 Mode Hors-ligne (PWA)'}
+            {isOnline ? '🟢 En ligne' : '🟠 Hors-ligne (PWA)'}
           </span>
 
+          <NotificationBell />
+
           {activeUser ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#e2e8f0' }}>
-                👤 <strong>{displayName}</strong> ({activeUser.role})
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <a
+                href={isStaffUser ? '/admin' : '/profile'}
+                style={{ fontSize: '12px', color: '#e2e8f0', textDecoration: 'none' }}
+                title="Accéder à mon profil"
+              >
+                👤 <strong>{displayName}</strong> <span style={{ color: '#94a3b8' }}>({activeUser.role})</span>
+              </a>
               <button
                 type="button"
                 onClick={handleLogout}
@@ -186,14 +221,13 @@ export default function Header({
             <button
               type="button"
               onClick={handleLogin}
-              className="btn btn-sm btn-accent"
+              className="btn btn-sm btn-brand"
             >
-              Connexion Requérant
+              Connexion
             </button>
           )}
-        </div>
+        </nav>
       </header>
     </>
   );
 }
-

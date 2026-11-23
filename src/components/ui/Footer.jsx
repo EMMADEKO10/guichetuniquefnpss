@@ -8,7 +8,7 @@ export default function Footer() {
     <footer
       style={{
         background: '#ffffff',
-        borderTop: '1px solid var(--border)',
+        borderTop: '3px solid var(--fnpss-orange)',
         padding: '24px 20px',
         marginTop: 'auto',
         fontSize: '12.5px',
@@ -23,21 +23,36 @@ export default function Footer() {
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '12px'
+          gap: '16px'
         }}
       >
-        <div>
-          <strong style={{ color: 'var(--fnpss-navy)' }}>Fonds National de Promotion et de Service Social (FNPSS)</strong>
-          <br />
-          Sous tutelle du Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale &bull; République Démocratique du Congo
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img
+            src="/brand/logo-fnpss.png"
+            alt="Logo FNPSS"
+            width={40}
+            height={40}
+            style={{ objectFit: 'contain', borderRadius: '6px' }}
+          />
+          <div>
+            <strong style={{ color: 'var(--fnpss-navy)' }}>Fonds National de Promotion et de Service Social (FNPSS)</strong>
+            <span style={{ color: 'var(--fnpss-orange-accessible)', fontWeight: 700, marginLeft: '8px' }}>
+              &laquo; Le social dans la solidarité &raquo;
+            </span>
+            <br />
+            Sous tutelle du Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale &bull; République Démocratique du Congo
+          </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <span>Sécurisé par SHA-256 & Polygon Amoy Blockchain</span>
-          <br />
+        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span>Sécurisé par SHA-256, AES-256-GCM &amp; Polygon Amoy Blockchain</span>
           <span>SLA légal : 10 jours ouvrables &bull; Vérification douanière DGDA 24/7</span>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '2px' }}>
+            <a href="/guide" style={{ color: 'var(--fnpss-blue)', textDecoration: 'none', fontWeight: 600 }}>Guide ONG</a>
+            <a href="/verifier" style={{ color: 'var(--fnpss-blue)', textDecoration: 'none', fontWeight: 600 }}>Vérification Douane</a>
+            <a href="/design-system" style={{ color: 'var(--fnpss-blue)', textDecoration: 'none', fontWeight: 600 }}>Design System UI</a>
+          </div>
         </div>
       </div>
     </footer>
   );
 }
-

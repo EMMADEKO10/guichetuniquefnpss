@@ -5,6 +5,9 @@ import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
+import { SkeletonCard } from '../../components/ui/Skeleton.jsx';
+import { useToast } from '../../components/ui/ToastProvider.jsx';
+import { getClientToken, clearClientSession, saveClientSession } from '../../lib/client-auth.js';
 
 const PROVINCES_RDC = [
   'Kinshasa', 'Nord-Kivu', 'Sud-Kivu', 'Haut-Katanga', 'Ituri', 'Kasaï-Central',
@@ -12,6 +15,7 @@ const PROVINCES_RDC = [
 ];
 
 export default function ProfilePage() {
+  const toast = useToast();
   const [profile, setProfile] = useState({
     firstName: '',
     lastName: '',
@@ -38,15 +42,14 @@ export default function ProfilePage() {
     setStatusMessage({ type: '', text: '' });
 
     try {
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') : null;
+      const token = getClientToken();
       if (!token) {
-        // Redirection vers login si non connecté
         window.location.href = '/auth/login';
         return;
       }
 
-      const res = await fetch(`/api/auth/profile?token=${token}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch('/api/auth/profile', {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (!res.ok) {
@@ -66,7 +69,7 @@ export default function ProfilePage() {
           role: data.user.role || 'REQUERANT'
         });
       }
-    } catch (err) {
+    } catch {
       setStatusMessage({ type: 'error', text: 'Impossible de charger le profil. Veuillez vous reconnecter.' });
     } finally {
       setIsLoading(false);
@@ -79,12 +82,12 @@ export default function ProfilePage() {
     setStatusMessage({ type: '', text: '' });
 
     try {
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') : null;
+      const token = getClientToken();
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           firstName: profile.firstName,
@@ -97,12 +100,18 @@ export default function ProfilePage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setStatusMessage({ type: 'error', text: data.error || 'Erreur lors de la mise à jour.' });
+        const msg = data.error || 'Erreur lors de la mise à jour.';
+        setStatusMessage({ type: 'error', text: msg });
+        toast.error(msg, 'Mise à jour refusée');
       } else {
+        if (data.user && token) saveClientSession(token, data.user);
         setStatusMessage({ type: 'success', text: 'Profil mis à jour avec succès.' });
+        toast.success('Profil de l\'organisation mis à jour.');
       }
-    } catch (err) {
-      setStatusMessage({ type: 'error', text: 'Erreur réseau lors de l\'enregistrement.' });
+    } catch {
+      const msg = 'Erreur réseau lors de l\'enregistrement.';
+      setStatusMessage({ type: 'error', text: msg });
+      toast.error(msg, 'Erreur Réseau');
     } finally {
       setIsSaving(false);
     }
@@ -111,7 +120,7 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('fnpss_session_token') : null;
+      const token = getClientToken();
       if (token) {
         await fetch('/api/auth/logout', {
           method: 'POST',
@@ -119,12 +128,11 @@ export default function ProfilePage() {
           body: JSON.stringify({ sessionToken: token })
         });
       }
-    } catch (err) {
+    } catch {
       console.warn('Erreur déconnexion réseau');
     } finally {
+      clearClientSession();
       if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('fnpss_session_token');
-        sessionStorage.removeItem('fnpss_user');
         window.location.href = '/auth/login';
       }
     }
@@ -134,14 +142,15 @@ export default function ProfilePage() {
     if (profile.walletAddress && typeof navigator !== 'undefined') {
       navigator.clipboard.writeText(profile.walletAddress);
       setCopiedWallet(true);
+      toast.info('Adresse Web3Auth copiée dans le presse-papier.');
       setTimeout(() => setCopiedWallet(false), 2000);
     }
   };
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <p>Chargement du profil de l'organisation...</p>
+      <div style={{ maxWidth: '780px', margin: '30px auto', padding: '0 16px' }}>
+        <SkeletonCard rows={5} />
       </div>
     );
   }

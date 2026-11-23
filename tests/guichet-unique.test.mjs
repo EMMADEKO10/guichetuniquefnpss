@@ -3093,6 +3093,133 @@ test('30. Routes API Next.js Sprint 7 : Lancement Pilote Cohorte ONG (DEP-06), S
   assert.equal(onboardData.summary.pilotCohortSize, 6);
 });
 
+test('Test 31 - Notifications multi-acteurs (anti-IDOR), identite visuelle auto-hebergee et UI production (P0-P4)', async () => {
+  const path = await import('node:path');
+  const { applicationEngine } = await import('../src/workflow/application-engine.mjs');
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const notifRoute = await import('../src/app/api/notifications/route.js');
+
+  const jsonReq = (url, method, body, token) =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+  const loginAs = async (email, password) => {
+    const res = await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email, password }));
+    assert.equal(res.status, 200);
+    return res.json();
+  };
+
+  const reqEmail = `ong.t31.${Date.now()}@example.cd`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Test Notifications 31',
+    representativeName: 'Jean-Paul Lumumba',
+    email: reqEmail,
+    password: 'PasswordRDC#2026'
+  }));
+
+  const { sessionToken: tokenReq } = await loginAs(reqEmail, 'PasswordRDC#2026');
+  const { sessionToken: tokenAgent } = await loginAs('agent@fnpss.cd', 'StaffFNPSS#2026');
+  const { sessionToken: tokenDg } = await loginAs('dg@fnpss.cd', 'StaffFNPSS#2026');
+
+  // 1. Emission d'une notification destinee aux roles AGENT et ADMIN uniquement
+  const emitted = applicationEngine.notifications.notifyRoleEvent({
+    targetRoles: ['AGENT', 'ADMIN'],
+    eventType: 'PAYMENT_RECEIVED',
+    title: 'Nouveau paiement recu',
+    message: 'Dossier APP-TEST-ROLE pret pour instruction.',
+    referenceNumber: 'APP-TEST-ROLE'
+  });
+  assert.ok(emitted && emitted.id);
+  assert.equal(emitted.userId, null);
+  assert.deepEqual(emitted.targetRoles, ['AGENT', 'ADMIN']);
+
+  // 2. Isolation anti-IDOR : le requerant et le DG (non cibles) ne voient pas l'alerte AGENT/ADMIN
+  const reqNotifsRes = await notifRoute.GET(
+    new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokenReq}` } })
+  );
+  assert.equal(reqNotifsRes.status, 200);
+  const reqNotifs = await reqNotifsRes.json();
+  assert.equal(reqNotifs.notifications.some((n) => n.id === emitted.id), false);
+
+  const dgNotifsRes = await notifRoute.GET(
+    new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokenDg}` } })
+  );
+  assert.equal(dgNotifsRes.status, 200);
+  const dgNotifs = await dgNotifsRes.json();
+  assert.equal(dgNotifs.notifications.some((n) => n.id === emitted.id), false);
+
+  // 3. L'agent cible recoit bien la notification multi-role et peut tout marquer comme lu
+  const agentNotifsRes = await notifRoute.GET(
+    new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokenAgent}` } })
+  );
+  assert.equal(agentNotifsRes.status, 200);
+  const agentNotifs = await agentNotifsRes.json();
+  assert.equal(agentNotifs.notifications.some((n) => n.id === emitted.id), true);
+  assert.ok(agentNotifs.unreadCount >= 1);
+
+  const markAllRes = await notifRoute.PUT(
+    jsonReq('http://localhost:3000/api/notifications', 'PUT', { markAllRead: true }, tokenAgent)
+  );
+  assert.equal(markAllRes.status, 200);
+  const markAllData = await markAllRes.json();
+  assert.equal(markAllData.markAllRead, true);
+  assert.ok(markAllData.updatedCount >= 1);
+
+  const agentAfterRes = await notifRoute.GET(
+    new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokenAgent}` } })
+  );
+  assert.equal(agentAfterRes.status, 200);
+  assert.equal((await agentAfterRes.json()).unreadCount, 0);
+
+  // 4. Verification des assets visuels auto-heberges (en-tete PNG valide)
+  const logoBytes = fs.readFileSync(path.join(process.cwd(), 'public/brand/logo-fnpss.png'));
+  const favBytes = fs.readFileSync(path.join(process.cwd(), 'public/brand/favicon-fnpss.png'));
+  assert.ok(logoBytes.length > 1000);
+  assert.ok(favBytes.length > 1000);
+  assert.equal(logoBytes[0], 0x89);
+  assert.equal(logoBytes[1], 0x50);
+  assert.equal(favBytes[0], 0x89);
+  assert.equal(favBytes[1], 0x50);
+
+  // 5. Verification qu'aucun fichier source ne contient d'URL externe vers fnpss.cd
+  const scanFiles = [];
+  const walkSrc = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walkSrc(full);
+      else scanFiles.push(full);
+    }
+  };
+  walkSrc(path.join(process.cwd(), 'src'));
+  for (const filePath of scanFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    assert.equal(/https?:\/\/fnpss\.cd/i.test(content), false, `URL externe fnpss.cd interdite dans ${filePath}`);
+  }
+
+  // 6. Presence des composants et pages UX de production (P0-P4)
+  const requiredUiPaths = [
+    'src/components/ui/ToastProvider.jsx',
+    'src/components/ui/ConfirmDialog.jsx',
+    'src/components/ui/StatusStepper.jsx',
+    'src/components/ui/SlaIndicator.jsx',
+    'src/components/ui/BlockchainSignal.jsx',
+    'src/components/ui/EmptyState.jsx',
+    'src/components/ui/Skeleton.jsx',
+    'src/components/ui/NotificationBell.jsx',
+    'src/app/design-system/page.jsx'
+  ];
+  for (const rel of requiredUiPaths) {
+    assert.equal(fs.existsSync(path.join(process.cwd(), rel)), true, `Fichier manquant: ${rel}`);
+  }
+});
+
 
 
 
