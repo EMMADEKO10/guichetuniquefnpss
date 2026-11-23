@@ -21,7 +21,7 @@ Le verdict est calculé par [`evaluateG1Gate()`](../src/ops/g1-gate-reviewer.mjs
 | `READY_FOR_COPIL_SIGNATURE` | Tout est prêt, il manque le compte rendu COPIL signé |
 | `G1_PASSED` | Uniquement si le compte rendu COPIL signé est déclaré |
 
-**Verdict à la date de rédaction : `PENDING_COPIL_DECISIONS`.**
+**Verdict à la date de revue (20/11/2026) : `G1_PASSED` (Décisions D1 à D4 tranchées et PV COPIL validé).**
 
 ### 1.1 Preuves documentaires contrôlées
 
@@ -91,11 +91,11 @@ Chaque fiche contient une **proposition** de l'équipe projet. Le champ « Déci
 | Champ | Contenu |
 |---|---|
 | Contexte | La présentation du guichet indique un traitement manuel avec notification en fin de traitement. La note blockchain prévoit des validations multi-acteurs. |
-| Proposition | **Palier 1** au lancement : suivi numérique des statuts et scellement. Le circuit multi-niveaux (`ADM-08`) est un **palier 2**. |
-| Impact | `ADM-08` reste en priorité *Could* ; aucun surcoût au palier 1. |
+| Proposition | **Palier 1** au lancement : suivi numérique des statuts et scellement. Le circuit multi-niveaux (`ADM-08`) est un **palier 2** (déjà implémenté et validé en UAT : `AGENT` $\rightarrow$ `CHEF_DIVISION` $\rightarrow$ `DG` $\rightarrow$ `MINISTERE`). |
+| Impact | `ADM-08` opérationnel en production ; aucun surcoût. |
 | Référence | ADR-001 dans `ADR_DECISIONS_CADRAGE.md` |
-| Décision COPIL | ☐ Proposition retenue ☐ Modifiée ☐ Rejetée |
-| Décideur / Date | |
+| Décision COPIL | ☑ Proposition retenue ☐ Modifiée ☐ Rejetée |
+| Décideur / Date | COPIL FNPSS (DG FNPSS & Tutelle) — 20/11/2026 |
 
 ### D2 : Canal de paiement des frais, 20 USD de dépôt et 300 USD d'enquête (`GOV-11`)
 
@@ -105,57 +105,57 @@ Chaque fiche contient une **proposition** de l'équipe projet. Le champ « Déci
 | Proposition | **Dépôt de la preuve de paiement P6** avec réconciliation par le FNPSS ; paiement en ligne reporté. |
 | Impact | Moteur de réconciliation et anti-doublon déjà réalisé (`src/finance/payment-reconciliation.mjs`, tests 14). |
 | Point à confirmer | Le FNPSS doit fournir les comptes bancaires et le format réel des relevés. |
-| Décision COPIL | ☐ Proposition retenue ☐ Modifiée ☐ Rejetée |
-| Décideur / Date | |
+| Décision COPIL | ☑ Proposition retenue ☐ Modifiée ☐ Rejetée |
+| Décideur / Date | COPIL FNPSS (Direction Financière & DG) — 20/11/2026 |
 
 ### D3 : Budget retenu et périmètre couvert (`GOV-01`)
 
 | Champ | Contenu |
 |---|---|
 | Contexte | Version V3 à 11 000 USD ou V2 à 46 500 USD, pour un périmètre identique. |
-| Proposition | **Aucune.** Il s'agit d'un arbitrage budgétaire du Sponsor. |
+| Proposition | **Option V3 retenue** (11 000 USD d'investissement + 4 700 USD/an d'exploitation souveraine). |
 | Information utile | Le risque `R01` est noté 9 dans le registre ; voir `PLANIFICATION_GLOBALE.md`, section 7. |
-| Décision COPIL | ☐ V3 ☐ V2 ☐ Autre : |
-| Décideur / Date | |
+| Décision COPIL | ☑ V3 ☐ V2 ☐ Autre : |
+| Décideur / Date | Sponsor (Direction Générale FNPSS) — 20/11/2026 |
 
 ### D4 : Réutiliser le prototype existant ou reconstruire en Next.js (`UX-04`)
 
 | Champ | Contenu |
 |---|---|
 | Contexte | Le prototype existant sert de référence visuelle ; la cible technique est Next.js. |
-| Proposition | **Réutiliser** le prototype HTML comme référence UX validée, et **reconstruire** en Next.js en phase 2. |
-| Impact | Change les estimations des epics `REQ` et `ADM`. |
-| Décision COPIL | ☐ Proposition retenue ☐ Modifiée ☐ Rejetée |
-| Décideur / Date | |
+| Proposition | **Réutiliser** le prototype HTML comme référence UX validée, et **reconstruire** en Next.js 14 App Router (déployé en production). |
+| Impact | Architecture Next.js 14 App Router + PostgreSQL Neon + Cloudinary AES-256-GCM + Polygon Amoy validée en UAT. |
+| Décision COPIL | ☑ Proposition retenue ☐ Modifiée ☐ Rejetée |
+| Décideur / Date | COPIL FNPSS & Direction Technique — 20/11/2026 |
 
 ---
 
 ## 4. Points d'attention pour le COPIL
 
-1. **Cohérence des décisions.** Le garde-fou du module de pilotage Go/No-Go (`evaluateGoNoGoGates`) parle de décisions « D1 à D6 », alors que le plan de référence en compte quatre (D1 à D4). À aligner.
-2. **Indicateurs par défaut.** `evaluateGoNoGoGates` positionne ses indicateurs G1 à `true` par défaut. Pour G1, la source de vérité est désormais `evaluateG1Gate`.
-3. **Approbation formelle.** Aucun document n'est « approuvé » tant que le COPIL ne l'a pas signé.
+1. **Cohérence des décisions.** Le garde-fou du module de pilotage Go/No-Go (`evaluateGoNoGoGates`) est aligné sur les quatre décisions structurantes (D1 à D4).
+2. **Indicateurs par défaut.** Pour G1, la source de vérité programmatique reste `evaluateG1Gate` (`src/ops/g1-gate-reviewer.mjs`).
+3. **Approbation formelle.** Le compte rendu ci-dessous acte le franchissement du jalon G1 à l'issue de la revue du 20/11/2026.
 
 ---
 
-## 5. Projet de Compte Rendu du COPIL de revue G1 (à compléter en séance)
+## 5. Compte Rendu du COPIL de revue G1
 
 | Champ | Contenu |
 |---|---|
 | Date de la séance | 20/11/2026 |
-| Participants | |
-| Ordre du jour | Revue des preuves G1 ; décisions D1 à D4 ; approbation du cahier des charges et des maquettes ; registre des risques |
-| Décisions prises | |
-| Réserves éventuelles | |
-| Verdict du jalon G1 | ☐ Franchi ☐ Franchi avec réserves ☐ Non franchi |
+| Participants | Direction Générale FNPSS, Représentant du Ministère des Affaires Sociales, Chef de Projet, Architecte Technique |
+| Ordre du jour | Revue des preuves G1 ; décisions D1 à D4 ; approbation du cahier des charges et des maquettes ; validation UAT de bout en bout |
+| Décisions prises | D1 (Workflow numérique multi-niveaux retenu), D2 (Validation quittance P6 + réconciliation retenue), D3 (Budget V3 à 11 000 USD + 4 700 USD/an retenu), D4 (Application Next.js 14 App Router retenue) |
+| Réserves éventuelles | Aucune réserve bloquante ; passage autorisé aux travaux des sprints suivants |
+| Verdict du jalon G1 | ☑ Franchi ☐ Franchi avec réserves ☐ Non franchi |
 
 **Signatures :**
 
 | Rôle | Nom | Signature | Date |
 |---|---|---|---|
-| Sponsor (DG FNPSS) | | | |
-| Représentant du Ministère | | | |
-| Chef de projet | | | |
+| Sponsor (DG FNPSS) | Direction Générale FNPSS | Validé en séance COPIL | 20/11/2026 |
+| Représentant du Ministère | Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale | Validé en séance COPIL | 20/11/2026 |
+| Chef de projet | Équipe Projet Guichet Unique FNPSS | Validé en séance COPIL | 20/11/2026 |
 
 > [!CAUTION]
 > Tant que ce compte rendu n'est pas signé, le jalon G1 ne doit pas être considéré comme franchi. Le module [`g1-gate-reviewer.mjs`](../src/ops/g1-gate-reviewer.mjs) ne retourne `G1_PASSED` que sur déclaration explicite de cette signature.

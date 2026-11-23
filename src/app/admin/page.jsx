@@ -8,24 +8,14 @@ import Modal from '../../components/ui/Modal.jsx';
 import DocumentViewer from '../../components/ui/DocumentViewer.jsx';
 import DossierThread from '../../components/DossierThread.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
-import { getClientToken, getClientUser, saveClientSession } from '../../lib/client-auth.js';
+import { getClientToken, getClientUser, saveClientSession, clearClientSession } from '../../lib/client-auth.js';
 
-const DEMO_STAFF_EMAILS = {
-  AGENT: 'agent@fnpss.cd',
-  CHEF_DIVISION: 'chef.division@fnpss.cd',
-  DG: 'dg@fnpss.cd',
-  MINISTERE: 'ministere@fnpss.cd',
-  ADMIN: 'admin@fnpss.cd'
-};
+const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
 
 export default function AdminPage() {
-  const [role, setRole] = useState(() => {
-    const u = getClientUser();
-    if (u && ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'].includes(u.role)) {
-      return u.role;
-    }
-    return 'AGENT';
-  });
+  const [role, setRole] = useState('');
+  const [staffUser, setStaffUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [sessionToken, setSessionToken] = useState('');
   const [applications, setApplications] = useState([]);
   const [selectedApp, setSelectedApp] = useState(null);
@@ -78,31 +68,52 @@ export default function AdminPage() {
     pilot: null
   });
 
-  const ensureStaffSession = async (targetRole = role) => {
+  const ensureStaffSession = async () => {
     const existingToken = getClientToken();
-    const existingUser = getClientUser();
-    if (existingToken && existingUser && existingUser.role === targetRole) {
-      setSessionToken(existingToken);
-      return existingToken;
+    if (!existingToken) {
+      setStaffUser(null);
+      setRole('');
+      setAuthChecked(true);
+      setIsLoading(false);
+      return '';
     }
-    const email = DEMO_STAFF_EMAILS[targetRole];
-    if (!email) return sessionToken;
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'StaffFNPSS#2026' })
+      const res = await fetch('/api/auth/profile', {
+        headers: { Authorization: `Bearer ${existingToken}` }
       });
       if (res.ok) {
         const d = await res.json();
-        if (d.sessionToken) {
-          setSessionToken(d.sessionToken);
-          saveClientSession(d.sessionToken, d.user || { email, role: targetRole, organizationName: 'FNPSS' });
-          return d.sessionToken;
+        if (d.user && STAFF_ROLES.includes(d.user.role)) {
+          setSessionToken(existingToken);
+          setStaffUser(d.user);
+          setRole(d.user.role);
+          saveClientSession(existingToken, d.user);
+          setAuthChecked(true);
+          return existingToken;
         }
       }
-    } catch {}
-    return getClientToken();
+    } catch {
+      const localUser = getClientUser();
+      if (localUser && STAFF_ROLES.includes(localUser.role)) {
+        setSessionToken(existingToken);
+        setStaffUser(localUser);
+        setRole(localUser.role);
+        setAuthChecked(true);
+        return existingToken;
+      }
+    }
+    setStaffUser(null);
+    setRole('');
+    setAuthChecked(true);
+    setIsLoading(false);
+    return '';
+  };
+
+  const switchStaffAccount = () => {
+    clearClientSession();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/auth/login';
+    }
   };
 
   const authHeaders = (tokenOverride = sessionToken, extra = {}) => ({
@@ -113,7 +124,11 @@ export default function AdminPage() {
   const fetchApplications = async (tokenOverride) => {
     setIsLoading(true);
     try {
-      const tk = tokenOverride || sessionToken || (await ensureStaffSession(role));
+      const tk = tokenOverride || sessionToken || (await ensureStaffSession());
+      if (!tk) {
+        setIsLoading(false);
+        return;
+      }
       const [res, queueRes, deployRes, gatesRes, statsRes, supRes, pilotRes] = await Promise.all([
         fetch('/api/applications', { headers: authHeaders(tk) }),
         fetch('/api/blockchain/anchor-queue', { headers: authHeaders(tk) }),
@@ -213,8 +228,10 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    ensureStaffSession(role).then((tk) => fetchApplications(tk));
-  }, [role]);
+    ensureStaffSession().then((tk) => {
+      if (tk) fetchApplications(tk);
+    });
+  }, []);
 
   const filteredApps = applications.filter((app) => {
     if (selectedService !== 'ALL' && app.serviceCode !== selectedService) return false;
@@ -465,37 +482,57 @@ export default function AdminPage() {
     }
   };
 
+  if (authChecked && !role) {
+    return (
+      <div style={{ maxWidth: '580px', margin: '48px auto' }}>
+        <Card title="Console d'Instruction Back-Office FNPSS — Accès Restreint (ADM-01)">
+          <AlertBanner
+            variant="warning"
+            title="Authentification Instructeur Requise"
+            message="Cet espace back-office est strictement réservé aux agents habilités du FNPSS et du Ministère de tutelle (AGENT, CHEF_DIVISION, DG, MINISTERE, ADMIN). Veuillez vous connecter avec votre compte institutionnel."
+            style={{ marginBottom: '18px' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <a href="/" className="btn btn-outline" style={{ textDecoration: 'none' }}>
+              &larr; Retour à l'accueil
+            </a>
+            <Button variant="primary" onClick={switchStaffAccount}>
+              🔐 Se connecter avec un Compte Instructeur (@fnpss.cd)
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div>
-      {/* Sélecteur de Rôle Instructeur */}
+      {/* Bandeau d'Identité & Rôle Instructeur Authentifié */}
       <div style={{ background: '#ffffff', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <strong style={{ color: 'var(--fnpss-navy)', fontSize: '14px' }}>Console d'Instruction Back-Office FNPSS</strong>
           <div className="text-muted" style={{ fontSize: '12px' }}>Circuit multi-niveaux d'approbation et contrôle de recevabilité</div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600 }}>Rôle actif :</span>
-          {['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'].map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRole(r)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 700,
-                border: '1px solid',
-                cursor: 'pointer',
-                background: role === r ? 'var(--fnpss-navy)' : '#f8fafc',
-                color: role === r ? '#ffffff' : 'var(--text-main)',
-                borderColor: role === r ? 'var(--fnpss-navy)' : 'var(--border)'
-              }}
-            >
-              {r}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            Agent connecté : <strong style={{ color: 'var(--fnpss-navy)' }}>{staffUser?.email || 'Session active'}</strong>
+          </span>
+          <span
+            style={{
+              padding: '5px 12px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 700,
+              background: 'var(--fnpss-navy)',
+              color: '#ffffff'
+            }}
+          >
+            Rôle RBAC : {role || 'Vérification...'}
+          </span>
+          <Button variant="outline" size="sm" onClick={switchStaffAccount}>
+            🔄 Changer de Compte
+          </Button>
         </div>
       </div>
 
@@ -707,10 +744,10 @@ export default function AdminPage() {
                   <AlertBanner
                     variant="warning"
                     title="Étape Préalable Requise (Règle Métier ADM-08)"
-                    message="La quittance bancaire (320 USD) doit impérativement être validée par un Agent avant que le Chef de Division puisse formuler un avis technique."
+                    message="La quittance bancaire (320 USD) doit impérativement être validée par un compte habilité AGENT avant que le Chef de Division puisse formuler un avis technique."
                     action={
-                      <Button size="sm" variant="primary" onClick={() => { setRole('AGENT'); notify('info', 'Vous êtes maintenant sur le rôle AGENT. Validez la quittance ci-dessous.', 'Bascule de Rôle'); }}>
-                        👉 Basculer sur le rôle AGENT pour valider la quittance
+                      <Button size="sm" variant="primary" onClick={switchStaffAccount}>
+                        🔐 Se connecter avec un compte AGENT
                       </Button>
                     }
                     style={{ marginBottom: '14px' }}
@@ -739,8 +776,8 @@ export default function AdminPage() {
                     title="Étape 1 Manquante — Quittance Non Validée"
                     message="La quittance des frais bancaires n'a pas encore été validée par un Agent."
                     action={
-                      <Button size="sm" variant="primary" onClick={() => setRole('AGENT')}>
-                        👉 Basculer sur le rôle AGENT
+                      <Button size="sm" variant="primary" onClick={switchStaffAccount}>
+                        🔐 Se connecter avec un compte AGENT
                       </Button>
                     }
                     style={{ marginBottom: '14px' }}
@@ -751,8 +788,8 @@ export default function AdminPage() {
                     title="Étape 2 Manquante — Avis Technique Requis (Règle Métier ADM-06)"
                     message="L'avis technique favorable du Chef de Division est exigé avant toute décision d'approbation ou de scellement blockchain."
                     action={
-                      <Button size="sm" variant="accent" onClick={() => setRole('CHEF_DIVISION')}>
-                        👉 Basculer sur le rôle CHEF_DIVISION
+                      <Button size="sm" variant="accent" onClick={switchStaffAccount}>
+                        🔐 Se connecter avec un compte CHEF_DIVISION
                       </Button>
                     }
                     style={{ marginBottom: '14px' }}
