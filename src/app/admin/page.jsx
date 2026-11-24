@@ -17,6 +17,7 @@ import { SkeletonKpiGrid, SkeletonCard } from '../../components/ui/Skeleton.jsx'
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken, getClientUser, saveClientSession, clearClientSession } from '../../lib/client-auth.js';
 import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
+import QrCodeDisplay from '../../components/ui/QrCodeDisplay.jsx';
 
 const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
 
@@ -73,6 +74,7 @@ export default function AdminPage() {
 
   // Modales
   const [isOpinionModalOpen, setIsOpinionModalOpen] = useState(false);
+  const [qrModalCert, setQrModalCert] = useState(null);
   const [opinionData, setOpinionData] = useState({ favorable: true, note: 'Avis favorable après examen des pièces' });
 
   const [isComplementModalOpen, setIsComplementModalOpen] = useState(false);
@@ -1015,6 +1017,15 @@ export default function AdminPage() {
                     >
                       📥 Télécharger l&apos;Attestation PDF Scellée
                     </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      style={{ fontSize: '11px' }}
+                      onClick={() => setQrModalCert(selectedApp.certificate)}
+                    >
+                      📱 Afficher / Télécharger QR Code
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1766,6 +1777,29 @@ export default function AdminPage() {
             />
           </div>
         </form>
+      </Modal>
+
+      {/* Modale QR Code Officiel Attestation */}
+      <Modal
+        isOpen={Boolean(qrModalCert)}
+        onClose={() => setQrModalCert(null)}
+        title={`QR Code de Vérification — ${qrModalCert?.certificateNumber || ''}`}
+        footer={
+          <Button variant="outline" onClick={() => setQrModalCert(null)}>
+            Fermer
+          </Button>
+        }
+      >
+        {qrModalCert && (
+          <QrCodeDisplay
+            value={
+              qrModalCert.qrVerificationUrl ||
+              `${typeof window !== 'undefined' ? window.location.origin : 'https://guichetuniquefnpss.vercel.app'}/verifier?hash=${qrModalCert.docHash}&cert=${encodeURIComponent(qrModalCert.certificateNumber)}`
+            }
+            certificateNumber={qrModalCert.certificateNumber}
+            label="QR Code Officiel Scellé Polygon"
+          />
+        )}
       </Modal>
     </div>
   );

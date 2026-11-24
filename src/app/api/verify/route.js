@@ -43,6 +43,11 @@ function enrichVerificationPayload(verification) {
       ? 'REVOKED'
       : 'EXPIRED';
 
+  const baseVerifyUrl = (process.env.PUBLIC_VERIFY_BASE_URL || 'https://guichetuniquefnpss.vercel.app/verifier').replace(/\/+$/, '');
+  const qrVerificationUrl =
+    matchingApp?.certificate?.qrVerificationUrl ||
+    `${baseVerifyUrl}?hash=${rec.docHash}&cert=${encodeURIComponent(rec.certificateNumber)}`;
+
   return {
     found: true,
     status: verification.status,
@@ -51,6 +56,8 @@ function enrichVerificationPayload(verification) {
     isValid: verification.isValid,
     isExpired: verification.isExpired,
     record: rec,
+    docHash: rec.docHash,
+    qrVerificationUrl,
     certificateNumber: rec.certificateNumber,
     beneficiary: matchingApp?.organizationName || 'Organisation Bénéficiaire Enregistrée',
     certType: `${tpl.officialTitle} (${svcKey})`,

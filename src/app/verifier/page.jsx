@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import jsQR from 'jsqr';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
+import QrCodeDisplay from '../../components/ui/QrCodeDisplay.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 
 const HISTORY_STORAGE_KEY = 'fnpss_verify_history_v1';
@@ -22,6 +24,8 @@ export default function VerifierPage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraInfo, setCameraInfo] = useState('');
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const qrImageInputRef = useRef(null);
   const streamRef = useRef(null);
   const scanTimerRef = useRef(null);
 
@@ -218,13 +222,7 @@ export default function VerifierPage() {
     setCameraInfo('');
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setCameraInfo(
-        'Votre navigateur ne permet pas l\'accès direct à la caméra. Utilisez la saisie du numéro d\'acte ci-dessus ou déposez le fichier PDF ci-dessous.'
-      );
-      return;
-    }
-    if (typeof window === 'undefined' || typeof window.BarcodeDetector !== 'function') {
-      setCameraInfo(
-        'La détection QR native (BarcodeDetector) n\'est pas prise en charge par ce navigateur. Utilisez la saisie directe ou le contrôle par fichier PDF.'
+        'Votre navigateur ne permet pas l\'accès direct à la caméra. Importez une photo du QR Code, saisissez le numéro d\'acte ou déposez le PDF ci-dessous.'
       );
       return;
     }
@@ -243,13 +241,39 @@ export default function VerifierPage() {
         }
       }, 60);
 
-      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      const useNativeDetector =
+        typeof window !== 'undefined' && typeof window.BarcodeDetector === 'function';
+      const detector = useNativeDetector
+        ? new window.BarcodeDetector({ formats: ['qr_code'] })
+        : null;
+
       scanTimerRef.current = setInterval(async () => {
-        if (!videoRef.current || videoRef.current.readyState < 2) return;
+        const video = videoRef.current;
+        if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
         try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes && codes.length > 0 && codes[0].rawValue) {
-            const target = extractScannedTarget(codes[0].rawValue);
+          let rawDecoded = '';
+          if (detector) {
+            const codes = await detector.detect(video);
+            if (codes && codes.length > 0 && codes[0].rawValue) {
+              rawDecoded = codes[0].rawValue;
+            }
+          }
+          if (!rawDecoded && canvasRef.current) {
+            const canvas = canvasRef.current;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const code = jsQR(imageData.data, canvas.width, canvas.height, {
+                inversionAttempts: 'dontInvert'
+              });
+              if (code?.data) rawDecoded = code.data;
+            }
+          }
+          if (rawDecoded) {
+            const target = extractScannedTarget(rawDecoded);
             stopCameraScan();
             if (target) {
               setHashInput(target);
@@ -260,13 +284,57 @@ export default function VerifierPage() {
         } catch {
           // Ignorer une frame illisible
         }
-      }, 450);
+      }, 400);
     } catch {
       stopCameraScan();
       setCameraInfo(
-        'Accès caméra refusé ou indisponible sur cet appareil. Saisissez le numéro d\'attestation ou importez le fichier PDF officiel.'
+        'Accès caméra refusé ou indisponible sur cet appareil. Importez une image du QR Code ou saisissez le numéro d\'attestation.'
       );
     }
+  };
+
+  const handleQrImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCameraInfo('');
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = canvasRef.current || document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) throw new Error('Canvas indisponible');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const decoded = jsQR(imageData.data, canvas.width, canvas.height, {
+          inversionAttempts: 'attemptBoth'
+        });
+        if (!decoded?.data) {
+          setCameraInfo('Aucun QR Code valide détecté sur cette image. Vérifiez la netteté et réessayez.');
+          toast.warning('Aucun QR Code détecté dans l\'image.');
+          return;
+        }
+        const target = extractScannedTarget(decoded.data);
+        if (target) {
+          setHashInput(target);
+          toast.success('QR Code décodé depuis l\'image ! Contrôle en cours...');
+          runVerification(target);
+        }
+      } catch {
+        setCameraInfo('Impossible d\'analyser l\'image sélectionnée.');
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+        e.target.value = '';
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setCameraInfo('Format d\'image non supporté.');
+      e.target.value = '';
+    };
+    img.src = objectUrl;
   };
 
   const isGreen = result && (result.verdict === 'PASTILLE_VERTE_VALIDE' || result.statusLabel === 'VALID' || result.isValid === true);
@@ -361,8 +429,8 @@ export default function VerifierPage() {
         )}
       </Card>
 
-      <Card title="📷 Scanner un QR Code (Caméra Mobile — Inspection Douanière Express)">
-        <div className="flex gap-3 items-center" style={{ flexWrap: 'wrap', marginBottom: cameraActive || cameraInfo ? '12px' : 0 }}>
+      <Card title="📷 Scanner un QR Code (Caméra Mobile ou Image — Inspection Douanière)">
+        <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap', marginBottom: cameraActive || cameraInfo ? '12px' : 0 }}>
           {!cameraActive ? (
             <Button type="button" variant="primary" size="sm" onClick={startCameraScan}>
               📷 Activer la caméra QR Code
@@ -372,13 +440,31 @@ export default function VerifierPage() {
               ⏹ Arrêter le scanner caméra
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => qrImageInputRef.current?.click()}
+          >
+            🖼️ Importer une image QR Code
+          </Button>
+          <input
+            ref={qrImageInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleQrImageUpload}
+            style={{ display: 'none' }}
+            aria-label="Importer une image contenant un QR Code"
+          />
           <span className="text-muted" style={{ fontSize: '12px' }}>
-            Visez le QR Code imprimé en haut à droite de l&apos;attestation FNPSS (poste frontalier mobile).
+            Scan caméra compatible tous navigateurs (desktop &amp; mobile) ou lecture directe d&apos;une image QR PNG/JPG.
           </span>
         </div>
 
+        <canvas ref={canvasRef} style={{ display: 'none' }} aria-hidden="true" />
+
         {cameraInfo && (
-          <AlertBanner variant="info" title="Scanner caméra indisponible" message={cameraInfo} style={{ marginBottom: 0 }} />
+          <AlertBanner variant="info" title="Information Scanner QR" message={cameraInfo} style={{ marginBottom: 0 }} />
         )}
 
         {cameraActive && (
@@ -502,6 +588,20 @@ export default function VerifierPage() {
                 }
                 style={{ marginTop: '14px', marginBottom: 0 }}
               />
+            )}
+
+            {result.found && (
+              <div style={{ marginTop: '18px' }}>
+                <QrCodeDisplay
+                  value={
+                    result.qrVerificationUrl ||
+                    `${typeof window !== 'undefined' ? window.location.origin : 'https://guichetuniquefnpss.vercel.app'}/verifier?hash=${encodeURIComponent(result.docHash || result.record?.docHash || result.certificateNumber || hashInput)}&cert=${encodeURIComponent(result.certificateNumber || result.record?.certificateNumber || '')}`
+                  }
+                  certificateNumber={result.certificateNumber || result.record?.certificateNumber || ''}
+                  label="QR Code de Vérification à Présenter / Télécharger (ISO-18004)"
+                  size={164}
+                />
+              </div>
             )}
           </div>
         </Card>

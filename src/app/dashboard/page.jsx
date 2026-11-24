@@ -16,6 +16,7 @@ import { SkeletonKpiGrid, SkeletonCard } from '../../components/ui/Skeleton.jsx'
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken } from '../../lib/client-auth.js';
 import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
+import QrCodeDisplay from '../../components/ui/QrCodeDisplay.jsx';
 
 const COMPLEMENT_DOC_OPTIONS = [
   { code: 'P1_REQUETE', label: 'P1 — Requête motivée' },
@@ -57,6 +58,7 @@ export default function DashboardPage() {
   const [alertInfo, setAlertInfo] = useState(null);
   const [sessionToken, setSessionToken] = useState('');
   const [threadApp, setThreadApp] = useState(null);
+  const [qrModalApp, setQrModalApp] = useState(null);
   const [withdrawTarget, setWithdrawTarget] = useState(null);
   const [complementApp, setComplementApp] = useState(null);
   const [complementDocCode, setComplementDocCode] = useState('P1_REQUETE');
@@ -601,25 +603,35 @@ export default function DashboardPage() {
                       💬 Échanges
                     </button>
                     {app.certificate && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="success"
-                        onClick={async () => {
-                          try {
-                            await downloadAuthenticatedFile(
-                              `/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
-                              sessionToken,
-                              { fallbackFileName: `${app.referenceNumber}.pdf` }
-                            );
-                            toast.success('Attestation PDF officielle téléchargée.');
-                          } catch (err) {
-                            toast.error(err.message || 'Téléchargement impossible.', 'PDF indisponible');
-                          }
-                        }}
-                      >
-                        📥 PDF Scellé
-                      </Button>
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="success"
+                          onClick={async () => {
+                            try {
+                              await downloadAuthenticatedFile(
+                                `/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
+                                sessionToken,
+                                { fallbackFileName: `${app.referenceNumber}.pdf` }
+                              );
+                              toast.success('Attestation PDF officielle téléchargée.');
+                            } catch (err) {
+                              toast.error(err.message || 'Téléchargement impossible.', 'PDF indisponible');
+                            }
+                          }}
+                        >
+                          📥 PDF Scellé
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setQrModalApp(app)}
+                        >
+                          📱 QR Code
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -709,25 +721,35 @@ export default function DashboardPage() {
                           💬 Échanges
                         </button>
                         {app.certificate && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="success"
-                            onClick={async () => {
-                              try {
-                                await downloadAuthenticatedFile(
-                                  `/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
-                                  sessionToken,
-                                  { fallbackFileName: `${app.referenceNumber}.pdf` }
-                                );
-                                toast.success('Attestation PDF officielle téléchargée.');
-                              } catch (err) {
-                                toast.error(err.message || 'Téléchargement impossible.', 'PDF indisponible');
-                              }
-                            }}
-                          >
-                            📥 PDF Scellé
-                          </Button>
+                          <>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="success"
+                              onClick={async () => {
+                                try {
+                                  await downloadAuthenticatedFile(
+                                    `/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
+                                    sessionToken,
+                                    { fallbackFileName: `${app.referenceNumber}.pdf` }
+                                  );
+                                  toast.success('Attestation PDF officielle téléchargée.');
+                                } catch (err) {
+                                  toast.error(err.message || 'Téléchargement impossible.', 'PDF indisponible');
+                                }
+                              }}
+                            >
+                              📥 PDF Scellé
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setQrModalApp(app)}
+                            >
+                              📱 QR Code
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -945,6 +967,29 @@ export default function DashboardPage() {
         variant="danger"
         isLoading={isSubmitting}
       />
+
+      {/* Modale QR Code de Vérification DGDA */}
+      <Modal
+        isOpen={Boolean(qrModalApp?.certificate)}
+        onClose={() => setQrModalApp(null)}
+        title={`QR Code Officiel — ${qrModalApp?.certificate?.certificateNumber || ''}`}
+        footer={
+          <Button variant="outline" onClick={() => setQrModalApp(null)}>
+            Fermer
+          </Button>
+        }
+      >
+        {qrModalApp?.certificate && (
+          <QrCodeDisplay
+            value={
+              qrModalApp.certificate.qrVerificationUrl ||
+              `${typeof window !== 'undefined' ? window.location.origin : 'https://guichetuniquefnpss.vercel.app'}/verifier?hash=${qrModalApp.certificate.docHash}&cert=${encodeURIComponent(qrModalApp.certificate.certificateNumber)}`
+            }
+            certificateNumber={qrModalApp.certificate.certificateNumber}
+            label="QR Code de Contrôle Douanier DGDA"
+          />
+        )}
+      </Modal>
     </div>
   );
 }

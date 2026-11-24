@@ -3290,6 +3290,70 @@ test('Test 32 - Audit WCAG 2.1 AA Next.js, securite UI sans token URL, PWA hors-
   assert.ok(verifierSrc.includes('getUserMedia') && verifierSrc.includes('BarcodeDetector'));
 });
 
+test('Test 33 - Generation QR Code ISO-18004 dans PDF officiel, composant QrCodeDisplay et scan universel jsQR', async () => {
+  const path = await import('node:path');
+  const QRCode = (await import('qrcode')).default;
+  const jsQR = (await import('jsqr')).default;
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+
+  const testUrl =
+    'https://guichetuniquefnpss.vercel.app/verifier?hash=0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08&cert=FNPSS%2FEXO%2F2026%2F00001';
+
+  // 1. Le PDF genere doit integrer l'URL qrVerificationUrl et des vecteurs PDF (re f) dessinant le QR Code
+  const pdfBuf = generateOfficialPdfBuffer({
+    certificateNumber: 'FNPSS/EXO/2026/00001',
+    serviceCode: 'S4',
+    organizationName: 'ONG Espoir du Nord-Kivu',
+    projectTitle: 'Aide Humanitaire Goma',
+    goodsSummary: 'Kits medicaux',
+    issuedAtIso: '2026-11-24T10:00:00Z',
+    expiresAtIso: '2027-11-24T10:00:00Z',
+    docHash: '0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+    txHash: '0x1111111111111111111111111111111111111111111111111111111111111111',
+    qrVerificationUrl: testUrl
+  });
+  const pdfText = pdfBuf.toString('ascii');
+  assert.ok(pdfText.includes('Verification QR   : ' + testUrl));
+  assert.ok(pdfText.includes('SCAN QR CODE DGDA'));
+  assert.ok(pdfText.includes(' re f\n'));
+
+  // 2. Test aller-retour (round-trip) : encodage QRCode -> raster RGBA -> decodage jsQR
+  const qr = QRCode.create(testUrl, { errorCorrectionLevel: 'M' });
+  const size = qr.modules.size;
+  const margin = 4;
+  const scale = 4;
+  const width = (size + margin * 2) * scale;
+  const rgba = new Uint8ClampedArray(width * width * 4);
+  rgba.fill(255);
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (qr.modules.data[r * size + c]) {
+        for (let dy = 0; dy < scale; dy++) {
+          for (let dx = 0; dx < scale; dx++) {
+            const px = (c + margin) * scale + dx;
+            const py = (r + margin) * scale + dy;
+            const idx = (py * width + px) * 4;
+            rgba[idx] = 10;
+            rgba[idx + 1] = 37;
+            rgba[idx + 2] = 64;
+            rgba[idx + 3] = 255;
+          }
+        }
+      }
+    }
+  }
+  const decoded = jsQR(rgba, width, width);
+  assert.ok(decoded && decoded.data === testUrl);
+
+  // 3. Presence de QrCodeDisplay et integration dans /verifier, /dashboard, /admin + audit WCAG AA vert
+  assert.equal(fs.existsSync(path.join(process.cwd(), 'src/components/ui/QrCodeDisplay.jsx')), true);
+  const verifierSrc = fs.readFileSync(path.join(process.cwd(), 'src/app/verifier/page.jsx'), 'utf8');
+  assert.ok(verifierSrc.includes('jsQR') && verifierSrc.includes('QrCodeDisplay'));
+
+  const audit = auditNextAppAccessibility(process.cwd());
+  assert.equal(audit.passed, true);
+});
+
 
 
 

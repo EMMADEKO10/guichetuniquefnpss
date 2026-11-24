@@ -5,6 +5,8 @@
  * Prend en charge les 6 gabarits officiels normés (`S1` à `S6`) validés lors des ateliers A1–A4 (`GOV-03`).
  */
 
+import QRCode from 'qrcode';
+
 export const OFFICIAL_ACT_TEMPLATES = Object.freeze({
   S1: {
     code: 'S1',
@@ -67,6 +69,12 @@ function escapePdfText(input) {
 export function generateOfficialPdfBuffer(cert) {
   const svcCode = cert.serviceCode || 'S6';
   const tpl = OFFICIAL_ACT_TEMPLATES[svcCode] || OFFICIAL_ACT_TEMPLATES.S6;
+  const qrUrl =
+    cert.qrVerificationUrl ||
+    cert.verificationUrl ||
+    (cert.certificateNumber
+      ? `https://guichetuniquefnpss.vercel.app/verifier?cert=${encodeURIComponent(cert.certificateNumber)}`
+      : '');
 
   const lines = [
     { size: 13, x: 50, y: 785, text: 'REPUBLIQUE DEMOCRATIQUE DU CONGO' },
@@ -87,8 +95,8 @@ export function generateOfficialPdfBuffer(cert) {
     { size: 11, x: 50, y: 494, text: 'SCEAU CRYPTOGRAPHIQUE BLOCKCHAIN POLYGON (FNPSSRegistry.sol)' },
     { size: 9,  x: 50, y: 474, text: `SHA-256 (docHash) : ${cert.docHash || ''}` },
     { size: 9,  x: 50, y: 458, text: `TxHash Polygon    : ${cert.txHash || ''}` },
-    { size: 9,  x: 50, y: 442, text: `Verification QR   : ${cert.verificationUrl || ''}` },
-    { size: 8,  x: 50, y: 412, text: 'Controle Douanier DGDA : Scannez le QR Code ou verifiez le hash SHA-256 sur le portail FNPSS.' }
+    { size: 7.5, x: 50, y: 442, text: `Verification QR   : ${qrUrl}` },
+    { size: 8,  x: 50, y: 412, text: 'Controle Douanier DGDA : Scannez le QR Code ci-contre ou verifiez le hash SHA-256 sur le portail FNPSS.' }
   ];
 
   const streamOps = ['BT'];
@@ -98,6 +106,44 @@ export function generateOfficialPdfBuffer(cert) {
     streamOps.push(`(${escapePdfText(l.text)}) Tj`);
   }
   streamOps.push('ET');
+
+  // Dessin vectoriel natif du QR Code ISO/IEC 18004 dans le document PDF
+  if (qrUrl) {
+    const qrMatrix = QRCode.create(qrUrl, { errorCorrectionLevel: 'M' });
+    const count = qrMatrix.modules.size;
+    const data = qrMatrix.modules.data;
+    const qrBoxPt = 112;
+    const quietModules = 2;
+    const cellPt = qrBoxPt / (count + quietModules * 2);
+    const originX = 435;
+    const originY = 265;
+
+    streamOps.push('q');
+    streamOps.push('1 1 1 rg');
+    streamOps.push(`${originX} ${originY} ${qrBoxPt} ${qrBoxPt} re f`);
+    streamOps.push('0.04 0.145 0.25 RG 0.8 w');
+    streamOps.push(`${originX} ${originY} ${qrBoxPt} ${qrBoxPt} re S`);
+    streamOps.push('0.04 0.145 0.25 rg');
+
+    const cellStr = cellPt.toFixed(2);
+    for (let row = 0; row < count; row++) {
+      for (let col = 0; col < count; col++) {
+        if (data[row * count + col]) {
+          const mx = (originX + (col + quietModules) * cellPt).toFixed(2);
+          const my = (originY + qrBoxPt - (row + quietModules + 1) * cellPt).toFixed(2);
+          streamOps.push(`${mx} ${my} ${cellStr} ${cellStr} re f`);
+        }
+      }
+    }
+    streamOps.push('BT');
+    streamOps.push('/F1 7.5 Tf');
+    streamOps.push('0.04 0.145 0.25 rg');
+    streamOps.push(`1 0 0 1 ${originX + 12} ${originY - 11} Tm`);
+    streamOps.push('(SCAN QR CODE DGDA) Tj');
+    streamOps.push('ET');
+    streamOps.push('Q');
+  }
+
   const streamContent = streamOps.join('\n') + '\n';
   const streamByteLength = Buffer.byteLength(streamContent, 'ascii');
 
