@@ -7,6 +7,7 @@ import Button from '../../../components/ui/Button.jsx';
 import AlertBanner from '../../../components/ui/AlertBanner.jsx';
 import { useToast } from '../../../components/ui/ToastProvider.jsx';
 import { getClientToken, getClientUser } from '../../../lib/client-auth.js';
+import { downloadAuthenticatedFile } from '../../../lib/secure-download.js';
 
 const DRAFT_STORAGE_KEY = 'fnpss_new_app_draft_v1';
 const OFFLINE_QUEUE_KEY = 'fnpss_offline_queue_v1';
@@ -236,7 +237,7 @@ export default function NewApplicationPage() {
           localStorage.removeItem(DRAFT_STORAGE_KEY);
         }
         const okMsg = `Dossier créé avec succès ! Référence : ${data.application?.referenceNumber}`;
-        setFeedback({ type: 'success', message: okMsg });
+        setFeedback({ type: 'success', message: okMsg, referenceNumber: data.application?.referenceNumber || '' });
         toast.success(okMsg, 'Demande enregistrée');
         window.dispatchEvent(new Event('fnpss-notif-refresh'));
       }
@@ -332,9 +333,32 @@ export default function NewApplicationPage() {
           title={feedback.type === 'success' ? 'Dossier Enregistré' : feedback.type === 'error' ? 'Erreur de Soumission' : 'Information'}
           message={feedback.message}
           action={feedback.type === 'success' && (
-            <a href="/dashboard" className="btn btn-sm btn-success" style={{ textDecoration: 'none' }}>
-              Accéder au Tableau de Bord &rarr;
-            </a>
+            <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+              {feedback.referenceNumber && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="primary"
+                  onClick={async () => {
+                    try {
+                      await downloadAuthenticatedFile(
+                        `/api/applications/receipt.pdf?ref=${encodeURIComponent(feedback.referenceNumber)}`,
+                        getClientToken(),
+                        { fallbackFileName: `Accuse-${feedback.referenceNumber}.pdf` }
+                      );
+                      toast.success('Accusé de réception PDF téléchargé.');
+                    } catch (err) {
+                      toast.error(err.message || 'Téléchargement impossible.', 'Accusé indisponible');
+                    }
+                  }}
+                >
+                  🧾 Télécharger l&apos;Accusé PDF
+                </Button>
+              )}
+              <a href="/dashboard" className="btn btn-sm btn-success" style={{ textDecoration: 'none' }}>
+                Accéder au Tableau de Bord &rarr;
+              </a>
+            </div>
           )}
           onClose={() => setFeedback(null)}
           style={{ marginBottom: '18px' }}

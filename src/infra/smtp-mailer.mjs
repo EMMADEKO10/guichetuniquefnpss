@@ -4,6 +4,8 @@
  */
 
 import tls from 'node:tls';
+import crypto from 'node:crypto';
+import { buildWorkflowEmail } from '../notifications/email-templates.mjs';
 
 const DEMO_DUMMY_DOMAINS = ['@ong-rdc.org', '@espoir-kivu.org', '@fnpss.cd', '@example.com', '@test.local'];
 
@@ -25,11 +27,56 @@ function encodeUtf8Header(str) {
   return `=?UTF-8?B?${Buffer.from(String(str || ''), 'utf8').toString('base64')}?=`;
 }
 
+function encodeBase64MimeBody(str) {
+  const b64 = Buffer.from(String(str || ''), 'utf8').toString('base64');
+  return b64.match(/.{1,76}/g)?.join('\r\n') || '';
+}
+
+function buildMimePayload({ from, to, subject, text, html }) {
+  const commonHeaders = [
+    `From: Guichet Unique FNPSS <${from}>`,
+    `To: <${to}>`,
+    `Subject: ${encodeUtf8Header(subject)}`,
+    `Date: ${new Date().toUTCString()}`,
+    `MIME-Version: 1.0`
+  ];
+
+  if (!html) {
+    return [
+      ...commonHeaders,
+      `Content-Type: text/plain; charset=utf-8`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      encodeBase64MimeBody(text)
+    ].join('\r\n');
+  }
+
+  const boundary = `----=_FNPSS_${crypto.randomBytes(12).toString('hex')}`;
+  return [
+    ...commonHeaders,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    encodeBase64MimeBody(text),
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/html; charset=utf-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    encodeBase64MimeBody(html),
+    ``,
+    `--${boundary}--`
+  ].join('\r\n');
+}
+
 /**
- * Envoie un email transactionnel via TLS direct (port 465).
+ * Envoie un email transactionnel (HTML + texte alternatif) via TLS direct (port 465).
  * Ne bloque jamais si la configuration est absente ou si le destinataire est un domaine fictif de démonstration.
  */
-export async function sendSmtpEmail({ to, subject, text }, env = process.env) {
+export async function sendSmtpEmail({ to, subject, text, html = '' }, env = process.env) {
   if (!isSmtpConfigured(env)) {
     return { sent: false, skipped: true, reason: 'SMTP_NOT_CONFIGURED' };
   }
@@ -98,17 +145,13 @@ export async function sendSmtpEmail({ to, subject, text }, env = process.env) {
           socket.write('DATA\r\n');
         } else if (state === 'DATA' && code === '354') {
           state = 'DATA_CONTENT';
-          const mimeMsg = [
-            `From: Guichet Unique FNPSS <${from}>`,
-            `To: <${recipient}>`,
-            `Subject: ${encodeUtf8Header(subject)}`,
-            `Date: ${new Date().toUTCString()}`,
-            `MIME-Version: 1.0`,
-            `Content-Type: text/plain; charset=utf-8`,
-            `Content-Transfer-Encoding: 8bit`,
-            ``,
-            String(text || '').replace(/\r?\n/g, '\r\n')
-          ].join('\r\n');
+          const mimeMsg = buildMimePayload({
+            from,
+            to: recipient,
+            subject,
+            text,
+            html
+          });
           socket.write(`${mimeMsg}\r\n.\r\n`);
         } else if (state === 'DATA_CONTENT' && code === '250') {
           socket.write('QUIT\r\n');
@@ -129,39 +172,15 @@ export async function sendSmtpEmail({ to, subject, text }, env = process.env) {
   });
 }
 
-const WORKFLOW_EMAIL_TEMPLATES = {
-  APPLICATION_SUBMITTED: ({ referenceNumber, details }) => ({
-    subject: `[Guichet Unique FNPSS] Accusé de réception — Dossier ${referenceNumber}`,
-    text: `Bonjour,\n\nVotre demande d'acte pour "${details.organizationName || 'Organisation'}" a bien été déposée sous la référence ${referenceNumber} (Service ${details.serviceCode || ''}).\n\nSuivez l'avancement depuis votre tableau de bord : https://guichetuniquefnpss.vercel.app/dashboard`
-  }),
-  PAYMENT_VALIDATED: ({ referenceNumber, details }) => ({
-    subject: `[Guichet Unique FNPSS] Quittance validée (SLA 10 jours ouvrés) — ${referenceNumber}`,
-    text: `Bonjour,\n\nLa quittance de paiement du dossier ${referenceNumber} a été validée par le FNPSS. Le délai légal d'instruction SLA de 10 jours ouvrés est enclenché (échéance : ${details.slaDueAt || 'non précisée'}).\n\nCordialement,\nFNPSS — Guichet Unique`
-  }),
-  COMPLEMENT_REQUESTED: ({ referenceNumber, details }) => ({
-    subject: `[Guichet Unique FNPSS] Complément requis — Dossier ${referenceNumber}`,
-    text: `Bonjour,\n\nLe service instructeur du FNPSS demande un complément de pièce pour le dossier ${referenceNumber}.\nMotif : ${details.reason || 'À préciser dans votre espace'}.\nLe décompte SLA est suspendu jusqu'au dépôt de la pièce.`
-  }),
-  CERTIFICATE_ISSUED: ({ referenceNumber, details }) => ({
-    subject: `[Guichet Unique FNPSS] Acte officiel délivré & scellé — ${details.certificateNumber || referenceNumber}`,
-    text: `Bonjour,\n\nVotre acte officiel ${details.certificateNumber || ''} (dossier ${referenceNumber}) a été validé par la Direction Générale et scellé cryptographiquement.\nEmpreinte SHA-256 : ${details.docHash || ''}\n${details.explorerTxUrl ? `Preuve Polygon : ${details.explorerTxUrl}\n` : ''}Vérification publique : https://guichetuniquefnpss.vercel.app/verifier`
-  }),
-  CERTIFICATE_REVOKED: ({ referenceNumber, details }) => ({
-    subject: `[Guichet Unique FNPSS] URGENT : Révocation d'acte — ${details.certificateNumber || referenceNumber}`,
-    text: `Bonjour,\n\nL'acte officiel ${details.certificateNumber || ''} (dossier ${referenceNumber}) a été révoqué par la Direction Générale du FNPSS.\nMotif : ${details.reason || 'Révocation administrative'}.\nLes régies DGDA / DGRAD / DGI et le registre de vérification ont été notifiés.`
-  }),
-  APPLICATION_REJECTED: ({ referenceNumber, details }) => ({
-    subject: `[Guichet Unique FNPSS] Décision motivée — Rejet du dossier ${referenceNumber}`,
-    text: `Bonjour,\n\nVotre demande ${referenceNumber} n'a pas pu être approuvée.\nMotif officiel : ${details.reason || 'Non précisé'}.\n\nCordialement,\nDirection Générale du FNPSS`
-  })
-};
-
 /**
- * Formate et envoie un email transactionnel lié à une étape du workflow FNPSS.
+ * Formate (HTML charté + texte de secours) et envoie un email transactionnel lié au workflow FNPSS.
  */
 export async function sendTransactionalWorkflowEmail({ to, eventType, referenceNumber, details = {} }, env = process.env) {
-  const builder = WORKFLOW_EMAIL_TEMPLATES[eventType];
-  if (!builder) return { sent: false, skipped: true, reason: 'UNKNOWN_EVENT_TYPE' };
-  const { subject, text } = builder({ referenceNumber, details });
-  return sendSmtpEmail({ to, subject, text }, env);
+  const rendered = buildWorkflowEmail(eventType, {
+    referenceNumber,
+    details,
+    baseUrl: env.PUBLIC_APP_BASE_URL
+  });
+  if (!rendered) return { sent: false, skipped: true, reason: 'UNKNOWN_EVENT_TYPE' };
+  return sendSmtpEmail({ to, subject: rendered.subject, text: rendered.text, html: rendered.html }, env);
 }

@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import tls from 'node:tls';
 import net from 'node:net';
+import { sendSmtpEmail } from '../src/infra/smtp-mailer.mjs';
+import { buildWorkflowEmail } from '../src/notifications/email-templates.mjs';
 
 function parseEnv() {
   const content = fs.readFileSync('.env', 'utf8');
@@ -246,7 +248,25 @@ function testSmtpStarttls() {
 
 try {
   let result;
-  if (port === 465) {
+  if (process.argv.includes('--send')) {
+    const rendered = buildWorkflowEmail('SMTP_TEST');
+    const smtpRes = await sendSmtpEmail(
+      {
+        to: from,
+        subject: rendered.subject,
+        text: rendered.text,
+        html: rendered.html
+      },
+      { ...env, FNPSS_SEND_DEMO_EMAILS: 'true' }
+    );
+    if (!smtpRes.sent) {
+      throw new Error(smtpRes.error || smtpRes.reason || 'Echec envoi SMTP');
+    }
+    result = {
+      success: true,
+      message: `Email HTML/Texte charté envoyé avec succès via ${smtpRes.provider} à ${smtpRes.to} !`
+    };
+  } else if (port === 465) {
     result = await testSmtpDirectTls();
   } else {
     // Port 587 STARTTLS

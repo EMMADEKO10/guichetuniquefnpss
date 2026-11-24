@@ -63,7 +63,9 @@ const ACTIONS = Object.freeze({
 const ACTION_TO_EMAIL_EVENT = {
   'validate-payment': 'PAYMENT_VALIDATED',
   'request-complement': 'COMPLEMENT_REQUESTED',
+  'division-opinion': 'DIVISION_OPINION',
   'approve-seal': 'CERTIFICATE_ISSUED',
+  'cosign-ministry': 'MINISTRY_COSIGNED',
   revoke: 'CERTIFICATE_REVOKED',
   reject: 'APPLICATION_REJECTED'
 };
@@ -192,18 +194,27 @@ export async function POST(request, { params }) {
     const emailEvent = ACTION_TO_EMAIL_EVENT[actionName];
     if (emailEvent && storedApp) {
       const owner = authService.usersById.get(storedApp.ownerId);
-      if (owner?.email) {
+      const isMandatorySecurityMail = emailEvent === 'CERTIFICATE_REVOKED';
+      const wantsEmail = owner?.notificationPreferences?.emailEnabled !== false;
+      if (owner?.email && (isMandatorySecurityMail || wantsEmail)) {
         await sendTransactionalWorkflowEmail({
           to: owner.email,
           eventType: emailEvent,
           referenceNumber: storedApp.referenceNumber,
           details: {
             organizationName: storedApp.organizationName,
+            serviceCode: storedApp.serviceCode,
+            projectTitle: storedApp.projectTitle,
             slaDueAt: storedApp.slaDueAt,
+            favorable: storedApp.divisionOpinion?.favorable,
+            opinionNote: storedApp.divisionOpinion?.opinionNote,
             reason: storedApp.rejectionReason || storedApp.complementReason || body.reason,
             certificateNumber: storedApp.certificate?.certificateNumber,
             docHash: storedApp.certificate?.docHash,
-            explorerTxUrl: storedApp.certificate?.explorerTxUrl
+            qrVerificationUrl: storedApp.certificate?.qrVerificationUrl,
+            explorerTxUrl: storedApp.certificate?.explorerTxUrl,
+            ministryReference: storedApp.ministryReference,
+            ministryExplorerTxUrl: storedApp.ministryExplorerTxUrl
           }
         }).catch(() => null);
       }

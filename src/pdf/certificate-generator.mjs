@@ -1,11 +1,21 @@
 /**
- * @fileoverview Générateur sans dépendance externe d'actes officiels PDF 1.4 (`VER-01`, `VER-02`)
+ * @fileoverview Générateur souverain d'actes officiels PDF 1.4 (`VER-01`, `VER-02`)
  * pour le Guichet Unique Dématérialisé du FNPSS (RDC).
  *
- * Prend en charge les 6 gabarits officiels normés (`S1` à `S6`) validés lors des ateliers A1–A4 (`GOV-03`).
+ * Prend en charge les 6 gabarits officiels normés (`S1` à `S6`), la charte graphique
+ * FNPSS, les tableaux structurés, le cachet électronique et le QR Code vectoriel ISO-18004.
  */
 
-import QRCode from 'qrcode';
+import {
+  wrapPdfText,
+  pushPdfText,
+  drawSovereignHeaderAndFrame,
+  drawOfficialTableRow,
+  drawOfficialStamp,
+  drawVectorQrCode,
+  drawSovereignFooter,
+  compileMultiFontPdfBuffer
+} from './pdf-primitives.mjs';
 
 export const OFFICIAL_ACT_TEMPLATES = Object.freeze({
   S1: {
@@ -52,17 +62,8 @@ export const OFFICIAL_ACT_TEMPLATES = Object.freeze({
   }
 });
 
-function escapePdfText(input) {
-  return String(input || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Normalisation ASCII pour la police standard Helvetica Type1
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
-}
-
 /**
- * Construit un Buffer PDF 1.4 officiel prêt à être téléchargé ou vérifié par hachage SHA-256.
+ * Construit un Buffer PDF 1.4 officiel charté prêt à être téléchargé ou vérifié par hachage SHA-256.
  * @param {object} cert
  * @returns {Buffer}
  */
@@ -75,100 +76,154 @@ export function generateOfficialPdfBuffer(cert) {
     (cert.certificateNumber
       ? `https://guichetuniquefnpss.vercel.app/verifier?cert=${encodeURIComponent(cert.certificateNumber)}`
       : '');
+  const isRevoked = cert.status === 'REVOKED' || cert.status === 'REVOQUE';
 
-  const lines = [
-    { size: 13, x: 50, y: 785, text: 'REPUBLIQUE DEMOCRATIQUE DU CONGO' },
-    { size: 10, x: 50, y: 769, text: 'Ministere des Affaires Sociales, Actions Humanitaires et Solidarite Nationale' },
-    { size: 11, x: 50, y: 753, text: 'FONDS NATIONAL DE PROMOTION ET DE SERVICE SOCIAL (FNPSS)' },
-    { size: 10, x: 50, y: 736, text: '----------------------------------------------------------------------------------------' },
-    { size: 13, x: 50, y: 712, text: `${tpl.officialTitle} (${svcCode})` },
-    { size: 11, x: 50, y: 693, text: `Numero Officiel d'Acte : ${cert.certificateNumber || 'FNPSS-ACT-2026'}` },
-    { size: 9,  x: 50, y: 672, text: tpl.legalVisa },
-    { size: 9,  x: 50, y: 656, text: tpl.bodyClause },
-    { size: 10, x: 50, y: 632, text: `Organisation Beneficiaire : ${cert.organizationName || ''}` },
-    { size: 10, x: 50, y: 614, text: `Intitule du Projet        : ${cert.projectTitle || ''}` },
-    { size: 10, x: 50, y: 596, text: `Biens / Perimetre         : ${(cert.goodsSummary || 'N/A').slice(0, 90)}` },
-    { size: 10, x: 50, y: 574, text: `Date d'emission (ISO)     : ${cert.issuedAtIso || ''}` },
-    { size: 10, x: 50, y: 556, text: `Date d'expiration (ISO)   : ${cert.expiresAtIso || 'Illimitee'}` },
-    { size: 10, x: 50, y: 534, text: `Autorite Signataire       : ${tpl.signatoryAuthority}` },
-    { size: 10, x: 50, y: 514, text: '----------------------------------------------------------------------------------------' },
-    { size: 11, x: 50, y: 494, text: 'SCEAU CRYPTOGRAPHIQUE BLOCKCHAIN POLYGON (FNPSSRegistry.sol)' },
-    { size: 9,  x: 50, y: 474, text: `SHA-256 (docHash) : ${cert.docHash || ''}` },
-    { size: 9,  x: 50, y: 458, text: `TxHash Polygon    : ${cert.txHash || ''}` },
-    { size: 7.5, x: 50, y: 442, text: `Verification QR   : ${qrUrl}` },
-    { size: 8,  x: 50, y: 412, text: 'Controle Douanier DGDA : Scannez le QR Code ci-contre ou verifiez le hash SHA-256 sur le portail FNPSS.' }
+  const ops = [];
+  drawSovereignHeaderAndFrame(ops, {
+    subtitle: 'Guichet Unique Dematerialise — Acte Officiel Scelle & Verifiable'
+  });
+
+  // Cartouche Titre + Badge statut + Numero officiel
+  ops.push('0.933 0.965 0.988 rg 32 664 531 50 re f');
+  ops.push('0.749 0.859 0.996 RG 0.8 w 32 664 531 50 re S');
+  ops.push('0.875 0.325 0.067 rg 32 664 4 50 re f');
+
+  pushPdfText(ops, {
+    font: '/F2',
+    size: 10.5,
+    x: 44,
+    y: 695,
+    text: `${tpl.officialTitle} (${svcCode})`,
+    rgb: '0.039 0.145 0.251'
+  });
+  pushPdfText(ops, {
+    font: '/F3',
+    size: 9.5,
+    x: 44,
+    y: 675,
+    text: `Numero Officiel d'Acte : ${cert.certificateNumber || 'FNPSS-ACT-2026'}`,
+    rgb: '0.024 0.353 0.510'
+  });
+
+  // Pastille statut en haut a droite du cartouche
+  const badgeBg = isRevoked ? '0.988 0.910 0.902' : '0.902 0.957 0.918';
+  const badgeBorder = isRevoked ? '0.851 0.188 0.145' : '0.075 0.451 0.200';
+  ops.push(`${badgeBg} rg 435 671 118 17 re f`);
+  ops.push(`${badgeBorder} RG 0.8 w 435 671 118 17 re S`);
+  pushPdfText(ops, {
+    font: '/F2',
+    size: 7.5,
+    x: isRevoked ? 470 : 453,
+    y: 676,
+    text: isRevoked ? 'REVOQUE' : 'ACTE AUTHENTIQUE',
+    rgb: badgeBorder
+  });
+
+  // Visas et dispositif legal
+  let cursorY = 648;
+  for (const line of [...wrapPdfText(tpl.legalVisa, 98), ...wrapPdfText(tpl.bodyClause, 98)].slice(0, 4)) {
+    pushPdfText(ops, { font: '/F1', size: 8.5, x: 34, y: cursorY, text: line, rgb: '0.180 0.220 0.280' });
+    cursorY -= 13;
+  }
+
+  // Tableau des metadonnees officielles
+  const signatoryText = cert.ministryReference
+    ? `${tpl.signatoryAuthority} — Co-signe (${cert.ministryReference})`
+    : tpl.signatoryAuthority;
+
+  const rows = [
+    { label: 'Organisation Beneficiaire', value: cert.organizationName || 'N/A' },
+    { label: 'Intitule du Projet', value: cert.projectTitle || 'Programme humanitaire approuve' },
+    { label: 'Biens / Perimetre', value: cert.goodsSummary || 'Conforme a la liste validee' },
+    { label: 'Date d\'emission (ISO)', value: cert.issuedAtIso || 'N/A', monoValue: true },
+    { label: 'Date d\'expiration (ISO)', value: cert.expiresAtIso || 'Illimitee', monoValue: true },
+    { label: 'Autorite Signataire', value: signatoryText }
   ];
 
-  const streamOps = ['BT'];
-  for (const l of lines) {
-    streamOps.push(`/F1 ${l.size} Tf`);
-    streamOps.push(`1 0 0 1 ${l.x} ${l.y} Tm`);
-    streamOps.push(`(${escapePdfText(l.text)}) Tj`);
+  let rowY = 562;
+  rows.forEach((row, idx) => {
+    drawOfficialTableRow(ops, { x: 32, y: rowY, width: 531, height: 22, index: idx, ...row });
+    rowY -= 22;
+  });
+
+  // Encadre Sceau Blockchain (gauche) + QR Code Vectoriel (droite)
+  ops.push('0.973 0.980 0.988 rg 32 232 396 206 re f');
+  ops.push('0.859 0.886 0.918 RG 0.8 w 32 232 396 206 re S');
+  ops.push('0.024 0.353 0.510 rg 32 434 396 4 re f');
+
+  pushPdfText(ops, {
+    font: '/F2',
+    size: 9.5,
+    x: 42,
+    y: 416,
+    text: 'SCEAU CRYPTOGRAPHIQUE BLOCKCHAIN POLYGON (FNPSSRegistry.sol)',
+    rgb: '0.039 0.145 0.251'
+  });
+  pushPdfText(ops, {
+    font: '/F3',
+    size: 7.2,
+    x: 42,
+    y: 396,
+    text: `SHA-256 (docHash) : ${cert.docHash || 'En attente d\'empreinte'}`,
+    rgb: '0.122 0.161 0.216'
+  });
+  pushPdfText(ops, {
+    font: '/F3',
+    size: 7.2,
+    x: 42,
+    y: 381,
+    text: `TxHash Polygon    : ${cert.txHash || 'En attente de confirmation'}`,
+    rgb: '0.122 0.161 0.216'
+  });
+  pushPdfText(ops, {
+    font: '/F1',
+    size: 6.4,
+    x: 42,
+    y: 365,
+    text: `Verification QR   : ${qrUrl}`,
+    rgb: '0.024 0.353 0.510'
+  });
+
+  // Cachet electronique officiel + bloc signature (dans l'encadre bas gauche)
+  drawOfficialStamp(ops, {
+    cx: 92,
+    cy: 292,
+    statusLabel: isRevoked ? 'REVOQUE' : 'SCELLE',
+    authorityLine: cert.ministryCoSigned ? 'DG + MIN' : 'DG FNPSS'
+  });
+  pushPdfText(ops, { font: '/F2', size: 8.5, x: 146, y: 312, text: 'Signature Electronique Qualifiee', rgb: '0.039 0.145 0.251' });
+  pushPdfText(ops, { font: '/F1', size: 8, x: 146, y: 298, text: 'Direction Generale du FNPSS (Kinshasa, RDC)', rgb: '0.294 0.333 0.388' });
+  pushPdfText(ops, { font: '/F1', size: 7.5, x: 146, y: 282, text: 'Controle Douanier DGDA / DGI / DGRAD sans gaz.', rgb: '0.294 0.333 0.388' });
+  if (isRevoked && cert.revocationReason) {
+    pushPdfText(ops, {
+      font: '/F2',
+      size: 7.5,
+      x: 42,
+      y: 243,
+      text: `MOTIF REVOCATION : ${String(cert.revocationReason).slice(0, 62)}`,
+      rgb: '0.851 0.188 0.145'
+    });
   }
-  streamOps.push('ET');
 
-  // Dessin vectoriel natif du QR Code ISO/IEC 18004 dans le document PDF
-  if (qrUrl) {
-    const qrMatrix = QRCode.create(qrUrl, { errorCorrectionLevel: 'M' });
-    const count = qrMatrix.modules.size;
-    const data = qrMatrix.modules.data;
-    const qrBoxPt = 112;
-    const quietModules = 2;
-    const cellPt = qrBoxPt / (count + quietModules * 2);
-    const originX = 435;
-    const originY = 265;
+  // Encadre QR Code DGDA (droite)
+  ops.push('1 1 1 rg 438 232 125 206 re f');
+  ops.push('0.859 0.886 0.918 RG 0.8 w 438 232 125 206 re S');
+  drawVectorQrCode(ops, {
+    url: qrUrl,
+    originX: 444,
+    originY: 294,
+    boxPt: 112,
+    caption: 'SCAN QR CODE DGDA'
+  });
+  pushPdfText(ops, {
+    font: '/F1',
+    size: 7,
+    x: 454,
+    y: 256,
+    text: 'Verification instantanee',
+    rgb: '0.294 0.333 0.388'
+  });
 
-    streamOps.push('q');
-    streamOps.push('1 1 1 rg');
-    streamOps.push(`${originX} ${originY} ${qrBoxPt} ${qrBoxPt} re f`);
-    streamOps.push('0.04 0.145 0.25 RG 0.8 w');
-    streamOps.push(`${originX} ${originY} ${qrBoxPt} ${qrBoxPt} re S`);
-    streamOps.push('0.04 0.145 0.25 rg');
-
-    const cellStr = cellPt.toFixed(2);
-    for (let row = 0; row < count; row++) {
-      for (let col = 0; col < count; col++) {
-        if (data[row * count + col]) {
-          const mx = (originX + (col + quietModules) * cellPt).toFixed(2);
-          const my = (originY + qrBoxPt - (row + quietModules + 1) * cellPt).toFixed(2);
-          streamOps.push(`${mx} ${my} ${cellStr} ${cellStr} re f`);
-        }
-      }
-    }
-    streamOps.push('BT');
-    streamOps.push('/F1 7.5 Tf');
-    streamOps.push('0.04 0.145 0.25 rg');
-    streamOps.push(`1 0 0 1 ${originX + 12} ${originY - 11} Tm`);
-    streamOps.push('(SCAN QR CODE DGDA) Tj');
-    streamOps.push('ET');
-    streamOps.push('Q');
-  }
-
-  const streamContent = streamOps.join('\n') + '\n';
-  const streamByteLength = Buffer.byteLength(streamContent, 'ascii');
-
-  const objects = [
-    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
-    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
-    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n',
-    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
-    `5 0 obj\n<< /Length ${streamByteLength} >>\nstream\n${streamContent}endstream\nendobj\n`
-  ];
-
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  for (const obj of objects) {
-    offsets.push(Buffer.byteLength(pdf, 'ascii'));
-    pdf += obj;
-  }
-
-  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
-  pdf += `xref\n0 ${objects.length + 1}\n`;
-  pdf += '0000000000 65535 f \n';
-  for (let i = 1; i <= objects.length; i++) {
-    pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
-  }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
-
-  return Buffer.from(pdf, 'ascii');
+  drawSovereignFooter(ops);
+  return compileMultiFontPdfBuffer(ops);
 }

@@ -99,12 +99,17 @@ export async function POST(request) {
     });
 
     await persistToNeon();
-    if (user?.email) {
+    const wantsEmail = user?.notificationPreferences?.emailEnabled !== false;
+    if (user?.email && wantsEmail) {
       await sendTransactionalWorkflowEmail({
         to: user.email,
         eventType: 'APPLICATION_SUBMITTED',
         referenceNumber: application.referenceNumber,
-        details: { organizationName: application.organizationName, serviceCode: application.serviceCode }
+        details: {
+          organizationName: application.organizationName,
+          serviceCode: application.serviceCode,
+          projectTitle: application.projectTitle
+        }
       }).catch(() => null);
     }
 

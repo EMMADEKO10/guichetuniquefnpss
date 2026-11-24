@@ -12,10 +12,21 @@ import BlockchainSignal from '../../components/ui/BlockchainSignal.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import { SkeletonCard, SkeletonKpiGrid, SkeletonRow } from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
+import { buildWorkflowEmail } from '../../notifications/email-templates.mjs';
+
+const EMAIL_PREVIEW_OPTIONS = [
+  { key: 'APPLICATION_SUBMITTED', label: 'Accusé de réception' },
+  { key: 'PAYMENT_VALIDATED', label: 'Quittance validée (SLA)' },
+  { key: 'COMPLEMENT_REQUESTED', label: 'Complément requis' },
+  { key: 'CERTIFICATE_ISSUED', label: 'Acte délivré & scellé' },
+  { key: 'CERTIFICATE_REVOKED', label: 'Alerte Révocation' },
+  { key: 'PASSWORD_RESET', label: 'Mot de passe oublié' }
+];
 
 export default function DesignSystemPage() {
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [emailPreviewKey, setEmailPreviewKey] = useState('CERTIFICATE_ISSUED');
 
   const tokens = [
     { name: '--fnpss-navy', hex: '#0a2540', role: 'Marine institutionnelle (Header, titres)', contrast: '14.8:1 sur blanc (AAA)' },
@@ -186,6 +197,55 @@ export default function DesignSystemPage() {
           />
         </div>
       </Card>
+
+      {(() => {
+        const previewEmail = buildWorkflowEmail(emailPreviewKey, {
+          referenceNumber: 'FNPSS/DEM/2026/00042',
+          details: {
+            organizationName: 'ONG Espoir du Nord-Kivu',
+            serviceCode: 'S4',
+            projectTitle: 'Aide Humanitaire Goma — Kits Médicaux',
+            slaDueAt: '2026-12-08',
+            reason: 'Rapport annuel 2025 non revêtu de la signature du représentant légal.',
+            certificateNumber: 'FNPSS/EXO/2026/00042',
+            docHash: '0x4b12f9d0e8c31a75b8009f112233445566778899aabbccddeeff001122334455',
+            explorerTxUrl: 'https://amoy.polygonscan.com/tx/0x4b12f9d0...',
+            resetToken: 'a1b2c3d4e5f67890abcd'
+          }
+        });
+        return (
+          <Card
+            title="6. Gabarits Emails Officiels (NOT-01 — HTML + Texte alternatif)"
+            subtitle={`Objet : ${previewEmail?.subject || ''}`}
+          >
+            <div className="flex gap-2" style={{ flexWrap: 'wrap', marginBottom: '12px' }}>
+              {EMAIL_PREVIEW_OPTIONS.map((opt) => (
+                <Button
+                  key={opt.key}
+                  type="button"
+                  size="sm"
+                  variant={emailPreviewKey === opt.key ? 'brand' : 'outline'}
+                  onClick={() => setEmailPreviewKey(opt.key)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+            <iframe
+              srcDoc={previewEmail?.html || ''}
+              sandbox=""
+              title="Aperçu email officiel FNPSS"
+              style={{
+                width: '100%',
+                height: '520px',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                background: '#f4f6f9'
+              }}
+            />
+          </Card>
+        );
+      })()}
 
       <ConfirmDialog
         open={confirmOpen}

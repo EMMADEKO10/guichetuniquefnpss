@@ -8,6 +8,8 @@
  * - NOT-04 : Demandes de compléments et messagerie rattachée au dossier
  */
 
+import { buildWorkflowEmail } from './email-templates.mjs';
+
 const EMAIL_TEMPLATES_FR = Object.freeze({
   APPLICATION_SUBMITTED: d => ({
     subject: `[FNPSS Guichet Unique] Accusé de réception du dossier ${d.referenceNumber}`,
@@ -76,13 +78,16 @@ export class NotificationCenter {
     };
     this.inAppNotifications.unshift(inApp);
 
+    const branded = buildWorkflowEmail(eventType, { referenceNumber, details });
+
     const emailEntry = {
       id: `mail-${id}`,
       to: email,
       userId,
       eventType,
-      subject: rendered.subject,
+      subject: branded?.subject || rendered.subject,
       body: rendered.body,
+      html: branded?.html || '',
       referenceNumber,
       status: smtpAvailable ? 'SENT' : 'RETRY_QUEUED',
       attempts: 1,

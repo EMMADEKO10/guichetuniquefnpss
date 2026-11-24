@@ -3354,6 +3354,131 @@ test('Test 33 - Generation QR Code ISO-18004 dans PDF officiel, composant QrCode
   assert.equal(audit.passed, true);
 });
 
+test('Test 34 - Templates emails HTML/Texte chartes FNPSS, refonte PDF officiels & Accuse de Reception PDF anti-IDOR', async () => {
+  const { buildWorkflowEmail } = await import('../src/notifications/email-templates.mjs');
+  const { generateReceiptPdfBuffer } = await import('../src/pdf/receipt-pdf-generator.mjs');
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+  const receiptRoute = await import('../src/app/api/applications/receipt.pdf/route.js');
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const appsRoute = await import('../src/app/api/applications/route.js');
+
+  const events = [
+    'APPLICATION_SUBMITTED',
+    'PAYMENT_VALIDATED',
+    'COMPLEMENT_REQUESTED',
+    'DIVISION_OPINION',
+    'CERTIFICATE_ISSUED',
+    'MINISTRY_COSIGNED',
+    'CERTIFICATE_REVOKED',
+    'APPLICATION_REJECTED',
+    'PASSWORD_RESET',
+    'SMTP_TEST'
+  ];
+
+  // 1. Verification des 10 templates email HTML + texte et echappement XSS
+  for (const evt of events) {
+    const rendered = buildWorkflowEmail(evt, {
+      referenceNumber: 'FNPSS/DEM/2026/00077',
+      details: {
+        organizationName: '<script>alert(1)</script> ONG Solidarite',
+        serviceCode: 'S4',
+        projectTitle: 'Kits medicaux',
+        reason: '<b>Test motif</b>',
+        certificateNumber: 'FNPSS/EXO/2026/00077',
+        docHash: '0x' + 'aa'.repeat(32),
+        resetToken: 'tok-reset-34'
+      }
+    });
+    assert.ok(rendered && rendered.subject && rendered.text && rendered.html, `Template incomplet: ${evt}`);
+    assert.ok(rendered.html.includes('#0a2540') && rendered.html.includes('#df5311'));
+    assert.ok(rendered.html.includes('Le social dans la solidarité'));
+    assert.equal(rendered.html.includes('<script>'), false, `Injection HTML non echappee pour ${evt}`);
+  }
+
+  // 2. PDF officiel multi-polices, anti-malware et etat REVOQUE
+  const revokedPdf = generateOfficialPdfBuffer({
+    certificateNumber: 'FNPSS/EXO/2026/00088',
+    serviceCode: 'S6',
+    status: 'REVOKED',
+    revocationReason: 'Anomalie sur facture proforma',
+    organizationName: 'ONG Test PDF',
+    projectTitle: 'Urgence Kivu',
+    docHash: '0x' + 'bb'.repeat(32),
+    txHash: '0x' + 'cc'.repeat(32),
+    qrVerificationUrl: 'https://guichetuniquefnpss.vercel.app/verifier?cert=FNPSS%2FEXO%2F2026%2F00088'
+  });
+  const revokedText = revokedPdf.toString('ascii');
+  assert.ok(revokedText.includes('/F1') && revokedText.includes('/F2') && revokedText.includes('/F3'));
+  assert.ok(revokedText.includes('REVOQUE'));
+  assert.ok(revokedText.includes('SCAN QR CODE DGDA'));
+  const inspection = validateAndInspectPdfUpload(revokedPdf, { fileName: 'acte.pdf' });
+  assert.equal(inspection.isSafePdf, true);
+
+  // 3. Accuse de reception PDF + route /api/applications/receipt.pdf (anti-IDOR 403)
+  const jsonReq = (url, method, body, token) =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+  const emailOwner = `ong.t34.owner.${Date.now()}@example.cd`;
+  const emailOther = `ong.t34.other.${Date.now()}@example.cd`;
+  for (const [org, mail] of [['ONG T34 Owner', emailOwner], ['ONG T34 Other', emailOther]]) {
+    await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+      organizationName: org,
+      representativeName: 'Responsable Test',
+      email: mail,
+      password: 'PasswordRDC#2026'
+    }));
+  }
+  const tokenOwner = (await (await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email: emailOwner, password: 'PasswordRDC#2026' }))).json()).sessionToken;
+  const tokenOther = (await (await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email: emailOther, password: 'PasswordRDC#2026' }))).json()).sessionToken;
+
+  const createRes = await appsRoute.POST(jsonReq('http://localhost:3000/api/applications', 'POST', {
+    serviceCode: 'S1',
+    projectTitle: 'Enrolement ONG T34',
+    goodsSummary: 'Statuts et PV',
+    paymentReference: `RAW-T34-${Date.now()}`,
+    attachedDocuments: ['P1_REQUETE', 'P3_PLAN_ACTION', 'P4_RAPPORT', 'P5_PROJET', 'P6_QUITTANCE'].map((docCode, idx) => ({
+      docCode,
+      fileName: `${docCode}.pdf`,
+      sizeBytes: 2048,
+      sha256Hash: '0x' + String(idx + 1).repeat(64).slice(0, 64)
+    }))
+  }, tokenOwner));
+  assert.equal(createRes.status, 201);
+  const createdApp = (await createRes.json()).application;
+
+  const receiptBuf = generateReceiptPdfBuffer(createdApp);
+  assert.ok(receiptBuf.toString('ascii').includes('ACCUSE DE RECEPTION DE DOSSIER ELECTRONIQUE'));
+  assert.equal(validateAndInspectPdfUpload(receiptBuf, { fileName: 'accuse.pdf' }).isSafePdf, true);
+
+  // Anti-IDOR : un autre requerant recoit 403
+  const idorReceiptRes = await receiptRoute.GET(new Request(
+    `http://localhost:3000/api/applications/receipt.pdf?ref=${encodeURIComponent(createdApp.referenceNumber)}`,
+    { headers: { Authorization: `Bearer ${tokenOther}` } }
+  ));
+  assert.equal(idorReceiptRes.status, 403);
+
+  // Proprietaire recoit 200 PDF authentique
+  const okReceiptRes = await receiptRoute.GET(new Request(
+    `http://localhost:3000/api/applications/receipt.pdf?ref=${encodeURIComponent(createdApp.referenceNumber)}`,
+    { headers: { Authorization: `Bearer ${tokenOwner}` } }
+  ));
+  assert.equal(okReceiptRes.status, 200);
+  assert.equal(okReceiptRes.headers.get('content-type'), 'application/pdf');
+  const receiptArrBuf = Buffer.from(await okReceiptRes.arrayBuffer());
+  assert.ok(receiptArrBuf.toString('ascii').startsWith('%PDF-1.4\n'));
+
+  // 4. Audit WCAG 2.1 AA + zero ?token= + zero lien fnpss.cd
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
 
 
 

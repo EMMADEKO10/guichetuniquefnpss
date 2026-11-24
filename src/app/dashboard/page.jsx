@@ -602,6 +602,25 @@ export default function DashboardPage() {
                     <button type="button" onClick={() => setThreadApp(app)} className="btn btn-sm btn-outline">
                       💬 Échanges
                     </button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await downloadAuthenticatedFile(
+                            `/api/applications/receipt.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
+                            sessionToken,
+                            { fallbackFileName: `Accuse-${app.referenceNumber}.pdf` }
+                          );
+                          toast.success('Accusé de réception PDF téléchargé.');
+                        } catch (err) {
+                          toast.error(err.message || 'Téléchargement impossible.', 'Accusé indisponible');
+                        }
+                      }}
+                    >
+                      🧾 Accusé PDF
+                    </Button>
                     {app.certificate && (
                       <>
                         <Button
@@ -720,6 +739,26 @@ export default function DashboardPage() {
                         >
                           💬 Échanges
                         </button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          title="Télécharger l'Accusé de Réception PDF (REQ-06)"
+                          onClick={async () => {
+                            try {
+                              await downloadAuthenticatedFile(
+                                `/api/applications/receipt.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
+                                sessionToken,
+                                { fallbackFileName: `Accuse-${app.referenceNumber}.pdf` }
+                              );
+                              toast.success('Accusé de réception PDF téléchargé.');
+                            } catch (err) {
+                              toast.error(err.message || 'Téléchargement impossible.', 'Accusé indisponible');
+                            }
+                          }}
+                        >
+                          🧾 Accusé PDF
+                        </Button>
                         {app.certificate && (
                           <>
                             <Button
