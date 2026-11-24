@@ -16,6 +16,7 @@ import EmptyState from '../../components/ui/EmptyState.jsx';
 import { SkeletonKpiGrid, SkeletonCard } from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken, getClientUser, saveClientSession, clearClientSession } from '../../lib/client-auth.js';
+import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
 
 const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
 
@@ -67,6 +68,7 @@ export default function AdminPage() {
   const [workQueueTab, setWorkQueueTab] = useState('TODO'); // 'TODO' | 'COMPLEMENTS' | 'DELIVERED' | 'ALL'
   const [selectedService, setSelectedService] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [showExecStats, setShowExecStats] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modales
@@ -710,13 +712,23 @@ export default function AdminPage() {
               <Button variant="primary" size="sm" isLoading={isSubmitting} onClick={handleDeployAmoy}>
                 ⛓️ Qualifier Contrat Amoy (BLK-11)
               </Button>
-              <a
-                href={`/api/admin/stats?format=csv&token=${encodeURIComponent(sessionToken)}`}
-                className="btn btn-outline btn-sm"
-                style={{ textDecoration: 'none' }}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await downloadAuthenticatedFile('/api/admin/stats?format=csv', sessionToken, {
+                      fallbackFileName: 'fnpss-statistiques-reconciliation.csv'
+                    });
+                    toast.success('Export CSV statistiques téléchargé.');
+                  } catch (err) {
+                    notify('error', err.message || 'Export CSV impossible.', 'Échec Export');
+                  }
+                }}
               >
                 📊 Export CSV (ADM-09)
-              </a>
+              </Button>
               <a
                 href="/guide"
                 className="btn btn-outline btn-sm"
@@ -728,6 +740,93 @@ export default function AdminPage() {
           )}
         </div>
       </div>
+
+      {/* Vue Exécutive & Recettes DG / Admin (ADM-09) */}
+      {(role === 'DG' || role === 'ADMIN') && blockchainInfo.stats && (() => {
+        const execStats = blockchainInfo.stats;
+        const serviceList = Object.values(execStats.byService || {});
+        const maxServiceTotal = Math.max(1, ...serviceList.map((s) => s.total || 0));
+        const statusEntries = Object.entries(execStats.byStatus || {});
+        return (
+          <Card
+            title="📊 Vue Exécutive & Recettes (ADM-09)"
+            subtitle="Pilotage consolidé des encaissements, statuts d'instruction et volumes par procédure S1–S6"
+            actions={
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowExecStats((v) => !v)}>
+                {showExecStats ? 'Masquer' : 'Afficher'}
+              </Button>
+            }
+          >
+            {showExecStats ? (
+              <div style={{ display: 'grid', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
+                  <div style={{ background: 'var(--surface-subtle)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-green)' }}>
+                    <div className="text-muted">Recettes réconciliées</div>
+                    <strong style={{ fontSize: '18px', color: 'var(--fnpss-navy)' }}>
+                      {execStats.financials?.totalCollectedFeesUsd ?? 0} USD
+                    </strong>
+                    <div className="text-muted" style={{ fontSize: '11px' }}>
+                      {(execStats.financials?.totalCollectedFeesCdf ?? 0).toLocaleString('fr-FR')} CDF &bull; {execStats.financials?.validatedPaymentsCount ?? 0} quittance(s)
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--surface-subtle)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-blue)' }}>
+                    <div className="text-muted">Actes &amp; Co-signatures</div>
+                    <strong style={{ fontSize: '18px', color: 'var(--fnpss-navy)' }}>
+                      {execStats.totals?.activeCertificatesCount ?? 0} actif(s)
+                    </strong>
+                    <div className="text-muted" style={{ fontSize: '11px' }}>
+                      {execStats.totals?.ministryCoSignedCount ?? 0} co-signé(s) Ministère &bull; {execStats.totals?.registeredOrganizations ?? 0} ONG
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--surface-subtle)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-orange-accessible)' }}>
+                    <div className="text-muted">Répartition par statut</div>
+                    <div className="flex gap-1" style={{ flexWrap: 'wrap', marginTop: '4px' }}>
+                      {statusEntries.map(([stKey, stVal]) => (
+                        <Badge key={stKey} status="neutral">{stKey}: {stVal}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {serviceList.length > 0 && (
+                  <div role="region" aria-label="Volume des dossiers par service S1 à S6">
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--fnpss-navy)', marginBottom: '8px' }}>
+                      Volumes par service FNPSS (S1–S6)
+                    </div>
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      {serviceList.map((svc) => {
+                        const pct = Math.round(((svc.total || 0) / maxServiceTotal) * 100);
+                        return (
+                          <div key={svc.code} style={{ display: 'grid', gridTemplateColumns: '48px 1fr 78px', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+                            <span className="mono" style={{ fontWeight: 700, color: 'var(--fnpss-navy)' }}>{svc.code}</span>
+                            <div style={{ height: '10px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                              <div
+                                style={{
+                                  width: `${svc.total > 0 ? Math.max(8, pct) : 0}%`,
+                                  height: '100%',
+                                  background: 'var(--fnpss-blue)',
+                                  borderRadius: '999px'
+                                }}
+                              />
+                            </div>
+                            <span className="text-muted" style={{ textAlign: 'right' }}>
+                              {svc.total} ({svc.validated} ✓)
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="text-muted" style={{ fontSize: '12px' }}>
+                Vue exécutive réduite — cliquez sur « Afficher » pour consulter les graphiques et recettes.
+              </span>
+            )}
+          </Card>
+        );
+      })()}
 
       {alertInfo && (
         <AlertBanner
@@ -896,15 +995,26 @@ export default function AdminPage() {
                     >
                       🔗 Voir sur PolygonScan Amoy
                     </a>
-                    <a
-                      href={`/api/applications/certificate.pdf?ref=${encodeURIComponent(selectedApp.referenceNumber)}&token=${encodeURIComponent(sessionToken)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-sm btn-success"
-                      style={{ textDecoration: 'none', fontSize: '11px' }}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="success"
+                      style={{ fontSize: '11px' }}
+                      onClick={async () => {
+                        try {
+                          await downloadAuthenticatedFile(
+                            `/api/applications/certificate.pdf?ref=${encodeURIComponent(selectedApp.referenceNumber)}`,
+                            sessionToken,
+                            { fallbackFileName: `${selectedApp.referenceNumber}.pdf` }
+                          );
+                          toast.success('Attestation PDF scellée téléchargée.');
+                        } catch (err) {
+                          notify('error', err.message || 'Téléchargement PDF impossible.', 'PDF indisponible');
+                        }
+                      }}
                     >
                       📥 Télécharger l&apos;Attestation PDF Scellée
-                    </a>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1279,13 +1389,23 @@ export default function AdminPage() {
                   value={auditActionFilter}
                   onChange={(e) => setAuditActionFilter(e.target.value.toUpperCase())}
                 />
-                <a
-                  href={`/api/admin/audit?format=csv&token=${encodeURIComponent(sessionToken)}`}
-                  className="btn btn-sm btn-outline"
-                  style={{ textDecoration: 'none' }}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await downloadAuthenticatedFile('/api/admin/audit?format=csv', sessionToken, {
+                        fallbackFileName: 'fnpss-journal-audit.csv'
+                      });
+                      toast.success('Journal d\'audit CSV téléchargé.');
+                    } catch (err) {
+                      notify('error', err.message || 'Export audit CSV impossible.', 'Échec Export');
+                    }
+                  }}
                 >
                   📥 Exporter Audit CSV (ADM-07)
-                </a>
+                </Button>
               </div>
               {filteredAuditLogs.length === 0 ? (
                 <EmptyState icon="📜" title="Aucune trace d'audit correspondante" />

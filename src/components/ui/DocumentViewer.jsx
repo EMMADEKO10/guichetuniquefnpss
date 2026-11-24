@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Badge from './Badge.jsx';
+import Button from './Button.jsx';
+import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
 
 /**
  * Visionneuse interactive de pièces justificatives (ADM-05, REQ-07)
@@ -22,6 +24,8 @@ export default function DocumentViewer({
 }) {
   const [selectedInternal, setSelectedInternal] = useState('');
   const [verifiedMap, setVerifiedMap] = useState({});
+  const [isOpening, setIsOpening] = useState(false);
+  const [docError, setDocError] = useState('');
   const currentCode = selectedDocCode || selectedInternal;
   const activeDoc = documents.find((d) => d.docCode === currentCode) || documents[0];
 
@@ -156,15 +160,38 @@ export default function DocumentViewer({
 
               {referenceNumber && activeDoc.stored ? (
                 <div>
-                  <a
-                    href={`/api/applications/document?ref=${encodeURIComponent(referenceNumber)}&docCode=${encodeURIComponent(activeDoc.docCode)}${token ? `&token=${encodeURIComponent(token)}` : ''}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-sm btn-primary"
-                    style={{ textDecoration: 'none', display: 'inline-flex' }}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    isLoading={isOpening}
+                    loadingText="Déchiffrement..."
+                    onClick={async () => {
+                      setIsOpening(true);
+                      setDocError('');
+                      try {
+                        await downloadAuthenticatedFile(
+                          `/api/applications/document?ref=${encodeURIComponent(referenceNumber)}&docCode=${encodeURIComponent(activeDoc.docCode)}`,
+                          token,
+                          {
+                            fallbackFileName: activeDoc.fileName || `${activeDoc.docCode}.pdf`,
+                            openInNewTab: true
+                          }
+                        );
+                      } catch (err) {
+                        setDocError(err.message || 'Impossible de déchiffrer la pièce justificative.');
+                      } finally {
+                        setIsOpening(false);
+                      }
+                    }}
                   >
                     🔓 Ouvrir &amp; Déchiffrer le PDF (Cloudinary AES-256-GCM)
-                  </a>
+                  </Button>
+                  {docError && (
+                    <div role="alert" style={{ marginTop: '8px', fontSize: '12px', color: '#991b1b', fontWeight: 600 }}>
+                      {docError}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-muted" style={{ fontSize: '11px' }}>

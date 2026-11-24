@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -19,6 +19,11 @@ export default function VerifierPage() {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraInfo, setCameraInfo] = useState('');
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const scanTimerRef = useRef(null);
 
   const buildHeaders = (extra = {}) => ({
     ...(partnerApiKey.trim() ? { 'X-API-Key': partnerApiKey.trim() } : {}),
@@ -178,6 +183,92 @@ export default function VerifierPage() {
     toast.info('Historique local des contrôles effacé.');
   };
 
+  const stopCameraScan = useCallback(() => {
+    if (scanTimerRef.current) {
+      clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  }, []);
+
+  useEffect(() => stopCameraScan, [stopCameraScan]);
+
+  const extractScannedTarget = (rawValue) => {
+    const trimmed = String(rawValue || '').trim();
+    if (!trimmed) return '';
+    try {
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        const u = new URL(trimmed);
+        return (u.searchParams.get('hash') || u.searchParams.get('cert') || u.searchParams.get('code') || trimmed).trim();
+      }
+    } catch {
+      // Valeur brute non-URL
+    }
+    return trimmed;
+  };
+
+  const startCameraScan = async () => {
+    setCameraInfo('');
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setCameraInfo(
+        'Votre navigateur ne permet pas l\'accès direct à la caméra. Utilisez la saisie du numéro d\'acte ci-dessus ou déposez le fichier PDF ci-dessous.'
+      );
+      return;
+    }
+    if (typeof window === 'undefined' || typeof window.BarcodeDetector !== 'function') {
+      setCameraInfo(
+        'La détection QR native (BarcodeDetector) n\'est pas prise en charge par ce navigateur. Utilisez la saisie directe ou le contrôle par fichier PDF.'
+      );
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      streamRef.current = stream;
+      setCameraActive(true);
+
+      setTimeout(() => {
+        if (videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+      }, 60);
+
+      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      scanTimerRef.current = setInterval(async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes && codes.length > 0 && codes[0].rawValue) {
+            const target = extractScannedTarget(codes[0].rawValue);
+            stopCameraScan();
+            if (target) {
+              setHashInput(target);
+              toast.info('QR Code détecté — vérification en cours...');
+              runVerification(target);
+            }
+          }
+        } catch {
+          // Ignorer une frame illisible
+        }
+      }, 450);
+    } catch {
+      stopCameraScan();
+      setCameraInfo(
+        'Accès caméra refusé ou indisponible sur cet appareil. Saisissez le numéro d\'attestation ou importez le fichier PDF officiel.'
+      );
+    }
+  };
+
   const isGreen = result && (result.verdict === 'PASTILLE_VERTE_VALIDE' || result.statusLabel === 'VALID' || result.isValid === true);
   const isRevoked = result && (result.verdict === 'PASTILLE_ROUGE_REVOQUE' || result.statusLabel === 'REVOKED' || result.status === 2);
   const isExpired = result && (result.verdict === 'PASTILLE_GRISE_EXPIRE' || result.statusLabel === 'EXPIRED' || result.isExpired === true);
@@ -266,6 +357,44 @@ export default function VerifierPage() {
             <Badge status={Number(rateLimitInfo.remaining) > 10 ? 'valide' : 'warning'}>
               {Number(rateLimitInfo.limit) >= 600 ? 'Canal Régie Authentifié' : 'Canal Public'}
             </Badge>
+          </div>
+        )}
+      </Card>
+
+      <Card title="📷 Scanner un QR Code (Caméra Mobile — Inspection Douanière Express)">
+        <div className="flex gap-3 items-center" style={{ flexWrap: 'wrap', marginBottom: cameraActive || cameraInfo ? '12px' : 0 }}>
+          {!cameraActive ? (
+            <Button type="button" variant="primary" size="sm" onClick={startCameraScan}>
+              📷 Activer la caméra QR Code
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={stopCameraScan}>
+              ⏹ Arrêter le scanner caméra
+            </Button>
+          )}
+          <span className="text-muted" style={{ fontSize: '12px' }}>
+            Visez le QR Code imprimé en haut à droite de l&apos;attestation FNPSS (poste frontalier mobile).
+          </span>
+        </div>
+
+        {cameraInfo && (
+          <AlertBanner variant="info" title="Scanner caméra indisponible" message={cameraInfo} style={{ marginBottom: 0 }} />
+        )}
+
+        {cameraActive && (
+          <div style={{ marginTop: '10px', textAlign: 'center' }}>
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              style={{
+                width: '100%',
+                maxWidth: '380px',
+                borderRadius: '10px',
+                border: '2px solid var(--fnpss-blue)',
+                background: '#0a2540'
+              }}
+            />
           </div>
         )}
       </Card>

@@ -234,3 +234,126 @@ export function evaluateG1Gate({
   };
 }
 
+const NEXT_APP_CONTRAST_PAIRS = Object.freeze([
+  { fg: '--text-main', bg: '--bg-page', usage: 'Texte courant sur fond de page' },
+  { fg: '--text-main', bg: '--bg-card', usage: 'Texte courant sur carte' },
+  { fg: '--text-muted', bg: '--bg-page', usage: 'Texte secondaire sur fond de page' },
+  { fg: '--text-muted', bg: '--bg-card', usage: 'Texte secondaire sur carte' },
+  { fg: '#ffffff', bg: '--fnpss-navy', usage: 'Texte blanc sur bleu marine' },
+  { fg: '#ffffff', bg: '--fnpss-blue', usage: 'Bouton primaire bleu (.btn-primary)' },
+  { fg: '#ffffff', bg: '--fnpss-orange-accessible', usage: 'Bouton action FNPSS (.btn-brand)' },
+  { fg: '#ffffff', bg: '--fnpss-green', usage: 'Bouton validation (.btn-success)' },
+  { fg: '#ffffff', bg: '--fnpss-red', usage: 'Bouton danger (.btn-danger)' },
+  { fg: '#ffffff', bg: '--fnpss-accent', usage: 'Bouton accent (.btn-accent)' }
+]);
+
+function collectJsxFiles(dir) {
+  const results = [];
+  if (!fs.existsSync(dir)) return results;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...collectJsxFiles(full));
+    } else if (entry.name.endsWith('.jsx') || entry.name.endsWith('.tsx')) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+/**
+ * Audit statique d'accessibilité WCAG 2.1 AA, sécurité UI et PWA de l'application Next.js (Phase P6).
+ */
+export function auditNextAppAccessibility(rootDir = defaultRootDir) {
+  const cssPath = path.join(rootDir, 'src', 'app', 'globals.css');
+  const layoutPath = path.join(rootDir, 'src', 'app', 'layout.jsx');
+  const css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
+  const layout = fs.existsSync(layoutPath) ? fs.readFileSync(layoutPath, 'utf8') : '';
+
+  const cssVars = {};
+  for (const m of css.matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,6})\s*;/g)) {
+    cssVars[m[1]] = m[2];
+  }
+  const resolve = token => (token.startsWith('--') ? cssVars[token] : token);
+
+  const findings = [];
+  const addCheck = (id, label, ok, detail = '') => findings.push({ id, label, ok, detail });
+
+  addCheck('NEXT_A11Y_LANG', 'Langue déclarée <html lang="fr"> dans layout.jsx', /<html[^>]*\blang="fr"/i.test(layout));
+  addCheck('NEXT_A11Y_SKIP_LINK', 'Lien d\'évitement .skip-link présent', layout.includes('skip-link') && layout.includes('#main-content'));
+  addCheck('NEXT_A11Y_VIEWPORT', 'Configuration viewport responsive exportée', /export\s+const\s+viewport\s*=/i.test(layout));
+  addCheck('NEXT_A11Y_FOCUS', 'Indicateurs clavier :focus-visible définis', css.includes(':focus-visible'));
+
+  const mediaCount = (css.match(/@media\s*\(/g) || []).length;
+  addCheck('NEXT_A11Y_RESPONSIVE', 'Règles responsives mobile-first (@media)', mediaCount > 0, `${mediaCount} media query(ies)`);
+
+  const contrastResults = NEXT_APP_CONTRAST_PAIRS.map(pair => {
+    const fgHex = resolve(pair.fg);
+    const bgHex = resolve(pair.bg);
+    if (!fgHex || !bgHex) {
+      return { ...pair, ratio: null, passesAA: false, detail: 'Token CSS introuvable' };
+    }
+    const ratio = computeContrastRatio(fgHex, bgHex);
+    return { ...pair, fgHex, bgHex, ratio, passesAA: ratio >= 4.5 };
+  });
+  const failingContrasts = contrastResults.filter(c => !c.passesAA);
+  addCheck(
+    'NEXT_A11Y_CONTRAST_AA',
+    'Contrastes WCAG 2.1 AA ≥ 4,5:1 sur les tokens Next.js',
+    failingContrasts.length === 0,
+    failingContrasts.length
+      ? failingContrasts.map(c => `${c.usage} = ${c.ratio}`).join(' ; ')
+      : `${contrastResults.length} couples conformes`
+  );
+
+  const jsxFiles = [
+    ...collectJsxFiles(path.join(rootDir, 'src', 'app')),
+    ...collectJsxFiles(path.join(rootDir, 'src', 'components'))
+  ];
+  const imgsMissingAlt = [];
+  const leakyTokenLinks = [];
+  for (const filePath of jsxFiles) {
+    const src = fs.readFileSync(filePath, 'utf8');
+    const imgs = src.match(/<img\b[^>]*>/gi) || [];
+    for (const tag of imgs) {
+      if (!/\balt=/i.test(tag)) imgsMissingAlt.push(path.relative(rootDir, filePath));
+    }
+    if (/href\s*=\s*\{?[^}]*token=/i.test(src)) {
+      leakyTokenLinks.push(path.relative(rootDir, filePath));
+    }
+  }
+
+  addCheck(
+    'NEXT_A11Y_IMG_ALT',
+    'Toutes les images JSX ont un attribut alt',
+    imgsMissingAlt.length === 0,
+    imgsMissingAlt.length ? imgsMissingAlt.join(', ') : `${jsxFiles.length} fichiers contrôlés`
+  );
+  addCheck(
+    'NEXT_SEC_NO_TOKEN_URL',
+    'Aucun lien href avec ?token= exposé dans les composants UI',
+    leakyTokenLinks.length === 0,
+    leakyTokenLinks.length ? leakyTokenLinks.join(', ') : 'Téléchargements via Bearer sécurisés'
+  );
+
+  const manifestPath = path.join(rootDir, 'public', 'manifest.webmanifest');
+  const swPath = path.join(rootDir, 'public', 'sw.js');
+  let validManifest = false;
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      validManifest = Boolean(m.name && m.short_name && Array.isArray(m.icons) && m.icons.length > 0);
+    } catch {
+      validManifest = false;
+    }
+  }
+  addCheck('NEXT_PWA_READY', 'Manifeste PWA valide et Service Worker présents', validManifest && fs.existsSync(swPath));
+
+  return {
+    standard: 'WCAG 2.1 AA + Sécurité UI + PWA (Next.js App Router)',
+    passed: findings.every(f => f.ok),
+    findings,
+    contrastResults
+  };
+}
+

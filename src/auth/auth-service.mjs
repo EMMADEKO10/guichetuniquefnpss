@@ -143,6 +143,10 @@ export class AuthService {
       authProvider: 'EMAIL_PASSWORD',
       status: 'ACTIVE',
       statusReason: '',
+      notificationPreferences: {
+        emailEnabled: true,
+        slaAlertsEnabled: true
+      },
       failedLoginAttempts: 0,
       lockedUntil: null,
       createdAt: new Date().toISOString()
@@ -219,6 +223,10 @@ export class AuthService {
         authProvider: 'GOOGLE_OAUTH',
         status: 'ACTIVE',
         statusReason: '',
+        notificationPreferences: {
+          emailEnabled: true,
+          slaAlertsEnabled: true
+        },
         failedLoginAttempts: 0,
         lockedUntil: null,
         createdAt: new Date().toISOString()
@@ -293,7 +301,7 @@ export class AuthService {
   /**
    * Mise à jour du profil de l'organisation et du représentant légal (REQ-04).
    */
-  updateOrganizationProfile(userId, { firstName, lastName, organizationName, province, enrollmentNumber }) {
+  updateOrganizationProfile(userId, { firstName, lastName, organizationName, province, enrollmentNumber, notificationPreferences }) {
     const user = this.usersById.get(userId);
     if (!user) {
       throw new Error('Utilisateur introuvable');
@@ -303,6 +311,19 @@ export class AuthService {
     if (organizationName !== undefined) user.organizationName = String(organizationName).trim();
     if (province !== undefined) user.province = String(province).trim();
     if (enrollmentNumber !== undefined) user.enrollmentNumber = enrollmentNumber;
+    if (notificationPreferences && typeof notificationPreferences === 'object') {
+      const prev = user.notificationPreferences || { emailEnabled: true, slaAlertsEnabled: true };
+      user.notificationPreferences = {
+        emailEnabled:
+          notificationPreferences.emailEnabled !== undefined
+            ? Boolean(notificationPreferences.emailEnabled)
+            : prev.emailEnabled,
+        slaAlertsEnabled:
+          notificationPreferences.slaAlertsEnabled !== undefined
+            ? Boolean(notificationPreferences.slaAlertsEnabled)
+            : prev.slaAlertsEnabled
+      };
+    }
 
     this._log('PROFILE_UPDATED', user.email, { userId: user.id, organizationName: user.organizationName });
     return this._sanitizeUser(user);
@@ -463,7 +484,13 @@ export class AuthService {
 
   _sanitizeUser(user) {
     const { passwordHash, ...safe } = user;
-    return { ...safe };
+    return {
+      ...safe,
+      notificationPreferences: {
+        emailEnabled: user.notificationPreferences?.emailEnabled !== false,
+        slaAlertsEnabled: user.notificationPreferences?.slaAlertsEnabled !== false
+      }
+    };
   }
 }
 

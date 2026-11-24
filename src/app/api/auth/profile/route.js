@@ -64,7 +64,8 @@ export async function PUT(request) {
       lastName: body.lastName,
       organizationName: body.organizationName,
       province: body.province,
-      enrollmentNumber: body.enrollmentNumber
+      enrollmentNumber: body.enrollmentNumber,
+      notificationPreferences: body.notificationPreferences
     });
     await persistToNeon();
 

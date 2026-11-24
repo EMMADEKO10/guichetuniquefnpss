@@ -24,7 +24,11 @@ export default function ProfilePage() {
     enrollmentNumber: '',
     email: '',
     walletAddress: '',
-    role: 'REQUERANT'
+    role: 'REQUERANT',
+    notificationPreferences: {
+      emailEnabled: true,
+      slaAlertsEnabled: true
+    }
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +70,11 @@ export default function ProfilePage() {
           enrollmentNumber: data.user.enrollmentNumber || '',
           email: data.user.email || '',
           walletAddress: data.user.walletAddress || '',
-          role: data.user.role || 'REQUERANT'
+          role: data.user.role || 'REQUERANT',
+          notificationPreferences: {
+            emailEnabled: data.user.notificationPreferences?.emailEnabled !== false,
+            slaAlertsEnabled: data.user.notificationPreferences?.slaAlertsEnabled !== false
+          }
         });
       }
     } catch {
@@ -94,7 +102,8 @@ export default function ProfilePage() {
           lastName: profile.lastName,
           organizationName: profile.organizationName,
           province: profile.province,
-          enrollmentNumber: profile.enrollmentNumber
+          enrollmentNumber: profile.enrollmentNumber,
+          notificationPreferences: profile.notificationPreferences
         })
       });
 
@@ -290,6 +299,54 @@ export default function ProfilePage() {
               onChange={(e) => setProfile({ ...profile, enrollmentNumber: e.target.value })}
               placeholder="Ex : FNPSS-ONG-2026-NK-0442"
             />
+          </div>
+
+          <div
+            role="group"
+            aria-label="Préférences de notifications"
+            style={{
+              background: 'var(--surface-subtle)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              padding: '14px',
+              marginTop: '14px'
+            }}
+          >
+            <strong style={{ display: 'block', fontSize: '13.5px', color: 'var(--fnpss-navy)', marginBottom: '8px' }}>
+              Préférences de Notifications (NOT-01 / NOT-02)
+            </strong>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={profile.notificationPreferences?.emailEnabled !== false}
+                onChange={(e) =>
+                  setProfile({
+                    ...profile,
+                    notificationPreferences: {
+                      ...profile.notificationPreferences,
+                      emailEnabled: e.target.checked
+                    }
+                  })
+                }
+              />
+              <span>Recevoir les notifications transactionnelles par email</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={profile.notificationPreferences?.slaAlertsEnabled !== false}
+                onChange={(e) =>
+                  setProfile({
+                    ...profile,
+                    notificationPreferences: {
+                      ...profile.notificationPreferences,
+                      slaAlertsEnabled: e.target.checked
+                    }
+                  })
+                }
+              />
+              <span>Recevoir les alertes prioritaires SLA et compléments</span>
+            </label>
           </div>
 
           <div className="flex justify-between items-center" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>

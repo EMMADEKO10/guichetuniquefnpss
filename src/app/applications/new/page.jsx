@@ -9,6 +9,7 @@ import { useToast } from '../../../components/ui/ToastProvider.jsx';
 import { getClientToken, getClientUser } from '../../../lib/client-auth.js';
 
 const DRAFT_STORAGE_KEY = 'fnpss_new_app_draft_v1';
+const OFFLINE_QUEUE_KEY = 'fnpss_offline_queue_v1';
 
 export default function NewApplicationPage() {
   const toast = useToast();
@@ -240,9 +241,39 @@ export default function NewApplicationPage() {
         window.dispatchEvent(new Event('fnpss-notif-refresh'));
       }
     } catch {
-      const warnMsg = 'Connexion interrompue. Votre brouillon reste sauvegardé localement et sera prêt dès le retour du réseau.';
+      const offlineKey = `offline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const offlinePayload = {
+        serviceCode,
+        organizationName,
+        projectTitle,
+        goodsSummary,
+        paymentReference,
+        attachedDocuments: documentsArray,
+        idempotencyKey: offlineKey
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          const prevRaw = window.localStorage.getItem(OFFLINE_QUEUE_KEY);
+          const prevQueue = prevRaw ? JSON.parse(prevRaw) : [];
+          const nextQueue = [
+            ...(Array.isArray(prevQueue) ? prevQueue : []),
+            {
+              idempotencyKey: offlineKey,
+              savedAt: new Date().toISOString(),
+              payload: offlinePayload
+            }
+          ];
+          window.localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(nextQueue));
+          window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+          window.dispatchEvent(new Event('fnpss-offline-queue-updated'));
+        } catch {
+          // Ignorer les erreurs de quota localStorage
+        }
+      }
+      const warnMsg =
+        'Connexion interrompue : votre dossier a été placé dans la file hors-ligne PWA. Il sera synchronisé sans doublon dès le retour du réseau.';
       setFeedback({ type: 'warning', message: warnMsg });
-      toast.warning(warnMsg, 'Mode hors-ligne PWA');
+      toast.warning(warnMsg, 'Mis en file hors-ligne PWA');
     } finally {
       setIsLoading(false);
     }

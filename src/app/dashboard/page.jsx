@@ -15,6 +15,7 @@ import EmptyState from '../../components/ui/EmptyState.jsx';
 import { SkeletonKpiGrid, SkeletonCard } from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken } from '../../lib/client-auth.js';
+import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
 
 const COMPLEMENT_DOC_OPTIONS = [
   { code: 'P1_REQUETE', label: 'P1 — Requête motivée' },
@@ -600,15 +601,25 @@ export default function DashboardPage() {
                       💬 Échanges
                     </button>
                     {app.certificate && (
-                      <a
-                        href={`/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}&token=${encodeURIComponent(sessionToken)}`}
-                        className="btn btn-sm btn-success"
-                        style={{ textDecoration: 'none' }}
-                        target="_blank"
-                        rel="noreferrer"
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="success"
+                        onClick={async () => {
+                          try {
+                            await downloadAuthenticatedFile(
+                              `/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
+                              sessionToken,
+                              { fallbackFileName: `${app.referenceNumber}.pdf` }
+                            );
+                            toast.success('Attestation PDF officielle téléchargée.');
+                          } catch (err) {
+                            toast.error(err.message || 'Téléchargement impossible.', 'PDF indisponible');
+                          }
+                        }}
                       >
                         📥 PDF Scellé
-                      </a>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -698,15 +709,25 @@ export default function DashboardPage() {
                           💬 Échanges
                         </button>
                         {app.certificate && (
-                          <a
-                            href={`/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}&token=${encodeURIComponent(sessionToken)}`}
-                            className="btn btn-sm btn-success"
-                            style={{ textDecoration: 'none' }}
-                            target="_blank"
-                            rel="noreferrer"
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="success"
+                            onClick={async () => {
+                              try {
+                                await downloadAuthenticatedFile(
+                                  `/api/applications/certificate.pdf?ref=${encodeURIComponent(app.referenceNumber)}`,
+                                  sessionToken,
+                                  { fallbackFileName: `${app.referenceNumber}.pdf` }
+                                );
+                                toast.success('Attestation PDF officielle téléchargée.');
+                              } catch (err) {
+                                toast.error(err.message || 'Téléchargement impossible.', 'PDF indisponible');
+                              }
+                            }}
                           >
                             📥 PDF Scellé
-                          </a>
+                          </Button>
                         )}
                       </div>
                     </td>

@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
-import Badge from '../../../components/ui/Badge.jsx';
+import AlertBanner from '../../../components/ui/AlertBanner.jsx';
+import { useToast } from '../../../components/ui/ToastProvider.jsx';
 
 export default function ResetPasswordPage() {
+  const toast = useToast();
   const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,8 +19,12 @@ export default function ResetPasswordPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get('token');
+      const devStored = window.sessionStorage.getItem('fnpss_dev_reset_token');
       if (urlToken) {
         setToken(urlToken);
+      } else if (devStored) {
+        setToken(devStored);
+        window.sessionStorage.removeItem('fnpss_dev_reset_token');
       }
     }
   }, []);
@@ -52,9 +58,12 @@ export default function ResetPasswordPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || 'Lien invalide ou expiré.');
+        const msg = data.error || 'Lien invalide ou expiré.';
+        setErrorMessage(msg);
+        toast.error(msg, 'Réinitialisation refusée');
       } else {
         setSuccessMessage('Votre mot de passe a été réinitialisé avec succès !');
+        toast.success('Mot de passe mis à jour. Redirection vers la connexion...');
         setTimeout(() => {
           if (typeof window !== 'undefined') {
             window.location.href = '/auth/login';
@@ -63,6 +72,7 @@ export default function ResetPasswordPage() {
       }
     } catch (err) {
       setErrorMessage('Erreur réseau. Impossible de contacter le serveur.');
+      toast.error('Erreur réseau.', 'Connexion interrompue');
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +83,14 @@ export default function ResetPasswordPage() {
       <Card
         title={
           <div style={{ textAlign: 'center', width: '100%' }}>
-            <h2 style={{ fontSize: '18px', color: 'var(--fnpss-navy)' }}>Nouveau Mot de Passe</h2>
+            <img
+              src="/brand/logo-fnpss.png"
+              alt="Logo officiel FNPSS"
+              width={38}
+              height={38}
+              style={{ objectFit: 'contain', marginBottom: '6px' }}
+            />
+            <h2 style={{ fontSize: '18px', color: 'var(--fnpss-navy)', margin: 0 }}>Nouveau Mot de Passe</h2>
             <p className="text-muted" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>
               Finalisation de la réinitialisation (REQ-03)
             </p>
@@ -81,16 +98,22 @@ export default function ResetPasswordPage() {
         }
       >
         {errorMessage && (
-          <div style={{ background: '#fce8e6', borderLeft: '4px solid var(--fnpss-red)', padding: '10px 12px', borderRadius: '4px', marginBottom: '14px', fontSize: '12.5px', color: '#b31412' }} role="alert">
-            {errorMessage}
-          </div>
+          <AlertBanner
+            variant="error"
+            title="Validation requise"
+            message={errorMessage}
+            onClose={() => setErrorMessage('')}
+            style={{ marginBottom: '14px' }}
+          />
         )}
 
         {successMessage && (
-          <div style={{ background: '#e6f4ea', borderLeft: '4px solid var(--fnpss-green)', padding: '10px 12px', borderRadius: '4px', marginBottom: '14px', fontSize: '12.5px', color: '#0d652d' }} role="status">
-            {successMessage}
-            <div style={{ marginTop: '6px', fontSize: '11.5px' }}>Redirection vers la page de connexion...</div>
-          </div>
+          <AlertBanner
+            variant="success"
+            title="Succès"
+            message={`${successMessage} Redirection vers la page de connexion...`}
+            style={{ marginBottom: '14px' }}
+          />
         )}
 
         <form onSubmit={handleReset}>

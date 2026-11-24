@@ -1,14 +1,17 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
+import AlertBanner from '../../../components/ui/AlertBanner.jsx';
+import { useToast } from '../../../components/ui/ToastProvider.jsx';
 import { saveClientSession } from '../../../lib/client-auth.js';
 
 const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
 export default function LoginPage() {
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -38,9 +41,12 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || 'Identifiants invalides. Veuillez réessayer.');
+        const msg = data.error || 'Identifiants invalides. Veuillez réessayer.';
+        setErrorMessage(msg);
+        toast.error(msg, 'Connexion refusée');
       } else {
         setSuccessMessage('Connexion réussie ! Redirection...');
+        toast.success('Connexion réussie au Guichet Unique FNPSS.');
         finishLogin(data);
       }
     } catch (err) {
@@ -133,7 +139,14 @@ export default function LoginPage() {
       <Card
         title={
           <div style={{ textAlign: 'center', width: '100%' }}>
-            <h2 style={{ fontSize: '18px', color: 'var(--fnpss-navy)' }}>Connexion au Guichet Unique</h2>
+            <img
+              src="/brand/logo-fnpss.png"
+              alt="Logo officiel FNPSS"
+              width={40}
+              height={40}
+              style={{ objectFit: 'contain', marginBottom: '6px' }}
+            />
+            <h2 style={{ fontSize: '18px', color: 'var(--fnpss-navy)', margin: 0 }}>Connexion au Guichet Unique</h2>
             <p className="text-muted" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>
               Espace sécurisé pour les ONG, ASBL et mandataires agréés
             </p>
@@ -141,15 +154,22 @@ export default function LoginPage() {
         }
       >
         {errorMessage && (
-          <div style={{ background: '#fce8e6', borderLeft: '4px solid var(--fnpss-red)', padding: '10px 12px', borderRadius: '4px', marginBottom: '14px', fontSize: '12.5px', color: '#b31412' }} role="alert">
-            {errorMessage}
-          </div>
+          <AlertBanner
+            variant="error"
+            title="Échec d'authentification"
+            message={errorMessage}
+            onClose={() => setErrorMessage('')}
+            style={{ marginBottom: '14px' }}
+          />
         )}
 
         {successMessage && (
-          <div style={{ background: '#e6f4ea', borderLeft: '4px solid var(--fnpss-green)', padding: '10px 12px', borderRadius: '4px', marginBottom: '14px', fontSize: '12.5px', color: '#0d652d' }} role="status">
-            {successMessage}
-          </div>
+          <AlertBanner
+            variant="success"
+            title="Authentifié"
+            message={successMessage}
+            style={{ marginBottom: '14px' }}
+          />
         )}
 
         <form onSubmit={handleLogin}>

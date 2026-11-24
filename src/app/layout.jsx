@@ -2,11 +2,13 @@ import React from 'react';
 import './globals.css';
 import Header from '../components/ui/Header.jsx';
 import Footer from '../components/ui/Footer.jsx';
+import PwaManager from '../components/ui/PwaManager.jsx';
 import { ToastProvider } from '../components/ui/ToastProvider.jsx';
 
 export const metadata = {
   title: 'Guichet Unique Dématérialisé — FNPSS (RDC)',
   description: 'FNPSS — Le social dans la solidarité. Portail officiel dématérialisé d\'enrôlement, de partenariat, d\'avis techniques et d\'exonérations pour les ONG et ASBL en RDC.',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: '/brand/favicon-fnpss.png',
     apple: '/brand/favicon-fnpss.png'
@@ -31,6 +33,7 @@ export default function RootLayout({ children }) {
           </a>
           <Header />
           <main className="container" id="main-content">
+            <PwaManager />
             {children}
           </main>
           <Footer />

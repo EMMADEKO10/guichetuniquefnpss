@@ -3220,6 +3220,76 @@ test('Test 31 - Notifications multi-acteurs (anti-IDOR), identite visuelle auto-
   }
 });
 
+test('Test 32 - Audit WCAG 2.1 AA Next.js, securite UI sans token URL, PWA hors-ligne et preferences notifications (P5-P6)', async () => {
+  const path = await import('node:path');
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const profileRoute = await import('../src/app/api/auth/profile/route.js');
+
+  // 1. Audit WCAG 2.1 AA, securite UI (zero ?token=) et PWA de l'application Next.js
+  const audit = auditNextAppAccessibility(process.cwd());
+  for (const finding of audit.findings) {
+    assert.equal(finding.ok, true, `Echec audit Next.js (${finding.id}): ${finding.label} — ${finding.detail}`);
+  }
+  assert.equal(audit.passed, true);
+
+  // 2. Persistance des preferences de notifications sur /api/auth/profile
+  const jsonReq = (url, method, body, token) =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+  const email = `ong.t32.${Date.now()}@example.cd`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Test Preferences 32',
+    representativeName: 'Patrice Mbuyi',
+    email,
+    password: 'PasswordRDC#2026'
+  }));
+
+  const loginRes = await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', {
+    email,
+    password: 'PasswordRDC#2026'
+  }));
+  assert.equal(loginRes.status, 200);
+  const { sessionToken } = await loginRes.json();
+
+  const putRes = await profileRoute.PUT(jsonReq('http://localhost:3000/api/auth/profile', 'PUT', {
+    notificationPreferences: { emailEnabled: false, slaAlertsEnabled: true }
+  }, sessionToken));
+  assert.equal(putRes.status, 200);
+  const putData = await putRes.json();
+  assert.equal(putData.user.notificationPreferences.emailEnabled, false);
+  assert.equal(putData.user.notificationPreferences.slaAlertsEnabled, true);
+
+  const getRes = await profileRoute.GET(new Request('http://localhost:3000/api/auth/profile', {
+    headers: { Authorization: `Bearer ${sessionToken}` }
+  }));
+  assert.equal(getRes.status, 200);
+  const getData = await getRes.json();
+  assert.equal(getData.user.notificationPreferences.emailEnabled, false);
+  assert.equal(getData.user.notificationPreferences.slaAlertsEnabled, true);
+
+  // 3. Presence des modules PWA, telechargement securise et scan QR camera
+  for (const rel of [
+    'src/lib/secure-download.js',
+    'src/components/ui/PwaManager.jsx',
+    'public/manifest.webmanifest',
+    'public/sw.js'
+  ]) {
+    assert.equal(fs.existsSync(path.join(process.cwd(), rel)), true, `Fichier manquant: ${rel}`);
+  }
+
+  const verifierSrc = fs.readFileSync(path.join(process.cwd(), 'src/app/verifier/page.jsx'), 'utf8');
+  assert.ok(verifierSrc.includes('getUserMedia') && verifierSrc.includes('BarcodeDetector'));
+});
+
 
 
 

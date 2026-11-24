@@ -3,8 +3,11 @@
 import React, { useState } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
+import AlertBanner from '../../../components/ui/AlertBanner.jsx';
+import { useToast } from '../../../components/ui/ToastProvider.jsx';
 
 export default function RegisterPage() {
+  const toast = useToast();
   const [formData, setFormData] = useState({
     organizationName: '',
     legalForm: 'ONG_NATIONALE',
@@ -46,12 +49,16 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || 'Erreur lors de la création du compte.');
+        const msg = data.error || 'Erreur lors de la création du compte.';
+        setErrorMessage(msg);
+        toast.error(msg, 'Inscription refusée');
       } else {
         setSuccessMessage('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
+        toast.success('Compte ONG / ASBL enregistré sur le Guichet Unique.');
       }
     } catch (err) {
       setErrorMessage('Erreur réseau. Veuillez réessayer ultérieurement.');
+      toast.error('Erreur réseau lors de la création du compte.', 'Erreur Réseau');
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +69,14 @@ export default function RegisterPage() {
       <Card
         title={
           <div style={{ textAlign: 'center', width: '100%' }}>
-            <h2 style={{ fontSize: '18px', color: 'var(--fnpss-navy)' }}>Création de Compte ONG / ASBL</h2>
+            <img
+              src="/brand/logo-fnpss.png"
+              alt="Logo officiel FNPSS"
+              width={40}
+              height={40}
+              style={{ objectFit: 'contain', marginBottom: '6px' }}
+            />
+            <h2 style={{ fontSize: '18px', color: 'var(--fnpss-navy)', margin: 0 }}>Création de Compte ONG / ASBL</h2>
             <p className="text-muted" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>
               Enregistrez votre organisation pour accéder aux démarches dématérialisées
             </p>
@@ -70,18 +84,27 @@ export default function RegisterPage() {
         }
       >
         {errorMessage && (
-          <div style={{ background: '#fce8e6', borderLeft: '4px solid var(--fnpss-red)', padding: '10px 12px', borderRadius: '4px', marginBottom: '14px', fontSize: '12.5px', color: '#b31412' }} role="alert">
-            {errorMessage}
-          </div>
+          <AlertBanner
+            variant="error"
+            title="Validation requise"
+            message={errorMessage}
+            onClose={() => setErrorMessage('')}
+            style={{ marginBottom: '14px' }}
+          />
         )}
 
         {successMessage && (
-          <div style={{ background: '#e6f4ea', borderLeft: '4px solid var(--fnpss-green)', padding: '10px 12px', borderRadius: '4px', marginBottom: '14px', fontSize: '12.5px', color: '#0d652d' }} role="status">
-            {successMessage}{' '}
-            <a href="/auth/login" style={{ color: 'var(--fnpss-green)', fontWeight: 700 }}>
-              Aller à la connexion &rarr;
-            </a>
-          </div>
+          <AlertBanner
+            variant="success"
+            title="Compte créé"
+            message={successMessage}
+            action={
+              <a href="/auth/login" className="btn btn-sm btn-success" style={{ textDecoration: 'none' }}>
+                Aller à la connexion &rarr;
+              </a>
+            }
+            style={{ marginBottom: '14px' }}
+          />
         )}
 
         <form onSubmit={handleRegister}>
@@ -129,7 +152,7 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
             <div className="form-group">
               <label htmlFor="reg-email">Email Professionnel</label>
               <input
@@ -158,7 +181,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
             <div className="form-group">
               <label htmlFor="reg-pass">Mot de Passe</label>
               <input
