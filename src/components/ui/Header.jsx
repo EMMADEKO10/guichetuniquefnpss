@@ -98,22 +98,9 @@ export default function Header({
   };
 
   return (
-    <>
+    <div className="site-header-sticky">
       <div className="drc-ribbon" role="presentation" />
-      <header
-        style={{
-          background: 'var(--fnpss-navy)',
-          color: '#ffffff',
-          padding: '10px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px',
-          borderBottom: '2px solid var(--fnpss-orange)',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
-        }}
-      >
+      <header className="site-header-bar">
         <a
           href="/"
           style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}
@@ -228,6 +215,6 @@ export default function Header({
           )}
         </nav>
       </header>
-    </>
+    </div>
   );
 }
