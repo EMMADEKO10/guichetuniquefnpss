@@ -3825,6 +3825,64 @@ test('Test 40 - Typographie auto-hebergee (Plus Jakarta Sans, Inter, JetBrains M
   assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
 });
 
+test('Test 41 - Identite officielle fnpss.org, logos HD optimises 3G et tutelle institutionnelle', async () => {
+  const path = await import('node:path');
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+
+  const requiredAssets = [
+    'logo-fnpss.png',
+    'favicon-fnpss.png',
+    'logo-fnpss-horizontal.webp',
+    'logo-fnpss-mono.webp',
+    'logo-ministere-affaires-sociales.webp',
+    'logo-fsrdc.png',
+    'hero-solidarite-nationale.webp',
+    'terrain-fnpss-action.jpg',
+    'fnpss-wave.svg'
+  ];
+
+  for (const name of requiredAssets) {
+    const filePath = path.join(process.cwd(), 'public/brand', name);
+    assert.equal(fs.existsSync(filePath), true, `Asset manquant dans public/brand/: ${name}`);
+    const bytes = fs.readFileSync(filePath);
+    assert.ok(bytes.length > 100, `${name} ne doit pas etre vide`);
+    assert.ok(bytes.length < 200 * 1024, `${name} (${bytes.length} octets) depasse le budget 3G de 200 KB`);
+    if (name.endsWith('.png')) {
+      assert.equal(bytes[0], 0x89, `${name} doit avoir un en-tete PNG valide`);
+      assert.equal(bytes[1], 0x50, `${name} doit avoir un en-tete PNG valide`);
+    }
+  }
+
+  const rawFolder = path.join(
+    process.cwd(),
+    'public',
+    'FNPSS _ Investments, Partnerships & Donations company in the Republic Democratic of Congo'
+  );
+  assert.equal(fs.existsSync(rawFolder), false, 'Le dossier brut non optimise doit etre retire de public/');
+
+  const footerSrc = fs.readFileSync('src/components/ui/Footer.jsx', 'utf8');
+  const homeSrc = fs.readFileSync('src/app/page.jsx', 'utf8');
+  const emailSrc = fs.readFileSync('src/notifications/email-templates.mjs', 'utf8');
+
+  for (const [label, src] of [
+    ['Footer.jsx', footerSrc],
+    ['page.jsx', homeSrc],
+    ['email-templates.mjs', emailSrc]
+  ]) {
+    assert.ok(src.includes('https://www.fnpss.org/'), `${label} doit referencer le site officiel https://www.fnpss.org/`);
+    assert.ok(src.includes('Kinshasa-Gombe'), `${label} doit mentionner le siege Kinshasa-Gombe`);
+    assert.ok(src.includes('Ministère des Affaires Sociales'), `${label} doit mentionner la tutelle du Ministere des Affaires Sociales`);
+    assert.equal(/https?:\/\/fnpss\.cd/i.test(src), false, `${label} ne doit contenir aucune URL externe fnpss.cd`);
+  }
+
+  assert.ok(homeSrc.includes('hero-solidarite-nationale.webp'));
+  assert.ok(homeSrc.includes('terrain-fnpss-action.jpg'));
+  assert.ok(homeSrc.includes('logo-fsrdc.png'));
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
+
 
 
 

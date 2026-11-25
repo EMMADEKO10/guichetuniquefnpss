@@ -70,11 +70,11 @@ export default function RegisterPage() {
         title={
           <div style={{ textAlign: 'center', width: '100%' }}>
             <img
-              src="/brand/logo-fnpss.png"
-              alt="Logo officiel FNPSS"
-              width={40}
-              height={40}
-              style={{ objectFit: 'contain', marginBottom: '6px' }}
+              src="/brand/logo-fnpss-horizontal.webp"
+              alt="Logo officiel FNPSS — Fonds National de Promotion et de Service Social"
+              width={210}
+              height={72}
+              style={{ objectFit: 'contain', maxWidth: '100%', height: 'auto', margin: '0 auto 10px', display: 'block' }}
             />
             <h2 style={{ fontSize: '18px', color: 'var(--fnpss-navy)', margin: 0 }}>Création de Compte ONG / ASBL</h2>
             <p className="text-muted" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>

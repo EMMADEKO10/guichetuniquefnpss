@@ -1,7 +1,10 @@
-const CACHE_NAME = 'fnpss-static-v1';
+const CACHE_NAME = 'fnpss-static-v2';
 const PRECACHE_URLS = [
   '/brand/logo-fnpss.png',
   '/brand/favicon-fnpss.png',
+  '/brand/logo-fnpss-horizontal.webp',
+  '/brand/logo-ministere-affaires-sociales.webp',
+  '/brand/fnpss-wave.svg',
   '/manifest.webmanifest'
 ];
 

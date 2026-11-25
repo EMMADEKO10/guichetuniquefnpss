@@ -31,8 +31,9 @@ export default function DesignSystemPage() {
 
   const tokens = [
     { name: '--fnpss-navy', hex: '#0a2540', role: 'Marine institutionnelle (Header, titres)', contrast: '14.8:1 sur blanc (AAA)' },
-    { name: '--fnpss-blue', hex: '#0066b2', role: 'Bleu République / Congo (Actions primaires)', contrast: '5.7:1 sur blanc (AA)' },
-    { name: '--fnpss-orange-accessible', hex: '#b83d08', role: 'Orange FNPSS Texte & CTA (Accessible)', contrast: '6.3:1 sur blanc (AA+)' },
+    { name: '--fnpss-royal', hex: '#0b4ea2', role: 'Bleu Royal FNPSS fnpss.org (Actions primaires)', contrast: '8.3:1 sur blanc (AAA)' },
+    { name: '--fnpss-blue', hex: '#065a82', role: 'Bleu République / Secondaire (Liens, bordures)', contrast: '7.2:1 sur blanc (AAA)' },
+    { name: '--fnpss-orange-accessible', hex: '#b83d08', role: 'Orange Alerte & CTA Action (Accessible)', contrast: '6.3:1 sur blanc (AA+)' },
     { name: '--fnpss-orange', hex: '#df5311', role: 'Orange FNPSS Charte Graphique (Bordures / Icônes)', contrast: 'Décoratif / grands éléments' },
     { name: '--fnpss-green', hex: '#137333', role: 'Vert Souverain (Validé / Pastille Verte)', contrast: '5.9:1 sur blanc (AA)' },
     { name: '--fnpss-red', hex: '#c5221f', role: 'Rouge Alerte (Rejet / Révocation)', contrast: '5.6:1 sur blanc (AA)' },
@@ -68,16 +69,58 @@ export default function DesignSystemPage() {
 
   return (
     <div style={{ maxWidth: '1080px', margin: '10px auto 32px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <img src="/brand/logo-fnpss.png" alt="Logo FNPSS" width={52} height={52} style={{ objectFit: 'contain' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        <img src="/brand/logo-fnpss.png" alt="Logo officiel FNPSS" width={54} height={57} style={{ objectFit: 'contain' }} />
         <div>
-          <Badge status="brand" style={{ marginBottom: '4px' }}>Système de Design &amp; Signaux v1.0</Badge>
+          <Badge status="info" style={{ marginBottom: '4px' }}>Système de Design &amp; Identité fnpss.org</Badge>
           <h2 style={{ margin: 0 }}>Charte Graphique &amp; Composants FNPSS</h2>
           <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
-            &laquo; Le social dans la solidarité &raquo; &mdash; Référentiel visuel de production accessible WCAG 2.1 AA et optimisé 3G.
+            &laquo; Le social dans la solidarité &raquo; &mdash; Référentiel visuel officiel accessible WCAG 2.1 AA et optimisé 3G.
           </p>
         </div>
       </div>
+
+      <Card title="0. Identité Visuelle & Déclinaisons Officielles (fnpss.org)">
+        <div className="partners-strip" style={{ marginBottom: 0 }}>
+          <div className="partner-logo-card">
+            <img src="/brand/logo-fnpss.png" alt="Sceau officiel FNPSS HD" width={72} height={76} style={{ objectFit: 'contain' }} />
+            <div style={{ fontSize: '12px' }}>
+              <strong style={{ color: 'var(--fnpss-navy)' }}>Sceau Principal FNPSS</strong>
+              <div className="text-muted">Header, Favicon PWA, Certificats &amp; Contrôle Douane</div>
+            </div>
+          </div>
+          <div className="partner-logo-card">
+            <img src="/brand/logo-fnpss-horizontal.webp" alt="Logo horizontal officiel FNPSS" width={200} height={68} style={{ objectFit: 'contain', maxWidth: '100%', height: 'auto' }} />
+            <div style={{ fontSize: '12px' }}>
+              <strong style={{ color: 'var(--fnpss-navy)' }}>Logo Horizontal fnpss.org</strong>
+              <div className="text-muted">Bannière d&apos;accueil, Auth &amp; Pied de page</div>
+            </div>
+          </div>
+          <div className="partner-logo-card">
+            <img src="/brand/logo-fnpss-mono.webp" alt="Emblème monochrome FNPSS" width={68} height={67} style={{ objectFit: 'contain' }} />
+            <div style={{ fontSize: '12px' }}>
+              <strong style={{ color: 'var(--fnpss-navy)' }}>Emblème Monochrome</strong>
+              <div className="text-muted">Sceaux d&apos;impression PDF &amp; filigranes</div>
+            </div>
+          </div>
+          <div className="partner-logo-card">
+            <div className="ministere-logo-crop">
+              <img src="/brand/logo-ministere-affaires-sociales.webp" alt="Ministère des Affaires Sociales RDC" width={210} height={74} />
+            </div>
+            <div style={{ fontSize: '12px' }}>
+              <strong style={{ color: 'var(--fnpss-navy)' }}>Ministère de Tutelle</strong>
+              <div className="text-muted">Affaires Sociales, Actions Humanitaires &amp; Solidarité</div>
+            </div>
+          </div>
+          <div className="partner-logo-card">
+            <img src="/brand/logo-fsrdc.png" alt="Fonds Social de la RDC" width={190} height={68} style={{ objectFit: 'contain', maxWidth: '100%', height: 'auto' }} />
+            <div style={{ fontSize: '12px' }}>
+              <strong style={{ color: 'var(--fnpss-navy)' }}>Partenaire Institutionnel</strong>
+              <div className="text-muted">Fonds Social de la République Démocratique du Congo</div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card title="1. Palette Institutionnelle & Contraste">
         <div className="drc-ribbon" style={{ marginBottom: '16px', borderRadius: '4px' }} />

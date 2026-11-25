@@ -345,6 +345,13 @@ export default function VerifierPage() {
   return (
     <div style={{ maxWidth: '860px', margin: '20px auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <img
+          src="/brand/logo-fnpss.png"
+          alt="Sceau officiel FNPSS"
+          width={52}
+          height={55}
+          style={{ objectFit: 'contain', display: 'block', margin: '0 auto 10px' }}
+        />
         <Badge status="valide" style={{ marginBottom: '8px' }}>
           DGDA &bull; DGI &bull; DGRAD &bull; Contrôle Douanier Souverain
         </Badge>

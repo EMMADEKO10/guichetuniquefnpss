@@ -110,7 +110,7 @@ export function renderBrandedEmailHtml({
           </tr>
           <!-- En-tête institutionnel FNPSS -->
           <tr>
-            <td style="background:#0a2540;padding:18px 24px;border-bottom:3px solid #df5311;">
+            <td style="background:#0a2540;padding:18px 24px;border-bottom:3px solid #0b4ea2;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td width="56" valign="middle">
@@ -120,7 +120,7 @@ export function renderBrandedEmailHtml({
                   </td>
                   <td valign="middle" style="padding-left:12px;">
                     <div style="font-size:16px;font-weight:800;color:#ffffff;line-height:1.25;">Guichet Unique Dématérialisé — FNPSS</div>
-                    <div style="font-size:12px;color:#fdba74;font-weight:600;margin-top:2px;">Fonds National de Promotion et de Service Social &bull; &laquo; Le social dans la solidarité &raquo;</div>
+                    <div style="font-size:12px;color:#f7d618;font-weight:600;margin-top:2px;">Fonds National de Promotion et de Service Social &bull; &laquo; Le social dans la solidarité &raquo;</div>
                   </td>
                 </tr>
               </table>
@@ -153,9 +153,12 @@ export function renderBrandedEmailHtml({
               <div style="font-weight:700;color:#0a2540;margin-bottom:3px;">
                 République Démocratique du Congo &bull; Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale
               </div>
+              <div style="margin-bottom:4px;">
+                Siège social FNPSS : Croisement Boulevard du 30 Juin &amp; Avenue Batetela, Kinshasa-Gombe, RDC &bull; contact@fnpss.org &bull; <a href="https://www.fnpss.org/" style="color:#0b4ea2;font-weight:600;">www.fnpss.org</a>
+              </div>
               <div>
                 FNPSS — Notification automatique du Guichet Unique conforme au Code du Numérique (Ordonnance-Loi n&deg; 23/010).
-                Vérification publique : <a href="${escapeHtml(cleanBase)}/verifier" style="color:#065a82;font-weight:600;">${escapeHtml(cleanBase)}/verifier</a>
+                Vérification publique : <a href="${escapeHtml(cleanBase)}/verifier" style="color:#0b4ea2;font-weight:600;">${escapeHtml(cleanBase)}/verifier</a>
               </div>
             </td>
           </tr>

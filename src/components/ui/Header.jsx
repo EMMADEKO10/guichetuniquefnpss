@@ -126,7 +126,8 @@ export default function Header({
                 height: '44px',
                 borderRadius: '10px',
                 background: '#ffffff',
-                border: '2px solid var(--fnpss-orange)',
+                border: '1.5px solid rgba(255,255,255,0.88)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.22)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -137,8 +138,8 @@ export default function Header({
               <img
                 src="/brand/logo-fnpss.png"
                 alt="Logo officiel FNPSS"
-                width={36}
-                height={36}
+                width={38}
+                height={38}
                 style={{ objectFit: 'contain', display: 'block' }}
               />
             </div>
@@ -147,7 +148,7 @@ export default function Header({
                 Guichet Unique Dématérialisé
               </h1>
               <p style={{ fontSize: '11.5px', color: '#cbd5e1', margin: 0, lineHeight: 1.2 }}>
-                FNPSS &bull; <span style={{ color: '#fdba74', fontWeight: 600 }}>Le social dans la solidarité</span> &bull; RDC
+                FNPSS &bull; <span style={{ color: '#f7d618', fontWeight: 600 }}>Le social dans la solidarité</span> &bull; RDC
               </p>
             </div>
           </a>
