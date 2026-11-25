@@ -47,6 +47,9 @@ export default function DashboardPage() {
   const [applications, setApplications] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedNotifIds, setSelectedNotifIds] = useState([]);
+  const [confirmDeleteAllNotifs, setConfirmDeleteAllNotifs] = useState(false);
+  const [isDeletingNotifs, setIsDeletingNotifs] = useState(false);
   const [selectedService, setSelectedService] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
@@ -102,10 +105,20 @@ export default function DashboardPage() {
         setApplications(data.applications || []);
       }
       const nRes = await fetch('/api/notifications', { headers: { Authorization: `Bearer ${t}` } });
-      if (nRes.ok) {
+      if (nRes.status === 401) {
+        clearClientSession();
+        setSessionToken('');
+        setAuthExpired(true);
+        setNotifications([]);
+        setUnreadCount(0);
+        setSelectedNotifIds([]);
+      } else if (nRes.ok) {
         const nData = await nRes.json();
-        setNotifications(nData.notifications || []);
+        const nextNotifs = nData.notifications || [];
+        setNotifications(nextNotifs);
         setUnreadCount(nData.unreadCount || 0);
+        const validIds = new Set(nextNotifs.map((n) => n.id));
+        setSelectedNotifIds((prev) => prev.filter((id) => validIds.has(id)));
       }
     } catch (err) {
       console.error('Erreur chargement demandes', err);
@@ -131,6 +144,33 @@ export default function DashboardPage() {
     }
   };
 
+  const refreshNotificationsOnly = useCallback(async () => {
+    const t = getToken();
+    if (!t) return;
+    try {
+      const nRes = await fetch('/api/notifications', { headers: { Authorization: `Bearer ${t}` } });
+      if (nRes.status === 401) {
+        clearClientSession();
+        setSessionToken('');
+        setAuthExpired(true);
+        setNotifications([]);
+        setUnreadCount(0);
+        setSelectedNotifIds([]);
+        return;
+      }
+      if (nRes.ok) {
+        const nData = await nRes.json();
+        const nextNotifs = nData.notifications || [];
+        setNotifications(nextNotifs);
+        setUnreadCount(nData.unreadCount || 0);
+        const validIds = new Set(nextNotifs.map((n) => n.id));
+        setSelectedNotifIds((prev) => prev.filter((id) => validIds.has(id)));
+      }
+    } catch {
+      // Silencieux si réseau indisponible
+    }
+  }, []);
+
   const handleMarkAllRead = async () => {
     try {
       const res = await fetch('/api/notifications', {
@@ -138,19 +178,122 @@ export default function DashboardPage() {
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ markAllRead: true })
       });
+      if (res.status === 401) {
+        clearClientSession();
+        setAuthExpired(true);
+        return;
+      }
       if (res.ok) {
         toast.success('Toutes vos notifications ont été marquées comme lues.');
         window.dispatchEvent(new Event('fnpss-notif-refresh'));
-        fetchApplications();
+        refreshNotificationsOnly();
       }
     } catch {
       toast.error('Erreur lors de la mise à jour des notifications.');
     }
   };
 
+  const toggleNotifSelection = (id) => {
+    setSelectedNotifIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    setIsDeletingNotifs(true);
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ notificationId })
+      });
+      if (res.status === 401) {
+        clearClientSession();
+        setAuthExpired(true);
+        return;
+      }
+      if (!res.ok) {
+        toast.error('Impossible de supprimer cette notification.');
+        return;
+      }
+      setSelectedNotifIds((prev) => prev.filter((id) => id !== notificationId));
+      toast.success('Notification supprimée.');
+      window.dispatchEvent(new Event('fnpss-notif-refresh'));
+      await refreshNotificationsOnly();
+    } catch {
+      toast.error('Erreur réseau lors de la suppression.');
+    } finally {
+      setIsDeletingNotifs(false);
+    }
+  };
+
+  const handleDeleteSelectedNotifications = async () => {
+    if (selectedNotifIds.length === 0) return;
+    setIsDeletingNotifs(true);
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ notificationIds: selectedNotifIds })
+      });
+      if (res.status === 401) {
+        clearClientSession();
+        setAuthExpired(true);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Suppression groupée impossible.');
+        return;
+      }
+      setSelectedNotifIds([]);
+      toast.success(`${data.deletedCount || 0} notification(s) supprimée(s).`);
+      window.dispatchEvent(new Event('fnpss-notif-refresh'));
+      await refreshNotificationsOnly();
+    } catch {
+      toast.error('Erreur réseau lors de la suppression.');
+    } finally {
+      setIsDeletingNotifs(false);
+    }
+  };
+
+  const handleDeleteAllNotifications = async () => {
+    setIsDeletingNotifs(true);
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ deleteAll: true })
+      });
+      if (res.status === 401) {
+        clearClientSession();
+        setAuthExpired(true);
+        setConfirmDeleteAllNotifs(false);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Impossible de supprimer toutes les notifications.');
+        return;
+      }
+      setSelectedNotifIds([]);
+      setConfirmDeleteAllNotifs(false);
+      toast.success(`${data.deletedCount || 0} notification(s) supprimée(s).`);
+      window.dispatchEvent(new Event('fnpss-notif-refresh'));
+      await refreshNotificationsOnly();
+    } catch {
+      toast.error('Erreur réseau lors de la suppression.');
+    } finally {
+      setIsDeletingNotifs(false);
+    }
+  };
+
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
+
+  useEffect(() => {
+    window.addEventListener('fnpss-notif-refresh', refreshNotificationsOnly);
+    return () => window.removeEventListener('fnpss-notif-refresh', refreshNotificationsOnly);
+  }, [refreshNotificationsOnly]);
 
   const filteredApps = applications.filter((app) => {
     if (selectedService !== 'ALL' && app.serviceCode !== selectedService) return false;
@@ -841,11 +984,25 @@ export default function DashboardPage() {
         title={`Centre de Notifications (${unreadCount} non lue${unreadCount > 1 ? 's' : ''}) — NOT-02`}
         style={{ marginTop: '20px' }}
         actions={
-          unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
-              <AppIcon name="check" size="xs" />
-              <span>Tout marquer comme lu</span>
-            </Button>
+          notifications.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {unreadCount > 0 && (
+                <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={isDeletingNotifs}>
+                  <AppIcon name="check" size="xs" />
+                  <span>Tout marquer comme lu</span>
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDeleteAllNotifs(true)}
+                disabled={isDeletingNotifs}
+                style={{ color: '#991b1b', borderColor: '#fecaca' }}
+              >
+                <AppIcon name="delete" size="xs" />
+                <span>Tout supprimer</span>
+              </Button>
+            </div>
           )
         }
       >
@@ -855,38 +1012,113 @@ export default function DashboardPage() {
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {notifications.slice(0, 6).map((n) => (
-                <div
-                  key={n.id}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border)',
-                    background: n.read ? '#ffffff' : '#eef6fc',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '10px'
-                  }}
-                >
-                  <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                    <div style={{ fontWeight: n.read ? 600 : 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
-                      {n.title}
-                    </div>
-                    <div className="text-muted" style={{ fontSize: '12px', wordBreak: 'break-word' }}>{n.message}</div>
-                  </div>
-                {!n.read && (
-                  <button
-                    type="button"
-                    onClick={() => handleMarkNotificationRead(n.id)}
-                    className="btn btn-sm btn-outline"
+            {(() => {
+              const displayedNotifs = notifications.slice(0, 12);
+              const allDisplayedSelected =
+                displayedNotifs.length > 0 && displayedNotifs.every((n) => selectedNotifIds.includes(n.id));
+              return (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      background: 'var(--surface-subtle)',
+                      border: '1px solid var(--border)'
+                    }}
                   >
-                    Marquer lu
-                  </button>
-                )}
-              </div>
-            ))}
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: 'var(--fnpss-navy)', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        className="notif-checkbox"
+                        checked={allDisplayedSelected}
+                        onChange={() => {
+                          if (allDisplayedSelected) {
+                            setSelectedNotifIds([]);
+                          } else {
+                            setSelectedNotifIds(displayedNotifs.map((n) => n.id));
+                          }
+                        }}
+                        aria-label="Sélectionner toutes les notifications affichées"
+                      />
+                      <span>Tout sélectionner ({displayedNotifs.length})</span>
+                    </label>
+                    {selectedNotifIds.length > 0 && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={handleDeleteSelectedNotifications}
+                        isLoading={isDeletingNotifs}
+                      >
+                        <AppIcon name="delete" size="xs" />
+                        <span>Supprimer la sélection ({selectedNotifIds.length})</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {displayedNotifs.map((n) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: n.read ? '#ffffff' : '#eef6fc',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: '1 1 240px', minWidth: 0 }}>
+                        <input
+                          type="checkbox"
+                          className="notif-checkbox"
+                          style={{ marginTop: '4px' }}
+                          checked={selectedNotifIds.includes(n.id)}
+                          onChange={() => toggleNotifSelection(n.id)}
+                          aria-label={`Sélectionner la notification : ${n.title}`}
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: n.read ? 600 : 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
+                            {n.title}
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '12px', wordBreak: 'break-word' }}>{n.message}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        {!n.read && (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkNotificationRead(n.id)}
+                            disabled={isDeletingNotifs}
+                            className="btn btn-sm btn-outline"
+                          >
+                            Marquer lu
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteNotification(n.id)}
+                          disabled={isDeletingNotifs}
+                          className="btn btn-sm btn-outline"
+                          style={{ color: '#991b1b', borderColor: '#fecaca' }}
+                          aria-label={`Supprimer la notification : ${n.title}`}
+                        >
+                          <AppIcon name="delete" size="xs" />
+                          <span>Supprimer</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
           </div>
         )}
       </Card>
@@ -1044,6 +1276,18 @@ export default function DashboardPage() {
         confirmLabel="Oui, retirer ce dossier"
         variant="danger"
         isLoading={isSubmitting}
+      />
+
+      {/* Confirmation suppression totale des notifications (NOT-02) */}
+      <ConfirmDialog
+        isOpen={confirmDeleteAllNotifs}
+        onClose={() => setConfirmDeleteAllNotifs(false)}
+        onConfirm={handleDeleteAllNotifications}
+        title="Supprimer toutes les notifications ?"
+        message={`Cette action supprimera définitivement l'ensemble de vos ${notifications.length} notification(s) dans votre centre in-app.`}
+        confirmLabel="Tout supprimer"
+        variant="danger"
+        isLoading={isDeletingNotifs}
       />
 
       {/* Modale QR Code de Vérification DGDA */}

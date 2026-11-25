@@ -8,7 +8,7 @@ const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
 
 /**
  * Cloche de notifications globale dans l'en-tête (tous rôles : Requérant & Staff FNPSS).
- * Polling toutes les 30s + rafraîchissement sur événement 'fnpss-notif-refresh' et 'fnpss-auth-change'.
+ * Supporte lecture, marquage lu, suppression unitaire, par sélection et suppression totale.
  */
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,6 +16,9 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [emailRetryQueued, setEmailRetryQueued] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMutating, setIsMutating] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -25,6 +28,8 @@ export default function NotificationBell() {
       setHasSession(false);
       setNotifications([]);
       setUnreadCount(0);
+      setSelectedIds([]);
+      setConfirmDeleteAll(false);
       return;
     }
     setHasSession(true);
@@ -38,13 +43,19 @@ export default function NotificationBell() {
         setHasSession(false);
         setNotifications([]);
         setUnreadCount(0);
+        setSelectedIds([]);
+        setConfirmDeleteAll(false);
         return;
       }
       if (!res.ok) return;
       const data = await res.json();
-      setNotifications(data.notifications || []);
+      const nextList = data.notifications || [];
+      setNotifications(nextList);
       setUnreadCount(Number(data.unreadCount) || 0);
       setEmailRetryQueued(Number(data.emailRetryQueued) || 0);
+      const validIds = new Set(nextList.map((n) => n.id));
+      setSelectedIds((prev) => prev.filter((id) => validIds.has(id)));
+      if (nextList.length === 0) setConfirmDeleteAll(false);
     } catch {
       // Silencieux en mode hors-ligne
     } finally {
@@ -71,10 +82,14 @@ export default function NotificationBell() {
     const handleOutside = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setIsOpen(false);
+        setConfirmDeleteAll(false);
       }
     };
     const handleEsc = (e) => {
-      if (e.key === 'Escape') setIsOpen(false);
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        setConfirmDeleteAll(false);
+      }
     };
     if (isOpen) {
       document.addEventListener('mousedown', handleOutside);
@@ -88,39 +103,74 @@ export default function NotificationBell() {
 
   if (!hasSession) return null;
 
-  const markRead = async (notificationId) => {
-    const token = getClientToken();
-    if (!token) return;
-    try {
-      const res = await fetch('/api/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ notificationId, read: true })
-      });
-      if (res.ok) {
-        await loadNotifications();
-        window.dispatchEvent(new Event('fnpss-notif-refresh'));
-      }
-    } catch {
-      // Ignore
+  const visibleNotifications = notifications.slice(0, 20);
+  const allVisibleSelected =
+    visibleNotifications.length > 0 && visibleNotifications.every((n) => selectedIds.includes(n.id));
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(visibleNotifications.map((n) => n.id));
     }
   };
 
-  const markAllRead = async () => {
+  const sendNotifMutation = async (method, payload) => {
     const token = getClientToken();
-    if (!token) return;
+    if (!token) return false;
+    setIsMutating(true);
     try {
       const res = await fetch('/api/notifications', {
-        method: 'PUT',
+        method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ markAllRead: true })
+        body: JSON.stringify(payload)
       });
+      if (res.status === 401) {
+        clearClientSession();
+        setHasSession(false);
+        setNotifications([]);
+        setUnreadCount(0);
+        setSelectedIds([]);
+        return false;
+      }
       if (res.ok) {
         await loadNotifications();
         window.dispatchEvent(new Event('fnpss-notif-refresh'));
+        return true;
       }
+      return false;
     } catch {
-      // Ignore
+      return false;
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const markRead = (notificationId) => sendNotifMutation('PUT', { notificationId, read: true });
+  const markAllRead = () => sendNotifMutation('PUT', { markAllRead: true });
+
+  const deleteOne = async (notificationId) => {
+    const ok = await sendNotifMutation('DELETE', { notificationId });
+    if (ok) {
+      setSelectedIds((prev) => prev.filter((id) => id !== notificationId));
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = await sendNotifMutation('DELETE', { notificationIds: selectedIds });
+    if (ok) setSelectedIds([]);
+  };
+
+  const deleteAll = async () => {
+    const ok = await sendNotifMutation('DELETE', { deleteAll: true });
+    if (ok) {
+      setSelectedIds([]);
+      setConfirmDeleteAll(false);
     }
   };
 
@@ -136,6 +186,7 @@ export default function NotificationBell() {
         onClick={() => {
           const next = !isOpen;
           setIsOpen(next);
+          if (!next) setConfirmDeleteAll(false);
           if (next) loadNotifications();
         }}
         aria-label={`Notifications (${unreadCount} non lue${unreadCount > 1 ? 's' : ''})`}
@@ -179,6 +230,7 @@ export default function NotificationBell() {
                 <button
                   type="button"
                   onClick={markAllRead}
+                  disabled={isMutating}
                   className="btn btn-sm btn-outline"
                   style={{ fontSize: '11px', padding: '3px 8px' }}
                 >
@@ -188,6 +240,7 @@ export default function NotificationBell() {
               <button
                 type="button"
                 onClick={loadNotifications}
+                disabled={isMutating}
                 className="btn btn-sm btn-outline"
                 style={{ fontSize: '11px', padding: '3px 8px' }}
                 title="Actualiser"
@@ -198,7 +251,74 @@ export default function NotificationBell() {
             </div>
           </div>
 
-          <div style={{ overflowY: 'auto', maxHeight: '350px', padding: '8px' }}>
+          {notifications.length > 0 && (
+            <div className="notif-toolbar">
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600, color: 'var(--fnpss-navy)', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  className="notif-checkbox"
+                  checked={allVisibleSelected}
+                  onChange={toggleSelectAll}
+                  aria-label="Sélectionner toutes les notifications affichées"
+                />
+                <span>Tout sélectionner</span>
+              </label>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {selectedIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={deleteSelected}
+                    disabled={isMutating}
+                    className="btn btn-sm btn-danger"
+                    style={{ fontSize: '11px', padding: '3px 8px' }}
+                  >
+                    <AppIcon name="delete" size="xs" />
+                    <span>Supprimer ({selectedIds.length})</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteAll((v) => !v)}
+                  disabled={isMutating}
+                  className="btn btn-sm btn-outline"
+                  style={{ fontSize: '11px', padding: '3px 8px', color: '#991b1b', borderColor: '#fecaca' }}
+                >
+                  <AppIcon name="delete" size="xs" />
+                  <span>Tout supprimer</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {confirmDeleteAll && notifications.length > 0 && (
+            <div className="notif-confirm-bar" role="alert">
+              <span>
+                Supprimer définitivement toutes vos notifications ({notifications.length}) ?
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={deleteAll}
+                  disabled={isMutating}
+                  className="btn btn-sm btn-danger"
+                  style={{ fontSize: '11px', padding: '3px 10px' }}
+                >
+                  Confirmer la suppression
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteAll(false)}
+                  disabled={isMutating}
+                  className="btn btn-sm btn-outline"
+                  style={{ fontSize: '11px', padding: '3px 10px' }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ overflowY: 'auto', maxHeight: '320px', padding: '8px' }}>
             {isLoading && notifications.length === 0 ? (
               <p className="text-muted text-center" style={{ padding: '20px', fontSize: '12.5px' }}>
                 Chargement des notifications...
@@ -208,7 +328,7 @@ export default function NotificationBell() {
                 Aucune notification pour le moment.
               </p>
             ) : (
-              notifications.slice(0, 12).map((n) => (
+              visibleNotifications.map((n) => (
                 <div
                   key={n.id}
                   style={{
@@ -216,46 +336,71 @@ export default function NotificationBell() {
                     borderRadius: '8px',
                     marginBottom: '6px',
                     border: '1px solid var(--border)',
-                    background: n.read ? '#ffffff' : '#eef6fc'
+                    background: n.read ? '#ffffff' : '#eef6fc',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div style={{ fontWeight: n.read ? 600 : 700, fontSize: '12px', color: 'var(--fnpss-navy)' }}>
-                      {!n.read && <span style={{ color: 'var(--fnpss-orange-accessible)', marginRight: '4px' }}>●</span>}
-                      {n.title}
+                  <input
+                    type="checkbox"
+                    className="notif-checkbox"
+                    style={{ marginTop: '3px' }}
+                    checked={selectedIds.includes(n.id)}
+                    onChange={() => toggleSelect(n.id)}
+                    aria-label={`Sélectionner la notification : ${n.title}`}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                      <div style={{ fontWeight: n.read ? 600 : 700, fontSize: '12px', color: 'var(--fnpss-navy)', wordBreak: 'break-word' }}>
+                        {!n.read && <span className="status-dot status-dot-orange" aria-hidden="true" style={{ marginRight: '6px' }} />}
+                        {n.title}
+                      </div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                        {!n.read && (
+                          <button
+                            type="button"
+                            onClick={() => markRead(n.id)}
+                            disabled={isMutating}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--fnpss-blue)',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Lu
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => deleteOne(n.id)}
+                          disabled={isMutating}
+                          className="notif-delete-btn"
+                          title="Supprimer cette notification"
+                          aria-label={`Supprimer la notification : ${n.title}`}
+                        >
+                          <AppIcon name="delete" size="xs" />
+                        </button>
+                      </div>
                     </div>
-                    {!n.read && (
-                      <button
-                        type="button"
-                        onClick={() => markRead(n.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--fnpss-blue)',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          flexShrink: 0
-                        }}
-                      >
-                        Lu
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-muted" style={{ fontSize: '11.5px', marginTop: '3px' }}>
-                    {n.message}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                    <span>{n.createdAt ? new Date(n.createdAt).toLocaleString('fr-FR') : ''}</span>
-                    {n.referenceNumber && (
-                      <a
-                        href={`${targetWorkspaceHref}?ref=${encodeURIComponent(n.referenceNumber)}`}
-                        onClick={() => setIsOpen(false)}
-                        style={{ color: 'var(--fnpss-blue)', fontWeight: 700, textDecoration: 'none' }}
-                      >
-                        Ouvrir {n.referenceNumber} &rarr;
-                      </a>
-                    )}
+                    <div className="text-muted" style={{ fontSize: '11.5px', marginTop: '3px', wordBreak: 'break-word' }}>
+                      {n.message}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                      <span>{n.createdAt ? new Date(n.createdAt).toLocaleString('fr-FR') : ''}</span>
+                      {n.referenceNumber && (
+                        <a
+                          href={`${targetWorkspaceHref}?ref=${encodeURIComponent(n.referenceNumber)}`}
+                          onClick={() => setIsOpen(false)}
+                          style={{ color: 'var(--fnpss-blue)', fontWeight: 700, textDecoration: 'none' }}
+                        >
+                          Ouvrir {n.referenceNumber} &rarr;
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))

@@ -150,7 +150,14 @@ export class NotificationCenter {
     return sentCount;
   }
 
+  _isSharedNotification(n) {
+    return n.userId === 'ALL' || (Array.isArray(n.targetRoles) && n.targetRoles.length > 0);
+  }
+
   _isNotificationVisibleFor(n, userId, userRole) {
+    if (userId && Array.isArray(n.deletedBy) && n.deletedBy.includes(userId)) {
+      return false;
+    }
     if (!userId) return true;
     if (n.userId === userId || n.userId === 'ALL') return true;
     if (userRole && userRole !== 'REQUERANT' && Array.isArray(n.targetRoles) && n.targetRoles.includes(userRole)) {
@@ -190,7 +197,7 @@ export class NotificationCenter {
    */
   markNotificationRead(notificationId, isRead = true, ownerUserId = null, ownerRole = null) {
     const found = this.inAppNotifications.find(n => n.id === notificationId);
-    if (!found) {
+    if (!found || (ownerUserId && Array.isArray(found.deletedBy) && found.deletedBy.includes(ownerUserId))) {
       throw new Error(`Notification introuvable : ${notificationId}`);
     }
     const isRoleTargeted = Array.isArray(found.targetRoles) && found.targetRoles.length > 0;
@@ -239,6 +246,86 @@ export class NotificationCenter {
       updated += 1;
     }
     return updated;
+  }
+
+  /**
+   * Supprime une notification individuelle pour cet utilisateur (anti-IDOR).
+   * Les notifications partagées (ALL / rôles) sont masquées via `deletedBy` sans affecter les autres acteurs.
+   */
+  deleteNotification(notificationId, ownerUserId = null, ownerRole = null) {
+    const idx = this.inAppNotifications.findIndex(n => n.id === notificationId);
+    if (idx === -1) {
+      throw new Error(`Notification introuvable : ${notificationId}`);
+    }
+    const target = this.inAppNotifications[idx];
+    if (ownerUserId && !this._isNotificationVisibleFor(target, ownerUserId, ownerRole)) {
+      throw new Error(`Notification introuvable : ${notificationId}`);
+    }
+    if (ownerUserId && this._isSharedNotification(target)) {
+      if (!Array.isArray(target.deletedBy)) target.deletedBy = [];
+      if (!target.deletedBy.includes(ownerUserId)) {
+        target.deletedBy.push(ownerUserId);
+      }
+    } else {
+      this.inAppNotifications.splice(idx, 1);
+    }
+    return { deletedCount: 1, notificationId };
+  }
+
+  /**
+   * Supprime une sélection de notifications visibles par l'utilisateur (ignore les IDs étrangers/inexistants).
+   */
+  deleteNotifications(notificationIds = [], ownerUserId = null, ownerRole = null) {
+    const uniqueIds = [
+      ...new Set(
+        (Array.isArray(notificationIds) ? notificationIds : [])
+          .map(id => String(id || '').trim())
+          .filter(Boolean)
+      )
+    ];
+    const deletedIds = [];
+    for (const id of uniqueIds) {
+      const idx = this.inAppNotifications.findIndex(n => n.id === id);
+      if (idx === -1) continue;
+      const target = this.inAppNotifications[idx];
+      if (ownerUserId && !this._isNotificationVisibleFor(target, ownerUserId, ownerRole)) {
+        continue;
+      }
+      if (ownerUserId && this._isSharedNotification(target)) {
+        if (!Array.isArray(target.deletedBy)) target.deletedBy = [];
+        if (!target.deletedBy.includes(ownerUserId)) {
+          target.deletedBy.push(ownerUserId);
+        }
+      } else {
+        this.inAppNotifications.splice(idx, 1);
+      }
+      deletedIds.push(id);
+    }
+    return { deletedCount: deletedIds.length, deletedIds };
+  }
+
+  /**
+   * Supprime toutes les notifications visibles pour cet acteur.
+   */
+  deleteAllNotifications(userId, userRole = null) {
+    let deletedCount = 0;
+    const kept = [];
+    for (const n of this.inAppNotifications) {
+      if (!this._isNotificationVisibleFor(n, userId, userRole)) {
+        kept.push(n);
+        continue;
+      }
+      if (userId && this._isSharedNotification(n)) {
+        if (!Array.isArray(n.deletedBy)) n.deletedBy = [];
+        if (!n.deletedBy.includes(userId)) {
+          n.deletedBy.push(userId);
+        }
+        kept.push(n);
+      }
+      deletedCount += 1;
+    }
+    this.inAppNotifications = kept;
+    return { deletedCount };
   }
 
   /**

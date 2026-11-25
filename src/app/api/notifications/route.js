@@ -139,3 +139,47 @@ export async function POST(request) {
   }
 }
 
+/**
+ * DELETE /api/notifications (NOT-02)
+ * Supprime une notification individuelle, une sélection (`notificationIds`) ou toutes (`deleteAll: true`).
+ */
+export async function DELETE(request) {
+  try {
+    await hydrateFromNeon();
+    const actor = requireActor(request);
+    let body = {};
+    try {
+      body = await readJson(request);
+    } catch {
+      body = {};
+    }
+    const { searchParams } = new URL(request.url);
+
+    if (body.deleteAll === true || searchParams.get('all') === 'true') {
+      const result = applicationEngine.notifications.deleteAllNotifications(actor.id, actor.role);
+      await persistToNeon();
+      return Response.json({ success: true, deleteAll: true, deletedCount: result.deletedCount });
+    }
+
+    if (Array.isArray(body.notificationIds)) {
+      if (body.notificationIds.length === 0) {
+        throw new HttpError(400, 'Aucune notification sélectionnée pour suppression.');
+      }
+      const result = applicationEngine.notifications.deleteNotifications(body.notificationIds, actor.id, actor.role);
+      await persistToNeon();
+      return Response.json({ success: true, deletedCount: result.deletedCount, deletedIds: result.deletedIds });
+    }
+
+    const notificationId = body.notificationId || searchParams.get('id');
+    if (!notificationId) {
+      throw new HttpError(400, 'Identifiant de notification, liste notificationIds ou deleteAll=true requis.');
+    }
+
+    const result = applicationEngine.notifications.deleteNotification(notificationId, actor.id, actor.role);
+    await persistToNeon();
+    return Response.json({ success: true, deletedCount: result.deletedCount, notificationId: result.notificationId });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+

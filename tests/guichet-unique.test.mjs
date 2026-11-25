@@ -3882,6 +3882,179 @@ test('Test 41 - Identite officielle fnpss.org, logos HD optimises 3G et tutelle 
   assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
 });
 
+test('Test 42 - Suppression notifications (unitaire, selection multiple, suppression totale, anti-IDOR et notifications partagees)', async () => {
+  const { applicationEngine } = await import('../src/workflow/application-engine.mjs');
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const notifRoute = await import('../src/app/api/notifications/route.js');
+
+  const jsonReq = (url, method, body, token) =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+  const ts = Date.now();
+  const emailA = `ong.notifA.${ts}@example.cd`;
+  const emailB = `ong.notifB.${ts}@example.cd`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Notif A',
+    representativeName: 'Jean Mutombo',
+    email: emailA,
+    password: 'PasswordRDC#2026'
+  }));
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Notif B',
+    representativeName: 'Claire Kasongo',
+    email: emailB,
+    password: 'PasswordRDC#2026'
+  }));
+
+  const loginA = await (await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', {
+    email: emailA,
+    password: 'PasswordRDC#2026'
+  }))).json();
+  const loginB = await (await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', {
+    email: emailB,
+    password: 'PasswordRDC#2026'
+  }))).json();
+  const loginAgent = await (await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', {
+    email: 'agent@fnpss.cd',
+    password: 'StaffFNPSS#2026'
+  }))).json();
+  const loginChef = await (await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', {
+    email: 'chef.division@fnpss.cd',
+    password: 'StaffFNPSS#2026'
+  }))).json();
+
+  const tokA = loginA.sessionToken;
+  const tokB = loginB.sessionToken;
+
+  const n1 = applicationEngine.notifications.notifyTransactionalEvent({
+    userId: loginA.user.id,
+    email: emailA,
+    eventType: 'APPLICATION_SUBMITTED',
+    referenceNumber: `FNPSS/DEM/2026/T42A1-${ts}`,
+    details: { organizationName: 'ONG Notif A', serviceCode: 'S1' }
+  }).inApp;
+  const n2 = applicationEngine.notifications.notifyTransactionalEvent({
+    userId: loginA.user.id,
+    email: emailA,
+    eventType: 'PAYMENT_VALIDATED',
+    referenceNumber: `FNPSS/DEM/2026/T42A2-${ts}`,
+    details: { organizationName: 'ONG Notif A', serviceCode: 'S1' }
+  }).inApp;
+  const n3 = applicationEngine.notifications.notifyTransactionalEvent({
+    userId: loginA.user.id,
+    email: emailA,
+    eventType: 'COMPLEMENT_REQUESTED',
+    referenceNumber: `FNPSS/DEM/2026/T42A3-${ts}`,
+    details: { organizationName: 'ONG Notif A', reason: 'Piece T42' }
+  }).inApp;
+  const nB = applicationEngine.notifications.notifyTransactionalEvent({
+    userId: loginB.user.id,
+    email: emailB,
+    eventType: 'APPLICATION_SUBMITTED',
+    referenceNumber: `FNPSS/DEM/2026/T42B1-${ts}`,
+    details: { organizationName: 'ONG Notif B', serviceCode: 'S2' }
+  }).inApp;
+
+  const broadcast = applicationEngine.notifications.sendBroadcastCommunication({
+    senderId: loginAgent.user.id,
+    subject: `Comm unique T42-${ts}`,
+    message: 'Communication test 42'
+  });
+  const broadcastNotifId = `notif-${broadcast.id}`;
+
+  const roleNotif = applicationEngine.notifications.notifyRoleEvent({
+    targetRoles: ['AGENT', 'CHEF_DIVISION'],
+    title: `Alerte role T42-${ts}`,
+    message: 'Alerte partagee staff'
+  });
+
+  // 1. Validation erreurs 400 sur requetes invalides/vides
+  const emptyIdsRes = await notifRoute.DELETE(jsonReq('http://localhost:3000/api/notifications', 'DELETE', { notificationIds: [] }, tokA));
+  assert.equal(emptyIdsRes.status, 400);
+  const missingPayloadRes = await notifRoute.DELETE(jsonReq('http://localhost:3000/api/notifications', 'DELETE', {}, tokA));
+  assert.equal(missingPayloadRes.status, 400);
+
+  // 2. Suppression unitaire pour A + controle anti-IDOR sur notification de B
+  const beforeARes = await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokA}` } }));
+  const beforeA = await beforeARes.json();
+  assert.equal(beforeA.notifications.some((n) => n.id === n1.id), true);
+
+  const idorSingleRes = await notifRoute.DELETE(jsonReq('http://localhost:3000/api/notifications', 'DELETE', { notificationId: nB.id }, tokA));
+  assert.equal(idorSingleRes.status, 404);
+
+  const singleDelRes = await notifRoute.DELETE(jsonReq('http://localhost:3000/api/notifications', 'DELETE', { notificationId: n1.id }, tokA));
+  assert.equal(singleDelRes.status, 200);
+  assert.equal((await singleDelRes.json()).deletedCount, 1);
+
+  const afterSingleA = await (await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokA}` } }))).json();
+  assert.equal(afterSingleA.notifications.some((n) => n.id === n1.id), false);
+  assert.equal(afterSingleA.notifications.length, beforeA.notifications.length - 1);
+
+  // 3. Suppression selectionnee (personnelle n2 + broadcast partage + ID etranger nB ignore sans effet)
+  const batchDelRes = await notifRoute.DELETE(
+    jsonReq('http://localhost:3000/api/notifications', 'DELETE', { notificationIds: [n2.id, broadcastNotifId, nB.id] }, tokA)
+  );
+  assert.equal(batchDelRes.status, 200);
+  const batchDelData = await batchDelRes.json();
+  assert.equal(batchDelData.deletedCount, 2);
+
+  const afterBatchA = await (await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokA}` } }))).json();
+  assert.equal(afterBatchA.notifications.some((n) => n.id === n2.id || n.id === broadcastNotifId), false);
+  assert.equal(afterBatchA.notifications.some((n) => n.id === n3.id), true);
+
+  // B voit toujours nB ET le broadcast partage
+  const listB1 = await (await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokB}` } }))).json();
+  assert.equal(listB1.notifications.some((n) => n.id === nB.id), true);
+  assert.equal(listB1.notifications.some((n) => n.id === broadcastNotifId), true);
+
+  // 4. Suppression totale pour A sans toucher aux notifications de B
+  const deleteAllARes = await notifRoute.DELETE(jsonReq('http://localhost:3000/api/notifications', 'DELETE', { deleteAll: true }, tokA));
+  assert.equal(deleteAllARes.status, 200);
+  assert.ok((await deleteAllARes.json()).deletedCount >= 1);
+
+  const afterAllA = await (await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokA}` } }))).json();
+  assert.equal(afterAllA.notifications.length, 0);
+  assert.equal(afterAllA.unreadCount, 0);
+
+  const listB2 = await (await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${tokB}` } }))).json();
+  assert.equal(listB2.notifications.some((n) => n.id === nB.id), true);
+  assert.equal(listB2.notifications.some((n) => n.id === broadcastNotifId), true);
+
+  // 5. Isolation sur alerte de role partagee (agent supprime tout, chef.division conserve sa notification)
+  const agentDelAllRes = await notifRoute.DELETE(
+    jsonReq('http://localhost:3000/api/notifications', 'DELETE', { deleteAll: true }, loginAgent.sessionToken)
+  );
+  assert.equal(agentDelAllRes.status, 200);
+  const agentAfter = await (await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${loginAgent.sessionToken}` } }))).json();
+  assert.equal(agentAfter.notifications.length, 0);
+
+  const chefAfter = await (await notifRoute.GET(new Request('http://localhost:3000/api/notifications', { headers: { Authorization: `Bearer ${loginChef.sessionToken}` } }))).json();
+  assert.equal(chefAfter.notifications.some((n) => n.id === roleNotif.id), true);
+
+  // 6. Verification UI NotificationBell & Dashboard (zero window.confirm, suppression unitaire/selection/totale, WCAG AA)
+  const bellSrc = fs.readFileSync('src/components/ui/NotificationBell.jsx', 'utf8');
+  const dashSrc = fs.readFileSync('src/app/dashboard/page.jsx', 'utf8');
+  for (const [label, src] of [['NotificationBell.jsx', bellSrc], ['dashboard/page.jsx', dashSrc]]) {
+    assert.ok(src.includes("'DELETE'"), `${label} doit utiliser la methode DELETE`);
+    assert.ok(src.includes('notificationIds'), `${label} doit supporter la suppression par selection notificationIds`);
+    assert.ok(src.includes('deleteAll'), `${label} doit supporter la suppression totale deleteAll`);
+    assert.ok(src.includes('name="delete"'), `${label} doit utiliser AppIcon delete`);
+    assert.equal(src.includes('window.confirm'), false, `${label} ne doit pas utiliser window.confirm`);
+  }
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
+
 
 
 

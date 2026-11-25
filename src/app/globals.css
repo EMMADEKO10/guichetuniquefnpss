@@ -531,6 +531,54 @@ tr:hover td {
   overflow: hidden;
 }
 
+.notif-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+}
+
+.notif-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--fnpss-royal);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.notif-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #991b1b;
+  padding: 3px 5px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.notif-delete-btn:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.notif-confirm-bar {
+  padding: 10px 12px;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Signaux permanents : Frise (StatusStepper), SLA & Blockchain */
 .stepper {
   display: flex;
