@@ -72,16 +72,7 @@ export default function HomePage() {
       {/* Bannière de Bienvenue Institutionnelle */}
       <section
         aria-label="Présentation du Guichet Unique FNPSS"
-        style={{
-          background: 'linear-gradient(135deg, var(--fnpss-navy) 0%, #0d3b66 65%, #065a82 100%)',
-          color: '#ffffff',
-          borderRadius: '14px',
-          padding: '32px 28px',
-          marginBottom: '18px',
-          boxShadow: 'var(--shadow-lg)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
+        className="hero-banner"
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
           <div
@@ -112,7 +103,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <h1 style={{ color: '#ffffff', fontSize: '28px', marginBottom: '10px', lineHeight: 1.2 }}>
+        <h1 className="hero-title">
           Portail du Guichet Unique Dématérialisé
         </h1>
         <p style={{ color: '#e2e8f0', fontSize: '15px', maxWidth: '780px', marginBottom: '22px', lineHeight: 1.6 }}>
@@ -120,7 +111,7 @@ export default function HomePage() {
           le suivi en temps réel et la vérification infalsifiable des agréments et exonérations fiscales et douanières en RDC.
         </p>
 
-        <div className="flex gap-4" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="flex gap-4 hero-actions" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
           <a href="/applications/new" className="btn btn-brand btn-lg" style={{ textDecoration: 'none' }}>
             Déposer un dossier en ligne &rarr;
           </a>
@@ -145,12 +136,7 @@ export default function HomePage() {
       <div
         role="region"
         aria-label="Garanties techniques et légales"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-          gap: '10px',
-          marginBottom: '22px'
-        }}
+        className="trust-grid"
       >
         {trustSignals.map((sig) => (
           <div
@@ -266,20 +252,20 @@ export default function HomePage() {
         <p style={{ marginTop: 0 }}>
           Le Guichet Unique FNPSS est interconnecté avec les systèmes d&apos;information des régies de recettes de la République Démocratique du Congo :
         </p>
-        <div className="flex gap-4" style={{ flexWrap: 'wrap', marginTop: '12px' }}>
-          <div style={{ flex: 1, minWidth: '220px', background: 'var(--surface-subtle)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-blue)' }}>
+        <div className="regies-grid">
+          <div style={{ background: 'var(--surface-subtle)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-blue)' }}>
             <strong style={{ color: 'var(--fnpss-navy)' }}>DGDA (Douanes) :</strong>
             <p className="text-muted" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>
               Vérification instantanée en douane via QR Code sécurisé et intégration SydoniaWorld (API OpenAPI 3.0).
             </p>
           </div>
-          <div style={{ flex: 1, minWidth: '220px', background: 'var(--surface-subtle)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-green)' }}>
+          <div style={{ background: 'var(--surface-subtle)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-green)' }}>
             <strong style={{ color: 'var(--fnpss-navy)' }}>DGI (Impôts) :</strong>
             <p className="text-muted" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>
               Contrôle des exemptions d&apos;impôts directs et taxe sur la valeur ajoutée pour les dons humanitaires.
             </p>
           </div>
-          <div style={{ flex: 1, minWidth: '220px', background: 'var(--surface-subtle)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-orange-accessible)' }}>
+          <div style={{ background: 'var(--surface-subtle)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '3px solid var(--fnpss-orange-accessible)' }}>
             <strong style={{ color: 'var(--fnpss-navy)' }}>DGRAD (Recettes non fiscales) :</strong>
             <p className="text-muted" style={{ fontSize: '12.5px', margin: '4px 0 0' }}>
               Suivi et notification synchronisée en cas de révocation ou suspension des exonérations.

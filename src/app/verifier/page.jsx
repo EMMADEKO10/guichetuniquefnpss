@@ -375,13 +375,13 @@ export default function VerifierPage() {
                 id="hash-input"
                 type="text"
                 className="form-control mono"
-                style={{ flex: 1, minWidth: '240px' }}
+                style={{ flex: '1 1 220px', minWidth: 0 }}
                 value={hashInput}
                 onChange={(e) => setHashInput(e.target.value)}
                 placeholder="Ex: FNPSS-EXO-2026-00001 ou 0x9f86d081884c7d659a2feaa0c55ad015..."
                 required
               />
-              <Button type="submit" variant="brand" isLoading={isLoading} loadingText="Contrôle...">
+              <Button type="submit" variant="brand" className="full-width-xs" isLoading={isLoading} loadingText="Contrôle...">
                 Vérifier l&apos;Acte
               </Button>
             </div>
@@ -499,7 +499,7 @@ export default function VerifierPage() {
           />
         </div>
         {pdfFileInfo && (
-          <div className="mono" style={{ fontSize: '11.5px', color: 'var(--fnpss-navy)', background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+          <div className="mono" style={{ fontSize: '11.5px', color: 'var(--fnpss-navy)', background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', wordBreak: 'break-all' }}>
             Fichier : <strong>{pdfFileInfo.name}</strong> ({pdfFileInfo.sizeBytes} octets) &bull; SHA-256 client : <code>{pdfFileInfo.clientSha256}</code>
           </div>
         )}
@@ -548,10 +548,10 @@ export default function VerifierPage() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '13px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: '12px', fontSize: '13px' }}>
               <div>
                 <strong className="text-muted">N° Officiel d&apos;Acte :</strong>
-                <div className="mono">{result.certificateNumber || result.record?.certificateNumber || 'Non répertorié'}</div>
+                <div className="mono" style={{ wordBreak: 'break-word' }}>{result.certificateNumber || result.record?.certificateNumber || 'Non répertorié'}</div>
               </div>
               <div>
                 <strong className="text-muted">Bénéficiaire :</strong>
@@ -643,8 +643,8 @@ export default function VerifierPage() {
                       {item.beneficiary} &bull; {new Date(item.checkedAt).toLocaleString('fr-FR')}
                     </div>
                   </div>
-                  <div className="flex gap-2 items-center">
-                    <Badge status={ok ? 'valide' : item.verdict === 'PASTILLE_GRISE_EXPIRE' ? 'neutral' : 'revoque'}>
+                  <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap' }}>
+                    <Badge status={ok ? 'valide' : item.verdict === 'PASTILLE_GRISE_EXPIRE' ? 'neutral' : 'revoque'} className="badge-wrap">
                       {item.verdict}
                     </Badge>
                     <Button

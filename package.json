@@ -13,6 +13,8 @@
     "db:neon": "node scripts/neon-setup.mjs",
     "storage:cloudinary": "node scripts/cloudinary-setup.mjs",
     "email:test": "node scripts/test-smtp.mjs",
+    "messaging:test": "node scripts/test-messaging.mjs",
+    "whatsapp:test": "node scripts/test-messaging.mjs --channel=whatsapp",
     "serve:prototype": "node src/server.mjs --demo-open",
     "serve": "node src/server.mjs"
   },

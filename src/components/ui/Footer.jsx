@@ -15,24 +15,14 @@ export default function Footer() {
         color: 'var(--text-muted)'
       }}
     >
-      <div
-        style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="site-footer-inner">
+        <div className="site-footer-brand">
           <img
             src="/brand/logo-fnpss.png"
             alt="Logo FNPSS"
             width={40}
             height={40}
-            style={{ objectFit: 'contain', borderRadius: '6px' }}
+            style={{ objectFit: 'contain', borderRadius: '6px', flexShrink: 0 }}
           />
           <div>
             <strong style={{ color: 'var(--fnpss-navy)' }}>Fonds National de Promotion et de Service Social (FNPSS)</strong>
@@ -43,10 +33,10 @@ export default function Footer() {
             Sous tutelle du Ministère des Affaires Sociales, Actions Humanitaires et Solidarité Nationale &bull; République Démocratique du Congo
           </div>
         </div>
-        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="site-footer-meta">
           <span>Sécurisé par SHA-256, AES-256-GCM &amp; Polygon Amoy Blockchain</span>
           <span>SLA légal : 10 jours ouvrables &bull; Vérification douanière DGDA 24/7</span>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '2px' }}>
+          <div className="site-footer-links">
             <a href="/guide" style={{ color: 'var(--fnpss-blue)', textDecoration: 'none', fontWeight: 600 }}>Guide ONG</a>
             <a href="/verifier" style={{ color: 'var(--fnpss-blue)', textDecoration: 'none', fontWeight: 600 }}>Vérification Douane</a>
             <a href="/design-system" style={{ color: 'var(--fnpss-blue)', textDecoration: 'none', fontWeight: 600 }}>Design System UI</a>

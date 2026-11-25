@@ -17,6 +17,7 @@ import {
 } from '../../../../infra/polygon-client.mjs';
 import { resolveCloudinaryConfig, uploadEncryptedPdfToCloudinary } from '../../../../storage/cloudinary-storage.mjs';
 import { sendTransactionalWorkflowEmail } from '../../../../infra/smtp-mailer.mjs';
+import { sendTransactionalMobileAlerts } from '../../../../infra/messaging-client.mjs';
 
 /**
  * POST /api/applications/{action} — actions du circuit d'instruction (ADM-04..08, REQ-08, VER-06).
@@ -216,6 +217,20 @@ export async function POST(request, { params }) {
             ministryReference: storedApp.ministryReference,
             ministryExplorerTxUrl: storedApp.ministryExplorerTxUrl
           }
+        }).catch(() => null);
+      }
+      if (owner?.phone) {
+        await sendTransactionalMobileAlerts({
+          to: owner.phone,
+          email: owner.email,
+          eventType: emailEvent,
+          referenceNumber: storedApp.referenceNumber,
+          details: {
+            organizationName: storedApp.organizationName,
+            serviceCode: storedApp.serviceCode,
+            certificateNumber: storedApp.certificate?.certificateNumber
+          },
+          preferences: owner.notificationPreferences
         }).catch(() => null);
       }
     }

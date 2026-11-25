@@ -12,6 +12,7 @@ import {
 import { hydrateFromNeon, persistToNeon } from '../../../infra/neon-persistence.mjs';
 import { resolveCloudinaryConfig, uploadEncryptedPdfToCloudinary } from '../../../storage/cloudinary-storage.mjs';
 import { sendTransactionalWorkflowEmail } from '../../../infra/smtp-mailer.mjs';
+import { sendTransactionalMobileAlerts } from '../../../infra/messaging-client.mjs';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -110,6 +111,19 @@ export async function POST(request) {
           serviceCode: application.serviceCode,
           projectTitle: application.projectTitle
         }
+      }).catch(() => null);
+    }
+    if (user?.phone) {
+      await sendTransactionalMobileAlerts({
+        to: user.phone,
+        email: user.email,
+        eventType: 'APPLICATION_SUBMITTED',
+        referenceNumber: application.referenceNumber,
+        details: {
+          organizationName: application.organizationName,
+          serviceCode: application.serviceCode
+        },
+        preferences: user.notificationPreferences
       }).catch(() => null);
     }
 

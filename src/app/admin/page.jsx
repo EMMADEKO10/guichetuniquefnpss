@@ -70,7 +70,17 @@ export default function AdminPage() {
   const [selectedService, setSelectedService] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [showExecStats, setShowExecStats] = useState(true);
+  const [showTechBanner, setShowTechBanner] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const selectAppWithMobileScroll = (app) => {
+    setSelectedApp(app);
+    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+      setTimeout(() => {
+        document.getElementById('admin-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+    }
+  };
 
   // Modales
   const [isOpinionModalOpen, setIsOpinionModalOpen] = useState(false);
@@ -685,62 +695,74 @@ export default function AdminPage() {
       )}
 
       {/* Bandeau Relayer Blockchain Polygon Amoy, File Résiliente & Jalon G2 Alpha (BLK-09..11, GOV-12) */}
-      <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', fontSize: '12px' }}>
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span>
-            <strong>Réseau :</strong> {blockchainInfo.deployment?.network?.name || 'Polygon Amoy Testnet (80002)'}
-          </span>
-          <span className="mono">
-            <strong>Contrat :</strong> {(blockchainInfo.deployment?.contractAddress || '0x1111...').slice(0, 14)}...
-          </span>
-          <span>
-            <strong>Relayer Paymaster :</strong> 0 crypto requérant ({blockchainInfo.relayer?.anchoredDocumentsCount ?? 0} actes ancrés)
-          </span>
-          <span>
-            <strong>File résiliente (BLK-10) :</strong> {blockchainInfo.queue?.queuedCount ?? 0} en attente / {blockchainInfo.queue?.confirmedCount ?? 0} confirmé(s)
-          </span>
-          <Badge status="valide">Jalon G2 Alpha : {blockchainInfo.milestoneG2?.status || 'VALIDATED'}</Badge>
-          <Badge status="valide">Jalon G3 Beta : {blockchainInfo.supervision?.milestoneG3Beta?.status || 'VALIDATED'}</Badge>
-          <span>
-            <strong>Budget 3G (REQ-12) :</strong> {blockchainInfo.supervision?.req12PerformanceBudget?.estimated3gLoadSeconds ?? '1.64'}s (&lt; 3,0s)
-          </span>
-        </div>
-        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-          <Button variant="outline" size="sm" isLoading={isSubmitting} onClick={handleFlushAnchorQueue}>
-            🔄 Synchroniser File d&apos;Ancrage
+      <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '18px', fontSize: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span>
+              <strong>Réseau :</strong> {blockchainInfo.deployment?.network?.name || 'Polygon Amoy Testnet (80002)'}
+            </span>
+            <Badge status="valide">Jalon G2 Alpha : {blockchainInfo.milestoneG2?.status || 'VALIDATED'}</Badge>
+            <Badge status="valide">Jalon G3 Beta : {blockchainInfo.supervision?.milestoneG3Beta?.status || 'VALIDATED'}</Badge>
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setShowTechBanner((v) => !v)}>
+            {showTechBanner ? 'Masquer détails réseau ▴' : 'Détails réseau & outils ▾'}
           </Button>
-          {(role === 'DG' || role === 'ADMIN') && (
-            <>
-              <Button variant="primary" size="sm" isLoading={isSubmitting} onClick={handleDeployAmoy}>
-                ⛓️ Qualifier Contrat Amoy (BLK-11)
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await downloadAuthenticatedFile('/api/admin/stats?format=csv', sessionToken, {
-                      fallbackFileName: 'fnpss-statistiques-reconciliation.csv'
-                    });
-                    toast.success('Export CSV statistiques téléchargé.');
-                  } catch (err) {
-                    notify('error', err.message || 'Export CSV impossible.', 'Échec Export');
-                  }
-                }}
-              >
-                📊 Export CSV (ADM-09)
-              </Button>
-              <a
-                href="/guide"
-                className="btn btn-outline btn-sm"
-                style={{ textDecoration: 'none' }}
-              >
-                🎓 Guides &amp; Formations (DEP-03..05)
-              </a>
-            </>
-          )}
         </div>
+
+        {showTechBanner && (
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="mono">
+                <strong>Contrat :</strong> {(blockchainInfo.deployment?.contractAddress || '0x1111...').slice(0, 14)}...
+              </span>
+              <span>
+                <strong>Relayer Paymaster :</strong> 0 crypto requérant ({blockchainInfo.relayer?.anchoredDocumentsCount ?? 0} actes ancrés)
+              </span>
+              <span>
+                <strong>File résiliente (BLK-10) :</strong> {blockchainInfo.queue?.queuedCount ?? 0} en attente / {blockchainInfo.queue?.confirmedCount ?? 0} confirmé(s)
+              </span>
+              <span>
+                <strong>Budget 3G (REQ-12) :</strong> {blockchainInfo.supervision?.req12PerformanceBudget?.estimated3gLoadSeconds ?? '1.64'}s (&lt; 3,0s)
+              </span>
+            </div>
+            <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+              <Button variant="outline" size="sm" isLoading={isSubmitting} onClick={handleFlushAnchorQueue}>
+                🔄 Synchroniser File d&apos;Ancrage
+              </Button>
+              {(role === 'DG' || role === 'ADMIN') && (
+                <>
+                  <Button variant="primary" size="sm" isLoading={isSubmitting} onClick={handleDeployAmoy}>
+                    ⛓️ Qualifier Contrat Amoy (BLK-11)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await downloadAuthenticatedFile('/api/admin/stats?format=csv', sessionToken, {
+                          fallbackFileName: 'fnpss-statistiques-reconciliation.csv'
+                        });
+                        toast.success('Export CSV statistiques téléchargé.');
+                      } catch (err) {
+                        notify('error', err.message || 'Export CSV impossible.', 'Échec Export');
+                      }
+                    }}
+                  >
+                    📊 Export CSV (ADM-09)
+                  </Button>
+                  <a
+                    href="/guide"
+                    className="btn btn-outline btn-sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    🎓 Guides &amp; Formations (DEP-03..05)
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Vue Exécutive & Recettes DG / Admin (ADM-09) */}
@@ -846,6 +868,7 @@ export default function AdminPage() {
         {/* Panneau Gauche : File de Travail & Fiche d'Instruction */}
         <div>
           <Card
+            id="admin-workqueue"
             title="Dossiers en File d'Attente"
             actions={
               <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
@@ -928,10 +951,10 @@ export default function AdminPage() {
                   return (
                     <div
                       key={app.referenceNumber}
-                      onClick={() => setSelectedApp(app)}
+                      onClick={() => selectAppWithMobileScroll(app)}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedApp(app); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectAppWithMobileScroll(app); }}
                       style={{
                         padding: '10px 12px',
                         borderRadius: '8px',
@@ -962,7 +985,15 @@ export default function AdminPage() {
 
           {/* Fiche d'Instruction & Actions */}
           {selectedApp && (
-            <Card title={`Fiche d'Instruction : ${selectedApp.referenceNumber}`}>
+            <Card
+              id="admin-detail-panel"
+              title={`Fiche d'Instruction : ${selectedApp.referenceNumber}`}
+              actions={
+                <a href="#admin-workqueue" className="btn btn-sm btn-outline mobile-only" style={{ textDecoration: 'none' }}>
+                  ↑ Liste
+                </a>
+              }
+            >
               <div style={{ marginBottom: '14px' }}>
                 <StatusStepper application={selectedApp} compact />
               </div>
@@ -972,7 +1003,7 @@ export default function AdminPage() {
                 <BlockchainSignal application={selectedApp} showLink />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px', marginBottom: '16px' }}>
+              <div className="meta-2col-grid" style={{ fontSize: '12.5px', marginBottom: '16px' }}>
                 <div><span className="text-muted">Statut :</span> <strong>{selectedApp.status}</strong></div>
                 <div><span className="text-muted">Frais :</span> <strong>{selectedApp.paymentValidated ? '✓ Quittance Validée' : '⏳ En attente'}</strong></div>
                 <div><span className="text-muted">Avis Division :</span> <strong>{selectedApp.divisionOpinion ? (selectedApp.divisionOpinion.favorable ? '✓ Favorable' : '⚠️ Réservé') : 'Non émis'}</strong></div>
@@ -1342,7 +1373,7 @@ export default function AdminPage() {
                 <input
                   type="text"
                   className="form-control"
-                  style={{ maxWidth: '320px' }}
+                  style={{ width: '100%', maxWidth: '320px' }}
                   placeholder="Rechercher organisation, email, province..."
                   value={applicantQuery}
                   onChange={(e) => setApplicantQuery(e.target.value)}
@@ -1395,7 +1426,7 @@ export default function AdminPage() {
                 <input
                   type="text"
                   className="form-control"
-                  style={{ maxWidth: '300px' }}
+                  style={{ width: '100%', maxWidth: '300px' }}
                   placeholder="Filtrer par action (ex: CERTIFICATE)..."
                   value={auditActionFilter}
                   onChange={(e) => setAuditActionFilter(e.target.value.toUpperCase())}

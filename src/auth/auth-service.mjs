@@ -11,6 +11,7 @@
 
 import crypto from 'node:crypto';
 import { Roles, assertPermission } from '../workflow/application-engine.mjs';
+import { normalizePhoneE164 } from '../infra/messaging-client.mjs';
 
 const MAX_FAILED_ATTEMPTS = 5;
 
@@ -114,6 +115,7 @@ export class AuthService {
     organizationName,
     province = 'Kinshasa',
     enrollmentNumber = null,
+    phone = '',
     role = Roles.REQUERANT
   }) {
     const cleanEmail = String(email || '').trim().toLowerCase();
@@ -138,6 +140,7 @@ export class AuthService {
       organizationName: String(organizationName || '').trim(),
       province,
       enrollmentNumber,
+      phone: normalizePhoneE164(phone) || String(phone || '').trim(),
       role,
       walletAddress,
       authProvider: 'EMAIL_PASSWORD',
@@ -145,6 +148,8 @@ export class AuthService {
       statusReason: '',
       notificationPreferences: {
         emailEnabled: true,
+        smsEnabled: false,
+        whatsappEnabled: false,
         slaAlertsEnabled: true
       },
       failedLoginAttempts: 0,
@@ -218,6 +223,7 @@ export class AuthService {
         organizationName,
         province,
         enrollmentNumber: null,
+        phone: '',
         role: Roles.REQUERANT,
         walletAddress: deriveWeb3AuthWallet(cleanEmail),
         authProvider: 'GOOGLE_OAUTH',
@@ -225,6 +231,8 @@ export class AuthService {
         statusReason: '',
         notificationPreferences: {
           emailEnabled: true,
+          smsEnabled: false,
+          whatsappEnabled: false,
           slaAlertsEnabled: true
         },
         failedLoginAttempts: 0,
@@ -301,7 +309,7 @@ export class AuthService {
   /**
    * Mise à jour du profil de l'organisation et du représentant légal (REQ-04).
    */
-  updateOrganizationProfile(userId, { firstName, lastName, organizationName, province, enrollmentNumber, notificationPreferences }) {
+  updateOrganizationProfile(userId, { firstName, lastName, organizationName, province, enrollmentNumber, phone, notificationPreferences }) {
     const user = this.usersById.get(userId);
     if (!user) {
       throw new Error('Utilisateur introuvable');
@@ -311,17 +319,34 @@ export class AuthService {
     if (organizationName !== undefined) user.organizationName = String(organizationName).trim();
     if (province !== undefined) user.province = String(province).trim();
     if (enrollmentNumber !== undefined) user.enrollmentNumber = enrollmentNumber;
+    if (phone !== undefined) {
+      const cleanPhone = String(phone || '').trim();
+      user.phone = cleanPhone ? (normalizePhoneE164(cleanPhone) || cleanPhone) : '';
+    }
     if (notificationPreferences && typeof notificationPreferences === 'object') {
-      const prev = user.notificationPreferences || { emailEnabled: true, slaAlertsEnabled: true };
+      const prev = user.notificationPreferences || {
+        emailEnabled: true,
+        smsEnabled: false,
+        whatsappEnabled: false,
+        slaAlertsEnabled: true
+      };
       user.notificationPreferences = {
         emailEnabled:
           notificationPreferences.emailEnabled !== undefined
             ? Boolean(notificationPreferences.emailEnabled)
-            : prev.emailEnabled,
+            : prev.emailEnabled !== false,
+        smsEnabled:
+          notificationPreferences.smsEnabled !== undefined
+            ? Boolean(notificationPreferences.smsEnabled)
+            : Boolean(prev.smsEnabled),
+        whatsappEnabled:
+          notificationPreferences.whatsappEnabled !== undefined
+            ? Boolean(notificationPreferences.whatsappEnabled)
+            : Boolean(prev.whatsappEnabled),
         slaAlertsEnabled:
           notificationPreferences.slaAlertsEnabled !== undefined
             ? Boolean(notificationPreferences.slaAlertsEnabled)
-            : prev.slaAlertsEnabled
+            : prev.slaAlertsEnabled !== false
       };
     }
 
@@ -458,7 +483,7 @@ export class AuthService {
       .map(u => this._sanitizeUser(u));
   }
 
-  registerApplicant({ organizationName, representativeName, email, password }) {
+  registerApplicant({ organizationName, representativeName, email, password, phone = '' }) {
     const parts = (representativeName || '').trim().split(' ');
     const firstName = parts[0] || 'Mandataire';
     const lastName = parts.slice(1).join(' ') || 'FNPSS';
@@ -468,6 +493,7 @@ export class AuthService {
       firstName,
       lastName,
       organizationName,
+      phone,
       role: Roles.REQUERANT
     });
     return { success: true, userId: user.id, user };
@@ -486,8 +512,11 @@ export class AuthService {
     const { passwordHash, ...safe } = user;
     return {
       ...safe,
+      phone: user.phone || '',
       notificationPreferences: {
         emailEnabled: user.notificationPreferences?.emailEnabled !== false,
+        smsEnabled: Boolean(user.notificationPreferences?.smsEnabled),
+        whatsappEnabled: Boolean(user.notificationPreferences?.whatsappEnabled),
         slaAlertsEnabled: user.notificationPreferences?.slaAlertsEnabled !== false
       }
     };

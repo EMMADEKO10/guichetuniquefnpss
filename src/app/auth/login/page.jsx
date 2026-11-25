@@ -109,12 +109,14 @@ export default function LoginPage() {
             client_id: cfg.clientId,
             callback: (response) => postGoogle({ credential: response.credential })
           });
+          const containerWidth = googleButtonRef.current.parentElement?.clientWidth || 340;
+          const btnWidth = Math.max(220, Math.min(340, Math.floor(containerWidth - 4)));
           window.google.accounts.id.renderButton(googleButtonRef.current, {
             theme: 'outline',
             size: 'large',
             text: 'continue_with',
             locale: 'fr',
-            width: 360
+            width: btnWidth
           });
         };
 
@@ -135,7 +137,7 @@ export default function LoginPage() {
     };
   }, []);
   return (
-    <div style={{ maxWidth: '440px', margin: '40px auto' }}>
+    <div className="auth-shell">
       <Card
         title={
           <div style={{ textAlign: 'center', width: '100%' }}>
@@ -188,7 +190,7 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <div className="flex justify-between items-center" style={{ marginBottom: '6px' }}>
+            <div className="flex justify-between items-center" style={{ marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
               <label htmlFor="login-password" style={{ margin: 0 }}>Mot de Passe</label>
               <a href="/auth/forgot-password" style={{ fontSize: '12px', color: 'var(--fnpss-accent)', textDecoration: 'none' }}>
                 Mot de passe oublié ?
@@ -224,7 +226,7 @@ export default function LoginPage() {
         </div>
 
         {googleConfig.clientId ? (
-          <div style={{ display: 'flex', justifyContent: 'center', minHeight: '44px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', minHeight: '44px', overflow: 'hidden' }}>
             <div ref={googleButtonRef} />
           </div>
         ) : googleConfig.loaded && googleConfig.simulated ? (
@@ -245,7 +247,7 @@ export default function LoginPage() {
 
 
         <div style={{ marginTop: '12px', textAlign: 'center' }}>
-          <Badge variant="info">
+          <Badge variant="info" className="badge-wrap">
             Abstraction Web3Auth : Portefeuille 0x... auto-dérivé sans seed phrase (BLK-02)
           </Badge>
         </div>

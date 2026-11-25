@@ -125,12 +125,12 @@ export default function DocumentViewer({
         </div>
 
         {/* Aperçu du document */}
-        <div style={{ padding: '20px', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ padding: '16px', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 0 }}>
           {activeDoc ? (
-            <div style={{ width: '100%', maxWidth: '480px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '24px 16px' }}>
+            <div style={{ width: '100%', maxWidth: '480px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '18px 14px' }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>📄</div>
-              <h4 style={{ fontSize: '14px', marginBottom: '6px' }}>{activeDoc.name}</h4>
-              <p className="text-muted" style={{ fontSize: '12px', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '14px', marginBottom: '6px', wordBreak: 'break-word' }}>{activeDoc.name}</h4>
+              <p className="text-muted" style={{ fontSize: '12px', marginBottom: '12px', wordBreak: 'break-word' }}>
                 Fichier : <strong>{activeDoc.fileName || `${activeDoc.docCode}.pdf`}</strong>
                 {activeDoc.sizeBytes && ` (${Math.round(activeDoc.sizeBytes / 1024)} Ko)`}
               </p>

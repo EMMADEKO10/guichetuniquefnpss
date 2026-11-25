@@ -80,7 +80,7 @@ export default function DesignSystemPage() {
 
       <Card title="1. Palette Institutionnelle & Contraste">
         <div className="drc-ribbon" style={{ marginBottom: '16px', borderRadius: '4px' }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 190px), 1fr))', gap: '12px' }}>
           {tokens.map((t) => (
             <div key={t.name} style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
               <div style={{ height: '42px', background: t.hex }} />
@@ -181,7 +181,7 @@ export default function DesignSystemPage() {
 
       <Card title="5. États Vides & Squelettes de Chargement">
         <SkeletonKpiGrid count={4} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px', marginTop: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '14px', marginTop: '14px' }}>
           <div>
             <SkeletonCard rows={3} />
             <div style={{ marginTop: '10px' }}>
@@ -235,13 +235,7 @@ export default function DesignSystemPage() {
               srcDoc={previewEmail?.html || ''}
               sandbox=""
               title="Aperçu email officiel FNPSS"
-              style={{
-                width: '100%',
-                height: '520px',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                background: '#f4f6f9'
-              }}
+              className="email-preview-iframe"
             />
           </Card>
         );

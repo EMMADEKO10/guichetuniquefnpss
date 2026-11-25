@@ -22,11 +22,14 @@ export default function ProfilePage() {
     organizationName: '',
     province: 'Kinshasa',
     enrollmentNumber: '',
+    phone: '',
     email: '',
     walletAddress: '',
     role: 'REQUERANT',
     notificationPreferences: {
       emailEnabled: true,
+      smsEnabled: false,
+      whatsappEnabled: false,
       slaAlertsEnabled: true
     }
   });
@@ -68,11 +71,14 @@ export default function ProfilePage() {
           organizationName: data.user.organizationName || '',
           province: data.user.province || 'Kinshasa',
           enrollmentNumber: data.user.enrollmentNumber || '',
+          phone: data.user.phone || '',
           email: data.user.email || '',
           walletAddress: data.user.walletAddress || '',
           role: data.user.role || 'REQUERANT',
           notificationPreferences: {
             emailEnabled: data.user.notificationPreferences?.emailEnabled !== false,
+            smsEnabled: Boolean(data.user.notificationPreferences?.smsEnabled),
+            whatsappEnabled: Boolean(data.user.notificationPreferences?.whatsappEnabled),
             slaAlertsEnabled: data.user.notificationPreferences?.slaAlertsEnabled !== false
           }
         });
@@ -103,6 +109,7 @@ export default function ProfilePage() {
           organizationName: profile.organizationName,
           province: profile.province,
           enrollmentNumber: profile.enrollmentNumber,
+          phone: profile.phone,
           notificationPreferences: profile.notificationPreferences
         })
       });
@@ -158,15 +165,15 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div style={{ maxWidth: '780px', margin: '30px auto', padding: '0 16px' }}>
+      <div style={{ maxWidth: '780px', margin: '12px auto' }}>
         <SkeletonCard rows={5} />
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '780px', margin: '30px auto', padding: '0 16px' }}>
-      <div className="flex justify-between items-center" style={{ marginBottom: '24px' }}>
+    <div style={{ maxWidth: '780px', margin: '12px auto' }}>
+      <div className="page-header-row" style={{ marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '24px', color: 'var(--fnpss-navy)', margin: 0 }}>
             Profil de l'Organisation & Mandataire
@@ -175,7 +182,7 @@ export default function ProfilePage() {
             Gestion de vos informations institutionnelles et de votre identité décentralisée (REQ-04, BLK-03)
           </p>
         </div>
-        <Button variant="outline" onClick={handleLogout} isLoading={isLoggingOut} style={{ color: 'var(--fnpss-red)', borderColor: '#fca5a5' }}>
+        <Button variant="outline" className="full-width-xs" onClick={handleLogout} isLoading={isLoggingOut} style={{ color: 'var(--fnpss-red)', borderColor: '#fca5a5' }}>
           Se Déconnecter
         </Button>
       </div>
@@ -194,7 +201,7 @@ export default function ProfilePage() {
       <Card style={{ marginBottom: '24px', background: 'linear-gradient(135deg, #0a2540 0%, #065a82 100%)', color: '#fff' }}>
         <div className="flex justify-between items-start" style={{ flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <div className="flex items-center" style={{ gap: '8px', marginBottom: '6px' }}>
+            <div className="flex items-center" style={{ gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '18px' }}>🔐</span>
               <h3 style={{ margin: 0, fontSize: '16px', color: '#fff' }}>
                 Portefeuille Numérique FNPSS (Web3Auth MPC)
@@ -235,7 +242,7 @@ export default function ProfilePage() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '16px' }}>
             <div className="form-group">
               <label htmlFor="prof-firstname">Prénom du Mandataire Légal</label>
               <input
@@ -260,7 +267,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '16px' }}>
             <div className="form-group">
               <label htmlFor="prof-email">Adresse Email Officielle (Non Modifiable)</label>
               <input
@@ -301,6 +308,20 @@ export default function ProfilePage() {
             />
           </div>
 
+          <div className="form-group">
+            <label htmlFor="prof-phone">
+              Téléphone Mobile / WhatsApp (Format international +243)
+            </label>
+            <input
+              id="prof-phone"
+              type="tel"
+              className="form-control"
+              value={profile.phone || ''}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              placeholder="+243 81 000 0000"
+            />
+          </div>
+
           <div
             role="group"
             aria-label="Préférences de notifications"
@@ -331,6 +352,38 @@ export default function ProfilePage() {
               />
               <span>Recevoir les notifications transactionnelles par email</span>
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(profile.notificationPreferences?.whatsappEnabled)}
+                onChange={(e) =>
+                  setProfile({
+                    ...profile,
+                    notificationPreferences: {
+                      ...profile.notificationPreferences,
+                      whatsappEnabled: e.target.checked
+                    }
+                  })
+                }
+              />
+              <span>Recevoir les alertes dossiers par WhatsApp</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(profile.notificationPreferences?.smsEnabled)}
+                onChange={(e) =>
+                  setProfile({
+                    ...profile,
+                    notificationPreferences: {
+                      ...profile.notificationPreferences,
+                      smsEnabled: e.target.checked
+                    }
+                  })
+                }
+              />
+              <span>Recevoir les alertes par SMS (repli automatique en zone 2G/3G)</span>
+            </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -349,11 +402,11 @@ export default function ProfilePage() {
             </label>
           </div>
 
-          <div className="flex justify-between items-center" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+          <div className="wizard-nav-row" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
             <a href="/dashboard" style={{ color: 'var(--fnpss-blue)', textDecoration: 'none', fontSize: '13px', fontWeight: 600 }}>
               ← Retour au Tableau de Bord
             </a>
-            <Button type="submit" variant="primary" isLoading={isSaving}>
+            <Button type="submit" variant="primary" className="full-width-xs" isLoading={isSaving}>
               Enregistrer les Modifications
             </Button>
           </div>

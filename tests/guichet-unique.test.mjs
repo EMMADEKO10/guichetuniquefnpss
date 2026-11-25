@@ -3479,6 +3479,265 @@ test('Test 34 - Templates emails HTML/Texte chartes FNPSS, refonte PDF officiels
   assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
 });
 
+test('Test 35 - Messagerie unifiee Twilio SMS + WhatsApp (normalisation +243, repli automatique, opt-in profil)', async () => {
+  const {
+    normalizePhoneE164,
+    buildShortMessagingText,
+    sendTwilioMessage,
+    sendTransactionalMobileAlerts
+  } = await import('../src/infra/messaging-client.mjs');
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+  const registerRoute = await import('../src/app/api/auth/register/route.js');
+  const loginRoute = await import('../src/app/api/auth/login/route.js');
+  const profileRoute = await import('../src/app/api/auth/profile/route.js');
+
+  // 1. Normalisation E.164 RDC (+243)
+  assert.equal(normalizePhoneE164('081 234 56 78'), '+243812345678');
+  assert.equal(normalizePhoneE164('+243 99 887 7665'), '+243998877665');
+  assert.equal(normalizePhoneE164('00243891122334'), '+243891122334');
+  assert.equal(normalizePhoneE164('abc'), null);
+
+  // 2. Simulation API REST Twilio (Basic Auth, prefixe whatsapp: & repli WhatsApp -> SMS)
+  const calls = [];
+  const fakeFetchFailWhatsapp = async (url, init) => {
+    calls.push({ url, init });
+    if (String(init.body).includes('whatsapp%3A')) {
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({ message: 'Sandbox opt-in required', code: 63015 })
+      };
+    }
+    return {
+      ok: true,
+      status: 201,
+      json: async () => ({ sid: 'SM_TEST_123', status: 'queued' })
+    };
+  };
+
+  const fakeEnv = {
+    TWILIO_ACCOUNT_SID: 'AC-MOCK-UNIT-TEST-SID-001',
+    TWILIO_AUTH_TOKEN: 'secret-token-test',
+    TWILIO_WHATSAPP_FROM: 'whatsapp:+14155238886',
+    TWILIO_SMS_FROM: '+15005550006'
+  };
+
+  const directWa = await sendTwilioMessage(
+    { to: '0812345678', channel: 'whatsapp', body: buildShortMessagingText('CERTIFICATE_ISSUED', { referenceNumber: 'FNPSS/DEM/2026/00090', details: { certificateNumber: 'FNPSS/EXO/2026/00090' } }) },
+    fakeEnv,
+    async (url, init) => {
+      calls.push({ url, init });
+      return { ok: true, status: 201, json: async () => ({ sid: 'WA_OK_01', status: 'queued' }) };
+    }
+  );
+  assert.equal(directWa.sent, true);
+  assert.equal(directWa.sid, 'WA_OK_01');
+  assert.ok(calls[0].init.headers.Authorization.startsWith('Basic '));
+
+  // Respect de l'opt-in : aucun envoi si whatsappEnabled=false et smsEnabled=false
+  const skipped = await sendTransactionalMobileAlerts(
+    { to: '+243812345678', email: 'ong@rdc-humanitaire.org', eventType: 'APPLICATION_SUBMITTED', referenceNumber: 'FNPSS/DEM/2026/00090', preferences: { whatsappEnabled: false, smsEnabled: false } },
+    fakeEnv,
+    fakeFetchFailWhatsapp
+  );
+  assert.equal(skipped.skipped, true);
+
+  // Cascade avec echec WhatsApp -> repli automatique sur SMS
+  const cascade = await sendTransactionalMobileAlerts(
+    { to: '+243812345678', email: 'ong@rdc-humanitaire.org', eventType: 'CERTIFICATE_ISSUED', referenceNumber: 'FNPSS/DEM/2026/00090', details: { certificateNumber: 'FNPSS/EXO/2026/00090' }, preferences: { whatsappEnabled: true, smsEnabled: false } },
+    fakeEnv,
+    fakeFetchFailWhatsapp
+  );
+  assert.equal(cascade.sent, true);
+  assert.equal(cascade.attempts.length, 2);
+  assert.equal(cascade.attempts[0].channel, 'whatsapp');
+  assert.equal(cascade.attempts[0].sent, false);
+  assert.equal(cascade.attempts[1].channel, 'sms');
+  assert.equal(cascade.attempts[1].sent, true);
+
+  // 3. Persistance telephone + opt-in WhatsApp / SMS sur /api/auth/register et /api/auth/profile
+  const jsonReq = (url, method, body, token) =>
+    new Request(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+  const email = `ong.t35.${Date.now()}@example.cd`;
+  await registerRoute.POST(jsonReq('http://localhost:3000/api/auth/register', 'POST', {
+    organizationName: 'ONG Test Mobile 35',
+    representativeName: 'Celine Tshisekedi',
+    email,
+    phone: '081 555 1234',
+    password: 'PasswordRDC#2026'
+  }));
+  const { sessionToken } = await (await loginRoute.POST(jsonReq('http://localhost:3000/api/auth/login', 'POST', { email, password: 'PasswordRDC#2026' }))).json();
+
+  const putRes = await profileRoute.PUT(jsonReq('http://localhost:3000/api/auth/profile', 'PUT', {
+    phone: '+243 99 123 4567',
+    notificationPreferences: { emailEnabled: true, whatsappEnabled: true, smsEnabled: true, slaAlertsEnabled: true }
+  }, sessionToken));
+  assert.equal(putRes.status, 200);
+  const putData = await putRes.json();
+  assert.equal(putData.user.phone, '+243991234567');
+  assert.equal(putData.user.notificationPreferences.whatsappEnabled, true);
+  assert.equal(putData.user.notificationPreferences.smsEnabled, true);
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
+test('Test 36 - Meta WhatsApp Cloud API (Graph API v22.0, texte libre, template hello_world et repli SMS Twilio)', async () => {
+  const {
+    isMetaWhatsAppConfigured,
+    sendMetaWhatsAppMessage,
+    sendTransactionalMobileAlerts
+  } = await import('../src/infra/messaging-client.mjs');
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+
+  // 1. Validation configuration Meta
+  assert.equal(isMetaWhatsAppConfigured({}), false);
+  assert.equal(isMetaWhatsAppConfigured({ META_WA_ACCESS_TOKEN: 'votre_token', META_WA_PHONE_NUMBER_ID: '1234567890' }), false);
+  assert.equal(isMetaWhatsAppConfigured({ META_WA_ACCESS_TOKEN: 'EAAG_real_token', META_WA_PHONE_NUMBER_ID: 'not-numeric' }), false);
+  assert.equal(isMetaWhatsAppConfigured({ META_WA_ACCESS_TOKEN: 'EAAG_real_token', META_WA_PHONE_NUMBER_ID: '123456789012345' }), true);
+
+  const metaEnv = {
+    MESSAGING_PROVIDER: 'meta',
+    META_WA_ACCESS_TOKEN: 'EAAG_test_token_fnpss',
+    META_WA_PHONE_NUMBER_ID: '123456789012345',
+    META_WA_API_VERSION: 'v22.0'
+  };
+
+  // 2. Envoi texte libre Meta Graph API
+  const textCalls = [];
+  const textRes = await sendMetaWhatsAppMessage(
+    { to: '+243 82 135 56 01', body: 'Notification FNPSS test' },
+    metaEnv,
+    async (url, init) => {
+      textCalls.push({ url, init, body: JSON.parse(init.body) });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ messages: [{ id: 'wamid.test.1', message_status: 'accepted' }] })
+      };
+    }
+  );
+  assert.equal(textRes.sent, true);
+  assert.equal(textRes.provider, 'meta');
+  assert.equal(textRes.messageId, 'wamid.test.1');
+  assert.equal(textCalls[0].url, 'https://graph.facebook.com/v22.0/123456789012345/messages');
+  assert.equal(textCalls[0].init.headers.Authorization, 'Bearer EAAG_test_token_fnpss');
+  assert.equal(textCalls[0].body.to, '243821355601');
+  assert.equal(textCalls[0].body.type, 'text');
+
+  // 3. Envoi modele pre-approuve Meta (hello_world / en_US)
+  const tplCalls = [];
+  const tplRes = await sendMetaWhatsAppMessage(
+    { to: '0821355601', mode: 'template', templateName: 'hello_world' },
+    metaEnv,
+    async (url, init) => {
+      tplCalls.push({ url, body: JSON.parse(init.body) });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ messages: [{ id: 'wamid.tpl.1', message_status: 'accepted' }] })
+      };
+    }
+  );
+  assert.equal(tplRes.sent, true);
+  assert.equal(tplRes.mode, 'template');
+  assert.equal(tplCalls[0].body.type, 'template');
+  assert.equal(tplCalls[0].body.template.name, 'hello_world');
+  assert.equal(tplCalls[0].body.template.language.code, 'en_US');
+
+  // 4. Priorite Meta dans sendTransactionalMobileAlerts et repli Twilio SMS en cas d'echec Meta
+  const hybridEnv = {
+    MESSAGING_PROVIDER: 'auto',
+    META_WA_ACCESS_TOKEN: 'EAAG_test_token_fnpss',
+    META_WA_PHONE_NUMBER_ID: '123456789012345',
+    TWILIO_ACCOUNT_SID: 'AC-MOCK-UNIT-TEST-SID-001',
+    TWILIO_AUTH_TOKEN: 'secret-token-test',
+    TWILIO_SMS_FROM: '+15005550006'
+  };
+
+  const hybridCalls = [];
+  const fallbackRes = await sendTransactionalMobileAlerts(
+    {
+      to: '+243821355601',
+      email: 'contact@ong-test.cd',
+      eventType: 'CERTIFICATE_ISSUED',
+      referenceNumber: 'FNPSS/DEM/2026/00100',
+      details: { certificateNumber: 'FNPSS/EXO/2026/00100' },
+      preferences: { whatsappEnabled: true, smsEnabled: false }
+    },
+    hybridEnv,
+    async (url) => {
+      hybridCalls.push(url);
+      if (url.startsWith('https://graph.facebook.com/')) {
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ error: { message: 'Re-engagement message required', code: 131047 } })
+        };
+      }
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({ sid: 'SM_FALLBACK_META_1', status: 'queued' })
+      };
+    }
+  );
+  assert.equal(fallbackRes.sent, true);
+  assert.equal(fallbackRes.attempts.length, 2);
+  assert.equal(fallbackRes.attempts[0].provider, 'meta');
+  assert.equal(fallbackRes.attempts[0].sent, false);
+  assert.equal(fallbackRes.attempts[1].channel, 'sms');
+  assert.equal(fallbackRes.attempts[1].sent, true);
+  assert.ok(hybridCalls[0].startsWith('https://graph.facebook.com/'));
+  assert.ok(hybridCalls[1].startsWith('https://api.twilio.com/'));
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
+test('Test 37 - Audit Responsive multi-ecrans (R0-R7 : menu mobile, modale scrollable, Google dynamique, anti-overflow SHA-256 & WCAG AA)', async () => {
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+
+  const css = fs.readFileSync('src/app/globals.css', 'utf8');
+  assert.ok(css.includes('overflow-x: clip'), 'globals.css doit empecher le debordement horizontal avec overflow-x: clip');
+  assert.ok(css.includes('.header-menu-toggle') && css.includes('.site-header-nav'), 'globals.css doit definir le menu mobile');
+  assert.ok(css.includes('.wizard-steps-grid') && css.includes('.meta-2col-grid'), 'globals.css doit definir les grilles adaptatives');
+  assert.ok(css.includes('position: fixed;') && css.includes('.notif-dropdown'), 'notif-dropdown doit basculer en fixed sur petit ecran');
+
+  const headerSrc = fs.readFileSync('src/components/ui/Header.jsx', 'utf8');
+  assert.ok(headerSrc.includes('mobileMenuOpen') && headerSrc.includes('header-menu-toggle') && headerSrc.includes('aria-expanded'));
+
+  const modalSrc = fs.readFileSync('src/components/ui/Modal.jsx', 'utf8');
+  assert.ok(modalSrc.includes('90dvh') && modalSrc.includes("overflowY: 'auto'"));
+
+  const loginSrc = fs.readFileSync('src/app/auth/login/page.jsx', 'utf8');
+  assert.equal(loginSrc.includes('width: 360'), false, 'Le bouton Google OAuth ne doit plus avoir une largeur fixe de 360px');
+
+  const verifierSrc = fs.readFileSync('src/app/verifier/page.jsx', 'utf8');
+  assert.equal(verifierSrc.includes("minWidth: '240px'"), false, 'Le champ hash sur /verifier ne doit plus imposer minWidth 240px');
+  assert.ok(verifierSrc.includes("wordBreak: 'break-all'"), 'L\'empreinte SHA-256 du PDF sur /verifier doit etre wrappable');
+
+  const profileSrc = fs.readFileSync('src/app/profile/page.jsx', 'utf8');
+  assert.ok(profileSrc.includes('page-header-row') && profileSrc.includes('wizard-nav-row'));
+
+  const dashboardSrc = fs.readFileSync('src/app/dashboard/page.jsx', 'utf8');
+  assert.ok(dashboardSrc.includes('page-header-row') && dashboardSrc.includes("flexWrap: 'wrap'"));
+
+  const newAppSrc = fs.readFileSync('src/app/applications/new/page.jsx', 'utf8');
+  assert.ok(newAppSrc.includes('wizard-steps-grid') && newAppSrc.includes('wizard-nav-row'));
+
+  const adminSrc = fs.readFileSync('src/app/admin/page.jsx', 'utf8');
+  assert.ok(adminSrc.includes('meta-2col-grid') && adminSrc.includes('admin-detail-panel'));
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
 
 
 

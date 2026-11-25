@@ -65,7 +65,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={{ maxWidth: '560px', margin: '30px auto' }}>
+    <div className="auth-shell-wide">
       <Card
         title={
           <div style={{ textAlign: 'center', width: '100%' }}>
@@ -152,7 +152,7 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '12px' }}>
             <div className="form-group">
               <label htmlFor="reg-email">Email Professionnel</label>
               <input
@@ -181,7 +181,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '12px' }}>
             <div className="form-group">
               <label htmlFor="reg-pass">Mot de Passe</label>
               <input

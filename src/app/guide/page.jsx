@@ -161,7 +161,7 @@ export default function GuidePage() {
           </a>
         }
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '10px', fontSize: '12.5px' }}>
           <div style={{ background: 'var(--surface-subtle)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}>
             <strong>1. Scanner ou saisir</strong>
             <div className="text-muted">Ouvrez <code>/verifier</code> et activez la caméra QR ou saisissez le N° d&apos;attestation.</div>
@@ -209,7 +209,7 @@ export default function GuidePage() {
               <Card
                 key={mod.id}
                 title={`Étape ${mod.stepNumber} — ${mod.title}`}
-                actions={<Badge status="soumis">{mod.targetRequirements.join(' · ')}</Badge>}
+                actions={<Badge status="soumis" className="badge-wrap">{mod.targetRequirements.join(' · ')}</Badge>}
               >
                 <p style={{ fontSize: '13.5px', marginBottom: '12px' }}>{mod.summary}</p>
                 <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--text-main)' }}>

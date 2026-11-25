@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div style={{ maxWidth: '440px', margin: '40px auto' }}>
+    <div className="auth-shell">
       <Card
         title={
           <div style={{ textAlign: 'center', width: '100%' }}>

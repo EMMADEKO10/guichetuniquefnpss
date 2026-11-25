@@ -115,7 +115,7 @@ export default function QrCodeDisplay({
             alt={`QR Code officiel ${certificateNumber || 'FNPSS'}`}
             width={size}
             height={size}
-            style={{ display: 'block' }}
+            style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
           />
         </div>
       ) : genError ? (
@@ -123,7 +123,7 @@ export default function QrCodeDisplay({
           {genError}
         </div>
       ) : (
-        <div className="skeleton" style={{ width: `${size}px`, height: `${size}px` }} />
+        <div className="skeleton" style={{ width: `${size}px`, maxWidth: '100%', height: `${size}px` }} />
       )}
 
       <div className="flex gap-2" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>

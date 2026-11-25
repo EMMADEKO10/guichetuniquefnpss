@@ -64,6 +64,9 @@ export default function Modal({
           borderRadius: '12px',
           width: '100%',
           maxWidth,
+          maxHeight: '90dvh',
+          display: 'flex',
+          flexDirection: 'column',
           boxShadow: '0 16px 36px rgba(0,0,0,0.3)',
           border: '1px solid var(--border)',
           overflow: 'hidden'
@@ -77,10 +80,12 @@ export default function Modal({
             padding: '14px 18px',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            gap: '10px',
+            flexShrink: 0
           }}
         >
-          <h3 id="modal-title" style={{ fontSize: '15px', color: '#ffffff', margin: 0 }}>
+          <h3 id="modal-title" style={{ fontSize: '15px', color: '#ffffff', margin: 0, overflowWrap: 'anywhere' }}>
             {title}
           </h3>
           <button
@@ -93,13 +98,14 @@ export default function Modal({
               color: '#ffffff',
               fontSize: '22px',
               cursor: 'pointer',
-              lineHeight: 1
+              lineHeight: 1,
+              flexShrink: 0
             }}
           >
             &times;
           </button>
         </div>
-        <div className="modal-body" style={{ padding: '18px' }}>
+        <div className="modal-body" style={{ padding: '18px', overflowY: 'auto', flex: '1 1 auto' }}>
           {children}
         </div>
         {footer && (
@@ -111,7 +117,9 @@ export default function Modal({
               background: '#f8fafc',
               display: 'flex',
               justifyContent: 'flex-end',
-              gap: '10px'
+              flexWrap: 'wrap',
+              gap: '10px',
+              flexShrink: 0
             }}
           >
             {footer}

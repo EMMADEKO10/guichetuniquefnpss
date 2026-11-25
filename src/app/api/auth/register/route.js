@@ -5,7 +5,7 @@ export async function POST(request) {
   try {
     await hydrateFromNeon();
     const body = await request.json();
-    const { organizationName, representativeName, email, password } = body;
+    const { organizationName, representativeName, email, password, phone } = body;
 
     if (!organizationName || !representativeName || !email || !password) {
       return Response.json(
@@ -18,7 +18,8 @@ export async function POST(request) {
       organizationName,
       representativeName,
       email,
-      password
+      password,
+      phone: phone || ''
     });
 
     if (!reg || !reg.success) {

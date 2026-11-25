@@ -344,18 +344,18 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="page-header-row" style={{ marginBottom: '20px' }}>
         <div>
           <h2>Tableau de Bord Requérant</h2>
           <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
             Suivi en temps réel de vos dossiers, échéances SLA et téléchargement des attestations scellées
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <a href="/profile" className="btn btn-outline" style={{ textDecoration: 'none' }}>
+        <div className="filter-controls-row">
+          <a href="/profile" className="btn btn-outline full-width-xs" style={{ textDecoration: 'none' }}>
             👤 Mon Profil ONG
           </a>
-          <a href="/applications/new" className="btn btn-brand" style={{ textDecoration: 'none' }}>
+          <a href="/applications/new" className="btn btn-brand full-width-xs" style={{ textDecoration: 'none' }}>
             ➕ Déposer une Nouvelle Demande
           </a>
         </div>
@@ -439,7 +439,7 @@ export default function DashboardPage() {
       <Card
         title="Mes Demandes au FNPSS (REQ-05)"
         actions={
-          <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap' }}>
+          <div className="filter-controls-row">
             <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
               <button
                 type="button"
@@ -540,17 +540,17 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span className="mono" style={{ fontWeight: 800, color: 'var(--fnpss-navy)', fontSize: '14px' }}>
+                      <span className="mono" style={{ fontWeight: 800, color: 'var(--fnpss-navy)', fontSize: '14px', wordBreak: 'break-word' }}>
                         {app.referenceNumber}
                       </span>
                       <Badge status="soumis">{app.serviceCode}</Badge>
                       {renderStatusBadge(app)}
                     </div>
-                    <h4 style={{ margin: '6px 0 2px', fontSize: '15px', color: 'var(--fnpss-navy)' }}>
+                    <h4 style={{ margin: '6px 0 2px', fontSize: '15px', color: 'var(--fnpss-navy)', wordBreak: 'break-word' }}>
                       {app.projectTitle || 'Projet sans intitulé'}
                     </h4>
                     {app.goodsSummary && (
-                      <div className="text-muted" style={{ fontSize: '12px' }}>{app.goodsSummary}</div>
+                      <div className="text-muted" style={{ fontSize: '12px', wordBreak: 'break-word' }}>{app.goodsSummary}</div>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -575,7 +575,7 @@ export default function DashboardPage() {
                   <span className="text-muted" style={{ fontSize: '11.5px' }}>
                     Déposé le {app.createdAt ? new Date(app.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui'}
                   </span>
-                  <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+                  <div className="card-action-bar">
                     {app.status === 'SOUMIS' && (
                       <>
                         <button type="button" onClick={() => handleOpenEdit(app)} className="btn btn-sm btn-outline">
@@ -819,25 +819,26 @@ export default function DashboardPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {notifications.slice(0, 6).map((n) => (
-              <div
-                key={n.id}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: n.read ? '#ffffff' : '#eef6fc',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: n.read ? 600 : 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
-                    {n.title}
+                <div
+                  key={n.id}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border)',
+                    background: n.read ? '#ffffff' : '#eef6fc',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                  }}
+                >
+                  <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                    <div style={{ fontWeight: n.read ? 600 : 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
+                      {n.title}
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '12px', wordBreak: 'break-word' }}>{n.message}</div>
                   </div>
-                  <div className="text-muted" style={{ fontSize: '12px' }}>{n.message}</div>
-                </div>
                 {!n.read && (
                   <button
                     type="button"

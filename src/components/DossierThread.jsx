@@ -83,11 +83,11 @@ export default function DossierThread({ referenceNumber, tokenOverride = '' }) {
         )}
         {messages.map((m) => (
           <div key={m.id} style={{ background: m.authorRole === 'REQUERANT' ? '#eef6fc' : '#f8fafc', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 10px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
               <strong>{ROLE_LABELS[m.authorRole] || m.authorRole}</strong>
               <span>{m.timestamp ? new Date(m.timestamp).toLocaleString('fr-FR') : ''}</span>
             </div>
-            <div style={{ fontSize: '12.5px' }}>{m.message}</div>
+            <div style={{ fontSize: '12.5px', wordBreak: 'break-word' }}>{m.message}</div>
           </div>
         ))}
       </div>
@@ -96,11 +96,11 @@ export default function DossierThread({ referenceNumber, tokenOverride = '' }) {
           {error}
         </div>
       )}
-      <form onSubmit={send} style={{ display: 'flex', gap: '8px' }}>
+      <form onSubmit={send} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <input
           type="text"
           className="form-control"
-          style={{ flex: 1 }}
+          style={{ flex: '1 1 180px', minWidth: 0 }}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Écrire un message sur ce dossier…"

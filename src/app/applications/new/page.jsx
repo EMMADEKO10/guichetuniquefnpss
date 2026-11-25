@@ -300,7 +300,7 @@ export default function NewApplicationPage() {
       </div>
 
       {/* Étapes du Wizard */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <div className="wizard-steps-grid" style={{ marginBottom: '20px' }}>
         {[
           { num: 1, title: '1. Démarche' },
           { num: 2, title: '2. Projet' },
@@ -310,9 +310,7 @@ export default function NewApplicationPage() {
           <div
             key={s.num}
             style={{
-              flex: 1,
-              minWidth: '120px',
-              padding: '10px',
+              padding: '10px 8px',
               textAlign: 'center',
               borderRadius: '8px',
               fontWeight: 700,
@@ -380,7 +378,7 @@ export default function NewApplicationPage() {
         {step === 1 && (
           <div>
             <h3 style={{ marginBottom: '14px' }}>Étape 1 : Sélectionnez le Service Dématérialisé</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '12px', marginBottom: '20px' }}>
               {[
                 { code: 'S1', title: 'S1 • Enrôlement Initial ONG', sla: '5j', fee: '20 USD' },
                 { code: 'S2', title: 'S2 • Accord de Partenariat', sla: '10j', fee: 'Inclus' },
@@ -411,7 +409,7 @@ export default function NewApplicationPage() {
               ))}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div className="wizard-nav-row" style={{ justifyContent: 'flex-end' }}>
               <Button variant="brand" onClick={() => { setStepError(''); setStep(2); }}>
                 Continuer vers l&apos;Étape 2 &rarr;
               </Button>
@@ -458,7 +456,7 @@ export default function NewApplicationPage() {
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
+            <div className="wizard-nav-row" style={{ marginTop: '20px' }}>
               <Button variant="outline" onClick={() => { setStepError(''); setStep(1); }}>
                 &larr; Retour
               </Button>
@@ -519,8 +517,8 @@ export default function NewApplicationPage() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
+                      <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)', wordBreak: 'break-word' }}>
                           {doc.code} &bull; {doc.name}
                         </div>
                         {isExempted ? (
@@ -532,7 +530,7 @@ export default function NewApplicationPage() {
                             ⏳ Calcul de l&apos;empreinte SHA-256 et chiffrement en cours...
                           </div>
                         ) : uploaded ? (
-                          <div className="mono text-muted" style={{ fontSize: '11px' }}>
+                          <div className="mono text-muted" style={{ fontSize: '11px', wordBreak: 'break-word' }}>
                             📄 {uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}... {uploaded.cloudinaryUrl ? '• 🔒 AES-256' : ''}
                           </div>
                         ) : (
@@ -543,7 +541,7 @@ export default function NewApplicationPage() {
                       </div>
 
                       {!isExempted && (
-                        <div>
+                        <div className="full-width-xs">
                           <input
                             id={`upload-${doc.code}`}
                             type="file"
@@ -554,7 +552,7 @@ export default function NewApplicationPage() {
                           />
                           <label
                             htmlFor={`upload-${doc.code}`}
-                            className="btn btn-sm btn-outline"
+                            className="btn btn-sm btn-outline full-width-xs"
                             style={{ cursor: isDocUploading ? 'wait' : 'pointer', margin: 0, opacity: isDocUploading ? 0.6 : 1 }}
                           >
                             {isDocUploading ? '⏳ Téléversement...' : uploaded ? '🔄 Remplacer' : '📤 Téléverser PDF'}
@@ -573,7 +571,7 @@ export default function NewApplicationPage() {
               })}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="wizard-nav-row">
               <Button variant="outline" onClick={() => { setStepError(''); setStep(2); }}>
                 &larr; Retour
               </Button>
@@ -624,7 +622,7 @@ export default function NewApplicationPage() {
               </ul>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+            <div className="wizard-nav-row">
               <Button variant="outline" onClick={() => setStep(3)}>
                 &larr; Retour aux Pièces
               </Button>

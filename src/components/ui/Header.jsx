@@ -24,6 +24,15 @@ export default function Header({
 }) {
   const [clientUser, setClientUser] = useState(null);
   const [networkOnline, setNetworkOnline] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     const syncUser = () => {
@@ -101,56 +110,78 @@ export default function Header({
     <div className="site-header-sticky">
       <div className="drc-ribbon" role="presentation" />
       <header className="site-header-bar">
-        <a
-          href="/"
-          style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}
-        >
-          <div
-            style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '10px',
-              background: '#ffffff',
-              border: '2px solid var(--fnpss-orange)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '3px',
-              flexShrink: 0
-            }}
+        <div className="site-header-top">
+          <a
+            href="/"
+            style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit', minWidth: 0, flex: '1 1 auto' }}
           >
-            <img
-              src="/brand/logo-fnpss.png"
-              alt="Logo officiel FNPSS"
-              width={38}
-              height={38}
-              style={{ objectFit: 'contain', display: 'block' }}
-            />
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '10px',
+                background: '#ffffff',
+                border: '2px solid var(--fnpss-orange)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '3px',
+                flexShrink: 0
+              }}
+            >
+              <img
+                src="/brand/logo-fnpss.png"
+                alt="Logo officiel FNPSS"
+                width={36}
+                height={36}
+                style={{ objectFit: 'contain', display: 'block' }}
+              />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
+                Guichet Unique Dématérialisé
+              </h1>
+              <p style={{ fontSize: '11.5px', color: '#cbd5e1', margin: 0, lineHeight: 1.2 }}>
+                FNPSS &bull; <span style={{ color: '#fdba74', fontWeight: 600 }}>Le social dans la solidarité</span> &bull; RDC
+              </p>
+            </div>
+          </a>
+
+          <div className="header-mobile-controls">
+            <NotificationBell />
+            <button
+              type="button"
+              className="header-menu-toggle"
+              aria-label={mobileMenuOpen ? 'Fermer le menu de navigation' : 'Ouvrir le menu de navigation'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="main-nav-menu"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+            >
+              {mobileMenuOpen ? '✕' : '☰'}
+            </button>
           </div>
-          <div>
-            <h1 style={{ fontSize: '16.5px', fontWeight: 800, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
-              Guichet Unique Dématérialisé
-            </h1>
-            <p style={{ fontSize: '11.5px', color: '#cbd5e1', margin: 0, lineHeight: 1.2 }}>
-              FNPSS &bull; <span style={{ color: '#fdba74', fontWeight: 600 }}>Le social dans la solidarité</span> &bull; RDC
-            </p>
-          </div>
-        </a>
+        </div>
 
         {/* Navigation & Contrôles statut */}
-        <nav aria-label="Navigation principale" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <nav
+          id="main-nav-menu"
+          aria-label="Navigation principale"
+          className={`site-header-nav ${mobileMenuOpen ? 'is-open' : ''}`}
+        >
           {activeUser && (
             <>
               <a
                 href={isStaffUser ? '/admin' : '/dashboard'}
-                style={{ color: '#f7d618', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ color: '#f7d618', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none' }}
               >
                 {isStaffUser ? '🏛️ Console Back-Office' : '📋 Mon Tableau de Bord'}
               </a>
               {!isStaffUser && (
                 <a
                   href="/applications/new"
-                  style={{ color: '#fed7aa', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ color: '#fed7aa', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none' }}
                 >
                   ➕ Déposer un dossier
                 </a>
@@ -159,13 +190,15 @@ export default function Header({
           )}
           <a
             href="/guide"
-            style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
+            onClick={() => setMobileMenuOpen(false)}
+            style={{ color: '#e2e8f0', fontSize: '12.5px', fontWeight: 600, textDecoration: 'none' }}
           >
             📘 Guide ONG
           </a>
           <a
             href="/verifier"
-            style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
+            onClick={() => setMobileMenuOpen(false)}
+            style={{ color: '#e2e8f0', fontSize: '12.5px', fontWeight: 600, textDecoration: 'none' }}
           >
             🔍 Contrôle Douane DGDA
           </a>
@@ -177,6 +210,7 @@ export default function Header({
               borderRadius: '999px',
               fontSize: '11.5px',
               fontWeight: 600,
+              alignSelf: 'flex-start',
               background: isOnline ? '#e6f4ea' : '#fef7e0',
               color: isOnline ? '#137333' : '#92400e'
             }}
@@ -184,20 +218,26 @@ export default function Header({
             {isOnline ? '🟢 En ligne' : '🟠 Hors-ligne (PWA)'}
           </span>
 
-          <NotificationBell />
+          <span className="header-desktop-bell">
+            <NotificationBell />
+          </span>
 
           {activeUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <a
                 href={isStaffUser ? '/admin' : '/profile'}
-                style={{ fontSize: '12px', color: '#e2e8f0', textDecoration: 'none' }}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ fontSize: '12px', color: '#e2e8f0', textDecoration: 'none', wordBreak: 'break-word' }}
                 title="Accéder à mon profil"
               >
                 👤 <strong>{displayName}</strong> <span style={{ color: '#94a3b8' }}>({activeUser.role})</span>
               </a>
               <button
                 type="button"
-                onClick={handleLogout}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLogout();
+                }}
                 className="btn btn-sm btn-outline"
                 style={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.3)', background: 'transparent' }}
               >
@@ -207,7 +247,10 @@ export default function Header({
           ) : (
             <button
               type="button"
-              onClick={handleLogin}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleLogin();
+              }}
               className="btn btn-sm btn-brand"
             >
               Connexion
