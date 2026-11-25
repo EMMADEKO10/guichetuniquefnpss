@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getClientToken, getClientUser } from '../../lib/client-auth.js';
+import { getClientToken, getClientUser, clearClientSession } from '../../lib/client-auth.js';
 import AppIcon from './AppIcon.jsx';
 
 const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
@@ -33,6 +33,13 @@ export default function NotificationBell() {
       const res = await fetch('/api/notifications', {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        clearClientSession();
+        setHasSession(false);
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);

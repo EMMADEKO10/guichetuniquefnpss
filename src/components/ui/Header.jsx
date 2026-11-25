@@ -53,13 +53,17 @@ export default function Header({
 
     syncUser();
     syncOnline();
+    const expiryCheckInterval = setInterval(syncUser, 60000);
     window.addEventListener('fnpss-auth-change', syncUser);
     window.addEventListener('storage', syncUser);
+    window.addEventListener('focus', syncUser);
     window.addEventListener('online', syncOnline);
     window.addEventListener('offline', syncOnline);
     return () => {
+      clearInterval(expiryCheckInterval);
       window.removeEventListener('fnpss-auth-change', syncUser);
       window.removeEventListener('storage', syncUser);
+      window.removeEventListener('focus', syncUser);
       window.removeEventListener('online', syncOnline);
       window.removeEventListener('offline', syncOnline);
     };

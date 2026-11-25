@@ -14,7 +14,7 @@ import BlockchainSignal from '../../components/ui/BlockchainSignal.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import { SkeletonKpiGrid, SkeletonCard } from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
-import { getClientToken } from '../../lib/client-auth.js';
+import { getClientToken, clearClientSession } from '../../lib/client-auth.js';
 import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
 import QrCodeDisplay from '../../components/ui/QrCodeDisplay.jsx';
 import AppIcon from '../../components/ui/AppIcon.jsx';
@@ -90,6 +90,8 @@ export default function DashboardPage() {
       }
       const res = await fetch('/api/applications', { headers: { Authorization: `Bearer ${t}` } });
       if (res.status === 401) {
+        clearClientSession();
+        setSessionToken('');
         setAuthExpired(true);
         setApplications([]);
         return;

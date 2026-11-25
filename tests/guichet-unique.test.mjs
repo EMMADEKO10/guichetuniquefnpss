@@ -3771,6 +3771,37 @@ test('Test 38 - Iconographie MUI Icons (AppIcon.jsx, zero emoji pictographique d
   assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
 });
 
+test('Test 39 - Synchronisation expiration de session (TTL 8h client-auth + purge clearClientSession sur 401)', async () => {
+  const { CLIENT_SESSION_TTL_MS, isClientTokenExpired } = await import('../src/lib/client-auth.js');
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+
+  assert.equal(CLIENT_SESSION_TTL_MS, 8 * 60 * 60 * 1000);
+
+  const now = Date.now();
+  const encodePayload = (obj) => Buffer.from(JSON.stringify(obj), 'utf8').toString('base64url');
+  const freshToken = `fnpss.${encodePayload({ userId: 'usr-1', createdAt: now - 1000 })}.sig`;
+  const expiredToken = `fnpss.${encodePayload({ userId: 'usr-1', createdAt: now - CLIENT_SESSION_TTL_MS - 1000 })}.sig`;
+
+  assert.equal(isClientTokenExpired(freshToken, now), false);
+  assert.equal(isClientTokenExpired(expiredToken, now), true);
+  assert.equal(isClientTokenExpired('invalid-token', now), false);
+
+  for (const file of [
+    'src/app/dashboard/page.jsx',
+    'src/app/profile/page.jsx',
+    'src/app/admin/page.jsx',
+    'src/components/ui/NotificationBell.jsx'
+  ]) {
+    const src = fs.readFileSync(file, 'utf8');
+    assert.ok(src.includes('clearClientSession()'), `${file} doit purger la session locale sur erreur 401`);
+  }
+
+  const headerSrc = fs.readFileSync('src/components/ui/Header.jsx', 'utf8');
+  assert.ok(headerSrc.includes('expiryCheckInterval') && headerSrc.includes("'focus'"));
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
 
 
 

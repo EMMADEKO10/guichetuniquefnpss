@@ -60,6 +60,10 @@ export default function ProfilePage() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      if (res.status === 401) {
+        clearClientSession();
+        throw new Error('Session expirée');
+      }
       if (!res.ok) {
         throw new Error('Session expirée');
       }
@@ -116,6 +120,9 @@ export default function ProfilePage() {
       });
 
       const data = await res.json();
+      if (res.status === 401) {
+        clearClientSession();
+      }
       if (!res.ok) {
         const msg = data.error || 'Erreur lors de la mise à jour.';
         setStatusMessage({ type: 'error', text: msg });

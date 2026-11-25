@@ -154,7 +154,9 @@ export default function AdminPage() {
       const res = await fetch('/api/auth/profile', {
         headers: { Authorization: `Bearer ${existingToken}` }
       });
-      if (res.ok) {
+      if (res.status === 401) {
+        clearClientSession();
+      } else if (res.ok) {
         const d = await res.json();
         if (d.user && STAFF_ROLES.includes(d.user.role)) {
           setSessionToken(existingToken);
