@@ -3802,6 +3802,29 @@ test('Test 39 - Synchronisation expiration de session (TTL 8h client-auth + purg
   assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
 });
 
+test('Test 40 - Typographie auto-hebergee (Plus Jakarta Sans, Inter, JetBrains Mono) et design premium /applications/new', async () => {
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+
+  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  assert.ok(pkg.dependencies['@fontsource-variable/plus-jakarta-sans']);
+  assert.ok(pkg.dependencies['@fontsource-variable/inter']);
+  assert.ok(pkg.dependencies['@fontsource-variable/jetbrains-mono']);
+
+  const layoutSrc = fs.readFileSync('src/app/layout.jsx', 'utf8');
+  assert.ok(layoutSrc.includes('@fontsource-variable/plus-jakarta-sans'));
+  assert.ok(layoutSrc.includes('@fontsource-variable/inter'));
+  assert.ok(layoutSrc.includes('@fontsource-variable/jetbrains-mono'));
+
+  const css = fs.readFileSync('src/app/globals.css', 'utf8');
+  assert.ok(css.includes('--font-display:') && css.includes('--font-sans:') && css.includes('--font-mono:'));
+  assert.ok(css.includes('-webkit-font-smoothing: antialiased') && css.includes('.service-option-card'));
+
+  const newAppSrc = fs.readFileSync('src/app/applications/new/page.jsx', 'utf8');
+  assert.ok(newAppSrc.includes('service-option-card') && newAppSrc.includes('role="radiogroup"') && newAppSrc.includes('wizard-footer-bar'));
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
 
 
 

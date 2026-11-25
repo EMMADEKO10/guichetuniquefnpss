@@ -13,6 +13,57 @@ import AppIcon from '../../../components/ui/AppIcon.jsx';
 const DRAFT_STORAGE_KEY = 'fnpss_new_app_draft_v1';
 const OFFLINE_QUEUE_KEY = 'fnpss_offline_queue_v1';
 
+const SERVICE_OPTIONS = [
+  {
+    code: 'S1',
+    title: 'Enrôlement Initial ONG',
+    description: 'Identification officielle de votre ONG/ASBL et obtention du matricule FNPSS.',
+    sla: '5 jours ouvr.',
+    fee: '20 USD',
+    icon: 'business'
+  },
+  {
+    code: 'S2',
+    title: 'Accord de Partenariat',
+    description: 'Convention cadre de partenariat avec le Ministère des Affaires Sociales.',
+    sla: '10 jours ouvr.',
+    fee: 'Inclus',
+    icon: 'institution'
+  },
+  {
+    code: 'S3',
+    title: 'Avis Technique Projet',
+    description: 'Évaluation de conformité sociale préalable des programmes humanitaires.',
+    sla: '7 jours ouvr.',
+    fee: 'Inclus',
+    icon: 'review'
+  },
+  {
+    code: 'S4',
+    title: 'Exonération Douanière',
+    description: 'Franchise douanière et fiscale scellée sur Polygon pour vos importations.',
+    sla: '10 jours ouvr.',
+    fee: '20 USD + 300 USD',
+    icon: 'seal'
+  },
+  {
+    code: 'S5',
+    title: 'Philanthropie & Dons',
+    description: 'Reconnaissance officielle des dons, fondations et legs d\'utilité sociale.',
+    sla: '7 jours ouvr.',
+    fee: '20 USD',
+    icon: 'verified'
+  },
+  {
+    code: 'S6',
+    title: 'Arrêté Interministériel',
+    description: 'Acte conjoint Affaires Sociales / Finances pour programmes pluriannuels.',
+    sla: '15 jours ouvr.',
+    fee: 'Sur dossier',
+    icon: 'audit'
+  }
+];
+
 export default function NewApplicationPage() {
   const toast = useToast();
   const [step, setStep] = useState(1);
@@ -281,16 +332,18 @@ export default function NewApplicationPage() {
     }
   };
 
+  const selectedServiceInfo = SERVICE_OPTIONS.find((s) => s.code === serviceCode) || SERVICE_OPTIONS[3];
+
   return (
-    <div style={{ maxWidth: '840px', margin: '12px auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '18px' }}>
+    <div style={{ maxWidth: '920px', margin: '12px auto' }}>
+      <div className="page-header-row" style={{ marginBottom: '20px' }}>
         <div>
-          <h2>Nouvelle Demande de Démarche FNPSS</h2>
-          <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
-            Formulaire dynamique S1–S6 avec principe Once-Only et calcul d&apos;intégrité SHA-256 (REQ-06)
+          <h2 style={{ marginBottom: '4px' }}>Nouvelle Demande de Démarche FNPSS</h2>
+          <p className="text-muted" style={{ fontSize: '13.5px', margin: 0 }}>
+            Formulaire dynamique S1–S6 avec principe Once-Only et empreinte SHA-256 (REQ-06)
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <Badge status="info">
             <AppIcon name="save" size="xs" />
             <span>Brouillon auto</span>
@@ -304,34 +357,27 @@ export default function NewApplicationPage() {
       </div>
 
       {/* Étapes du Wizard */}
-      <div className="wizard-steps-grid" style={{ marginBottom: '20px' }}>
+      <div className="wizard-steps-grid" style={{ marginBottom: '22px' }}>
         {[
-          { num: 1, title: '1. Démarche' },
-          { num: 2, title: '2. Projet' },
-          { num: 3, title: '3. Pièces' },
-          { num: 4, title: '4. Finalisation' }
-        ].map((s) => (
-          <div
-            key={s.num}
-            style={{
-              padding: '10px 8px',
-              textAlign: 'center',
-              borderRadius: '8px',
-              fontWeight: 700,
-              fontSize: '12px',
-              border: step === s.num ? '2px solid var(--fnpss-orange)' : '1px solid var(--border)',
-              background: step === s.num ? 'var(--fnpss-navy)' : step > s.num ? '#e6f4ea' : '#f1f5f9',
-              color: step === s.num ? '#ffffff' : step > s.num ? 'var(--fnpss-green)' : 'var(--text-muted)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '5px'
-            }}
-          >
-            {step > s.num && <AppIcon name="check" size="xs" />}
-            <span>{s.title}</span>
-          </div>
-        ))}
+          { num: 1, title: 'Démarche' },
+          { num: 2, title: 'Projet' },
+          { num: 3, title: 'Pièces' },
+          { num: 4, title: 'Finalisation' }
+        ].map((s) => {
+          const isActive = step === s.num;
+          const isDone = step > s.num;
+          return (
+            <div
+              key={s.num}
+              className={`wizard-step-pill ${isActive ? 'is-active' : isDone ? 'is-done' : ''}`}
+            >
+              <span className="wizard-step-num" aria-hidden="true">
+                {isDone ? <AppIcon name="check" size={13} /> : s.num}
+              </span>
+              <span>{s.title}</span>
+            </div>
+          );
+        })}
       </div>
 
       {feedback && (
@@ -364,7 +410,8 @@ export default function NewApplicationPage() {
                 </Button>
               )}
               <a href="/dashboard" className="btn btn-sm btn-success" style={{ textDecoration: 'none' }}>
-                Accéder au Tableau de Bord &rarr;
+                <span>Accéder au Tableau de Bord</span>
+                <AppIcon name="arrowForward" size="xs" />
               </a>
             </div>
           )}
@@ -387,41 +434,80 @@ export default function NewApplicationPage() {
         {/* Étape 1 : Choix du Service */}
         {step === 1 && (
           <div>
-            <h3 style={{ marginBottom: '14px' }}>Étape 1 : Sélectionnez le Service Dématérialisé</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '12px', marginBottom: '20px' }}>
-              {[
-                { code: 'S1', title: 'S1 • Enrôlement Initial ONG', sla: '5j', fee: '20 USD' },
-                { code: 'S2', title: 'S2 • Accord de Partenariat', sla: '10j', fee: 'Inclus' },
-                { code: 'S3', title: 'S3 • Avis Technique Projet', sla: '7j', fee: 'Inclus' },
-                { code: 'S4', title: 'S4 • Exonération Douanière', sla: '10j', fee: '20$ + 300$' },
-                { code: 'S5', title: 'S5 • Philanthropie & Dons', sla: '7j', fee: '20 USD' },
-                { code: 'S6', title: 'S6 • Arrêté Interministériel', sla: '15j', fee: 'Sur dossier' }
-              ].map((s) => (
-                <div
-                  key={s.code}
-                  onClick={() => setServiceCode(s.code)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setServiceCode(s.code); }}
-                  style={{
-                    border: `2px solid ${serviceCode === s.code ? 'var(--fnpss-orange-accessible)' : 'var(--border)'}`,
-                    background: serviceCode === s.code ? 'var(--fnpss-orange-soft)' : '#ffffff',
-                    padding: '14px',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <strong style={{ color: 'var(--fnpss-navy)' }}>{s.title}</strong>
-                  <div className="text-muted" style={{ fontSize: '11.5px', marginTop: '4px' }}>
-                    SLA : {s.sla} &bull; Frais : {s.fee}
-                  </div>
-                </div>
-              ))}
+            <div style={{ marginBottom: '18px' }}>
+              <h3 style={{ marginBottom: '4px' }}>Étape 1 : Sélectionnez le Service Dématérialisé</h3>
+              <p className="text-muted" style={{ fontSize: '13.5px', margin: 0 }}>
+                Choisissez la démarche officielle correspondant à votre demande auprès du FNPSS.
+              </p>
             </div>
 
-            <div className="wizard-nav-row" style={{ justifyContent: 'flex-end' }}>
+            <div className="service-options-grid" role="radiogroup" aria-label="Services dématérialisés FNPSS">
+              {SERVICE_OPTIONS.map((s) => {
+                const isSelected = serviceCode === s.code;
+                return (
+                  <button
+                    key={s.code}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setServiceCode(s.code)}
+                    className={`service-option-card ${isSelected ? 'is-selected' : ''}`}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span className="service-option-icon" aria-hidden="true">
+                            <AppIcon name={s.icon} size="md" />
+                          </span>
+                          <span
+                            className="mono"
+                            style={{
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              background: isSelected ? 'var(--fnpss-orange-soft)' : '#f1f5f9',
+                              color: isSelected ? 'var(--fnpss-orange-accessible)' : 'var(--fnpss-navy)'
+                            }}
+                          >
+                            {s.code}
+                          </span>
+                        </div>
+                        <span className="service-option-radio" aria-hidden="true">
+                          {isSelected && <AppIcon name="check" size={12} />}
+                        </span>
+                      </div>
+
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '15px', color: 'var(--fnpss-navy)', marginBottom: '5px', letterSpacing: '-0.015em' }}>
+                        {s.title}
+                      </div>
+                      <p className="text-muted" style={{ fontSize: '12.5px', lineHeight: 1.5, margin: 0 }}>
+                        {s.description}
+                      </p>
+                    </div>
+
+                    <div className="service-option-meta">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <AppIcon name="clock" size="xs" />
+                        <span>SLA : <strong style={{ color: 'var(--fnpss-navy)' }}>{s.sla}</strong></span>
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <AppIcon name="payment" size="xs" />
+                        <span>Frais : <strong style={{ color: 'var(--fnpss-navy)' }}>{s.fee}</strong></span>
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="wizard-footer-bar wizard-nav-row">
+              <div className="text-muted" style={{ fontSize: '13px' }}>
+                Sélection : <strong style={{ color: 'var(--fnpss-navy)' }}>{selectedServiceInfo.code} — {selectedServiceInfo.title}</strong>
+              </div>
               <Button variant="brand" onClick={() => { setStepError(''); setStep(2); }}>
-                Continuer vers l&apos;Étape 2 &rarr;
+                <span>Continuer vers l&apos;Étape 2</span>
+                <AppIcon name="arrowForward" size="sm" />
               </Button>
             </div>
           </div>
@@ -430,7 +516,16 @@ export default function NewApplicationPage() {
         {/* Étape 2 : Données du Projet */}
         {step === 2 && (
           <div>
-            <h3 style={{ marginBottom: '14px' }}>Étape 2 : Descriptif du Projet et Colisage</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '18px' }}>
+              <div>
+                <h3 style={{ marginBottom: '4px' }}>Étape 2 : Descriptif du Projet et Colisage</h3>
+                <p className="text-muted" style={{ fontSize: '13.5px', margin: 0 }}>
+                  Précisez l&apos;objet de votre démarche et les informations techniques du dossier.
+                </p>
+              </div>
+              <Badge status="brand">{selectedServiceInfo.code} &bull; {selectedServiceInfo.title}</Badge>
+            </div>
+
             <div className="form-group">
               <label htmlFor="proj-org">Organisation Déposante</label>
               <input
@@ -466,7 +561,7 @@ export default function NewApplicationPage() {
               />
             </div>
 
-            <div className="wizard-nav-row" style={{ marginTop: '20px' }}>
+            <div className="wizard-footer-bar wizard-nav-row">
               <Button variant="outline" onClick={() => { setStepError(''); setStep(1); }}>
                 &larr; Retour
               </Button>
@@ -481,7 +576,8 @@ export default function NewApplicationPage() {
                   setStep(3);
                 }}
               >
-                Continuer vers les Pièces &rarr;
+                <span>Continuer vers les Pièces</span>
+                <AppIcon name="arrowForward" size="sm" />
               </Button>
             </div>
           </div>
@@ -490,8 +586,13 @@ export default function NewApplicationPage() {
         {/* Étape 3 : Pièces Justificatives & Once-Only */}
         {step === 3 && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0 }}>Étape 3 : Téléversement des Pièces Justificatives (P1 à P6)</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px' }}>Étape 3 : Téléversement des Pièces Justificatives (P1 à P6)</h3>
+                <p className="text-muted" style={{ fontSize: '13px', margin: 0 }}>
+                  Chaque document PDF est haché (SHA-256) localement puis chiffré en AES-256-GCM.
+                </p>
+              </div>
               <Badge status={readyDocsCount === 6 ? 'valide' : 'info'}>
                 {readyDocsCount}/6 pièces prêtes
               </Badge>
@@ -506,7 +607,7 @@ export default function NewApplicationPage() {
               />
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}>
               {docDefinitions.map((doc) => {
                 const isExempted = doc.onceOnly && hasS1Enrollment;
                 const uploaded = attachedDocs[doc.code];
@@ -517,9 +618,9 @@ export default function NewApplicationPage() {
                   <div
                     key={doc.code}
                     style={{
-                      border: `1px solid ${docError ? '#fca5a5' : uploaded || isExempted ? '#bbf7d0' : 'var(--border)'}`,
-                      borderRadius: '8px',
-                      padding: '12px',
+                      border: `1.5px solid ${docError ? '#fca5a5' : uploaded || isExempted ? '#bbf7d0' : '#e2e8f0'}`,
+                      borderRadius: '10px',
+                      padding: '14px 16px',
                       background: isExempted ? '#f0fdf4' : uploaded ? '#f8fafc' : '#ffffff',
                       display: 'flex',
                       flexDirection: 'column',
@@ -528,21 +629,21 @@ export default function NewApplicationPage() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                       <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)', wordBreak: 'break-word' }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '13.5px', color: 'var(--fnpss-navy)', wordBreak: 'break-word' }}>
                           {doc.code} &bull; {doc.name}
                         </div>
                         {isExempted ? (
-                          <div style={{ color: 'var(--fnpss-green)', fontSize: '11.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ color: 'var(--fnpss-green)', fontSize: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
                             <AppIcon name="check" size="xs" />
                             <span>Dispensé (Once-Only validé antérieurement)</span>
                           </div>
                         ) : isDocUploading ? (
-                          <div style={{ color: 'var(--fnpss-blue)', fontSize: '11.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ color: 'var(--fnpss-blue)', fontSize: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
                             <AppIcon name="hourglass" size="xs" />
                             <span>Calcul de l&apos;empreinte SHA-256 et chiffrement en cours...</span>
                           </div>
                         ) : uploaded ? (
-                          <div className="mono text-muted" style={{ fontSize: '11px', wordBreak: 'break-word', display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          <div className="mono text-muted" style={{ fontSize: '11.5px', wordBreak: 'break-word', display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
                             <AppIcon name="pdf" size="xs" />
                             <span>{uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}...</span>
                             {uploaded.cloudinaryUrl && (
@@ -552,7 +653,7 @@ export default function NewApplicationPage() {
                             )}
                           </div>
                         ) : (
-                          <div className="text-muted" style={{ fontSize: '11px' }}>
+                          <div className="text-muted" style={{ fontSize: '12px', marginTop: '2px' }}>
                             Format PDF requis (max 3 Mo pour archivage cloud complet)
                           </div>
                         )}
@@ -581,7 +682,7 @@ export default function NewApplicationPage() {
                     </div>
 
                     {docError && (
-                      <div style={{ color: '#b91c1c', fontSize: '11.5px', fontWeight: 600, background: '#fee2e2', padding: '6px 10px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ color: '#b91c1c', fontSize: '12px', fontWeight: 600, background: '#fee2e2', padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <AppIcon name="warning" size="xs" />
                         <span>{docError}</span>
                       </div>
@@ -591,7 +692,7 @@ export default function NewApplicationPage() {
               })}
             </div>
 
-            <div className="wizard-nav-row">
+            <div className="wizard-footer-bar wizard-nav-row">
               <Button variant="outline" onClick={() => { setStepError(''); setStep(2); }}>
                 &larr; Retour
               </Button>
@@ -606,7 +707,8 @@ export default function NewApplicationPage() {
                   setStep(4);
                 }}
               >
-                Vérification et Paiement &rarr;
+                <span>Vérification et Paiement</span>
+                <AppIcon name="arrowForward" size="sm" />
               </Button>
             </div>
           </div>
@@ -615,34 +717,54 @@ export default function NewApplicationPage() {
         {/* Étape 4 : Quittance & Finalisation */}
         {step === 4 && (
           <div>
-            <h3 style={{ marginBottom: '14px' }}>Étape 4 : Quittance des Frais et Soumission Finale</h3>
+            <div style={{ marginBottom: '18px' }}>
+              <h3 style={{ marginBottom: '4px' }}>Étape 4 : Quittance des Frais et Soumission Finale</h3>
+              <p className="text-muted" style={{ fontSize: '13.5px', margin: 0 }}>
+                Vérifiez votre récapitulatif et saisissez la référence de votre bordereau de paiement.
+              </p>
+            </div>
+
             <div className="form-group">
               <label htmlFor="pay-ref">Référence du Bordereau Bancaire ou Mobile Money (P6)</label>
               <input
                 id="pay-ref"
                 type="text"
-                className="form-control"
+                className="form-control mono"
                 value={paymentReference}
                 onChange={(e) => setPaymentReference(e.target.value)}
                 placeholder="Ex: RAWBANK-TRX-2026-9874"
                 required
               />
-              <span className="text-muted" style={{ fontSize: '11.5px' }}>
+              <span className="text-muted" style={{ fontSize: '12px', display: 'block', marginTop: '5px' }}>
                 Frais légaux : 20 USD (Dépôt) + 300 USD (Enquête préalable FNPSS). SLA légal : 10 jours ouvrables.
               </span>
             </div>
 
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #eef2f6', marginBottom: '20px', fontSize: '13px' }}>
-              <strong style={{ color: 'var(--fnpss-navy)' }}>Récapitulatif de la Demande :</strong>
-              <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
-                <li>Démarche : <strong>{serviceCode}</strong></li>
-                <li>Organisation : <strong>{organizationName}</strong></li>
-                <li>Projet : <strong>{projectTitle || 'Non spécifié'}</strong></li>
-                <li>Pièces prêtes : <strong>{readyDocsCount}/6</strong> {hasS1Enrollment && '(Once-Only actif)'}</li>
-              </ul>
+            <div style={{ background: '#f8fafc', padding: '18px', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '18px' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '13.5px', color: 'var(--fnpss-navy)', marginBottom: '12px' }}>
+                Récapitulatif de la Demande
+              </div>
+              <div className="summary-grid" style={{ fontSize: '13px' }}>
+                <div>
+                  <div className="text-muted" style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Démarche</div>
+                  <strong style={{ color: 'var(--fnpss-navy)' }}>{selectedServiceInfo.code} — {selectedServiceInfo.title}</strong>
+                </div>
+                <div>
+                  <div className="text-muted" style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Organisation</div>
+                  <strong style={{ color: 'var(--fnpss-navy)' }}>{organizationName}</strong>
+                </div>
+                <div>
+                  <div className="text-muted" style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Projet</div>
+                  <strong style={{ color: 'var(--fnpss-navy)' }}>{projectTitle || 'Non spécifié'}</strong>
+                </div>
+                <div>
+                  <div className="text-muted" style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Dossier PDF</div>
+                  <strong style={{ color: 'var(--fnpss-navy)' }}>{readyDocsCount}/6 pièces {hasS1Enrollment && '(Once-Only actif)'}</strong>
+                </div>
+              </div>
             </div>
 
-            <div className="wizard-nav-row">
+            <div className="wizard-footer-bar wizard-nav-row">
               <Button variant="outline" onClick={() => setStep(3)}>
                 &larr; Retour aux Pièces
               </Button>

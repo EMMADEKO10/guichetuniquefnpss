@@ -1,4 +1,7 @@
 import React from 'react';
+import '@fontsource-variable/plus-jakarta-sans';
+import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
 import './globals.css';
 import Header from '../components/ui/Header.jsx';
 import Footer from '../components/ui/Footer.jsx';
