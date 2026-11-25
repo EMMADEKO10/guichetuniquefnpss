@@ -18,22 +18,23 @@ import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken, getClientUser, saveClientSession, clearClientSession } from '../../lib/client-auth.js';
 import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
 import QrCodeDisplay from '../../components/ui/QrCodeDisplay.jsx';
+import AppIcon from '../../components/ui/AppIcon.jsx';
 
 const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
 
 const OPINION_TEMPLATES = [
   {
-    label: '✓ Conforme Loi 004/2001',
+    label: 'Conforme Loi 004/2001',
     favorable: true,
     note: 'Statuts, personnalité juridique et pièces P1 à P6 conformes aux dispositions de la Loi n°004/2001 et aux critères du FNPSS.'
   },
   {
-    label: '✓ Exonération humanitaire justifiée',
+    label: 'Exonération humanitaire justifiée',
     favorable: true,
     note: 'Colisage cohérent avec l\'objet social et le plan d\'action validé. Avis technique favorable pour octroi d\'exonération.'
   },
   {
-    label: '⚠️ Réserves — précisions requises',
+    label: 'Réserves — précisions requises',
     favorable: false,
     note: 'Avis avec réserves : incohérence partielle relevée entre les pièces techniques P3/P5 et l\'objet de la requête.'
   }
@@ -613,7 +614,8 @@ export default function AdminPage() {
               &larr; Retour à l&apos;accueil
             </a>
             <Button variant="brand" onClick={switchStaffAccount}>
-              🔐 Se connecter avec un Compte Instructeur (@fnpss.cd)
+              <AppIcon name="security" size="sm" />
+              <span>Se connecter avec un Compte Instructeur (@fnpss.cd)</span>
             </Button>
           </div>
         </Card>
@@ -661,7 +663,8 @@ export default function AdminPage() {
           </span>
           <Badge status="brand">Rôle RBAC : {role || 'Vérification...'}</Badge>
           <Button variant="outline" size="sm" onClick={switchStaffAccount}>
-            🔄 Changer de Compte
+            <AppIcon name="swap" size="sm" />
+            <span>Changer de Compte</span>
           </Button>
         </div>
       </div>
@@ -727,12 +730,14 @@ export default function AdminPage() {
             </div>
             <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
               <Button variant="outline" size="sm" isLoading={isSubmitting} onClick={handleFlushAnchorQueue}>
-                🔄 Synchroniser File d&apos;Ancrage
+                <AppIcon name="sync" size="xs" />
+                <span>Synchroniser File d&apos;Ancrage</span>
               </Button>
               {(role === 'DG' || role === 'ADMIN') && (
                 <>
                   <Button variant="primary" size="sm" isLoading={isSubmitting} onClick={handleDeployAmoy}>
-                    ⛓️ Qualifier Contrat Amoy (BLK-11)
+                    <AppIcon name="chain" size="xs" />
+                    <span>Qualifier Contrat Amoy (BLK-11)</span>
                   </Button>
                   <Button
                     type="button"
@@ -749,14 +754,16 @@ export default function AdminPage() {
                       }
                     }}
                   >
-                    📊 Export CSV (ADM-09)
+                    <AppIcon name="stats" size="xs" />
+                    <span>Export CSV (ADM-09)</span>
                   </Button>
                   <a
                     href="/guide"
                     className="btn btn-outline btn-sm"
                     style={{ textDecoration: 'none' }}
                   >
-                    🎓 Guides &amp; Formations (DEP-03..05)
+                    <AppIcon name="training" size="xs" />
+                    <span>Guides &amp; Formations (DEP-03..05)</span>
                   </a>
                 </>
               )}
@@ -773,7 +780,7 @@ export default function AdminPage() {
         const statusEntries = Object.entries(execStats.byStatus || {});
         return (
           <Card
-            title="📊 Vue Exécutive & Recettes (ADM-09)"
+            title="Vue Exécutive & Recettes (ADM-09)"
             subtitle="Pilotage consolidé des encaissements, statuts d'instruction et volumes par procédure S1–S6"
             actions={
               <Button type="button" size="sm" variant="ghost" onClick={() => setShowExecStats((v) => !v)}>
@@ -834,7 +841,7 @@ export default function AdminPage() {
                               />
                             </div>
                             <span className="text-muted" style={{ textAlign: 'right' }}>
-                              {svc.total} ({svc.validated} ✓)
+                              {svc.total} ({svc.validated} val.)
                             </span>
                           </div>
                         );
@@ -939,7 +946,7 @@ export default function AdminPage() {
                 <SkeletonCard rows={3} />
               ) : filteredApps.length === 0 ? (
                 <EmptyState
-                  icon="✅"
+                  icon="success"
                   title="Aucun dossier dans cette file"
                   description={workQueueTab === 'TODO' ? 'Aucun dossier en attente de votre rôle actuellement. Consultez l\'onglet « Tous » pour l\'historique.' : 'Modifiez vos filtres pour voir les autres dossiers.'}
                   action={workQueueTab !== 'ALL' ? <Button size="sm" variant="outline" onClick={() => setWorkQueueTab('ALL')}>Voir tous les dossiers</Button> : null}
@@ -1005,15 +1012,16 @@ export default function AdminPage() {
 
               <div className="meta-2col-grid" style={{ fontSize: '12.5px', marginBottom: '16px' }}>
                 <div><span className="text-muted">Statut :</span> <strong>{selectedApp.status}</strong></div>
-                <div><span className="text-muted">Frais :</span> <strong>{selectedApp.paymentValidated ? '✓ Quittance Validée' : '⏳ En attente'}</strong></div>
-                <div><span className="text-muted">Avis Division :</span> <strong>{selectedApp.divisionOpinion ? (selectedApp.divisionOpinion.favorable ? '✓ Favorable' : '⚠️ Réservé') : 'Non émis'}</strong></div>
-                <div><span className="text-muted">Co-signature :</span> <strong>{selectedApp.ministryCoSigned ? '✓ Apposée' : 'Non apposée'}</strong></div>
+                <div><span className="text-muted">Frais :</span> <strong>{selectedApp.paymentValidated ? 'Quittance Validée' : 'En attente'}</strong></div>
+                <div><span className="text-muted">Avis Division :</span> <strong>{selectedApp.divisionOpinion ? (selectedApp.divisionOpinion.favorable ? 'Favorable' : 'Réservé') : 'Non émis'}</strong></div>
+                <div><span className="text-muted">Co-signature :</span> <strong>{selectedApp.ministryCoSigned ? 'Apposée' : 'Non apposée'}</strong></div>
               </div>
 
               {selectedApp.certificate && (
                 <div style={{ background: '#eef6fc', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 12px', marginBottom: '14px', fontSize: '12px' }}>
-                  <div style={{ fontWeight: 700, color: 'var(--fnpss-navy)', marginBottom: '4px' }}>
-                    ⛓️ Attestation Scellée : <span className="mono">{selectedApp.certificate.certificateNumber}</span>
+                  <div style={{ fontWeight: 700, color: 'var(--fnpss-navy)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <AppIcon name="chain" size="sm" />
+                    <span>Attestation Scellée : <span className="mono">{selectedApp.certificate.certificateNumber}</span></span>
                   </div>
                   <div className="mono text-muted" style={{ fontSize: '11px', wordBreak: 'break-all', marginBottom: '6px' }}>
                     Tx Amoy : {selectedApp.certificate.txHash} ({selectedApp.certificate.onChainMode || 'LIVE_RPC'})
@@ -1026,7 +1034,8 @@ export default function AdminPage() {
                       className="btn btn-sm btn-outline"
                       style={{ textDecoration: 'none', fontSize: '11px' }}
                     >
-                      🔗 Voir sur PolygonScan Amoy
+                      <AppIcon name="external" size="xs" />
+                      <span>Voir sur PolygonScan Amoy</span>
                     </a>
                     <Button
                       type="button"
@@ -1046,7 +1055,8 @@ export default function AdminPage() {
                         }
                       }}
                     >
-                      📥 Télécharger l&apos;Attestation PDF Scellée
+                      <AppIcon name="pdfFile" size="xs" />
+                      <span>Télécharger l&apos;Attestation PDF Scellée</span>
                     </Button>
                     <Button
                       type="button"
@@ -1055,7 +1065,8 @@ export default function AdminPage() {
                       style={{ fontSize: '11px' }}
                       onClick={() => setQrModalCert(selectedApp.certificate)}
                     >
-                      📱 Afficher / Télécharger QR Code
+                      <AppIcon name="qr" size="xs" />
+                      <span>Afficher / Télécharger QR Code</span>
                     </Button>
                   </div>
                 </div>
@@ -1088,7 +1099,8 @@ export default function AdminPage() {
                     message="La quittance bancaire (320 USD) doit impérativement être validée par un compte habilité AGENT avant que le Chef de Division puisse formuler un avis technique."
                     action={
                       <Button size="sm" variant="primary" onClick={switchStaffAccount}>
-                        🔐 Se connecter avec un compte AGENT
+                        <AppIcon name="security" size="xs" />
+                        <span>Se connecter avec un compte AGENT</span>
                       </Button>
                     }
                     style={{ marginBottom: '14px' }}
@@ -1118,7 +1130,8 @@ export default function AdminPage() {
                     message="La quittance des frais bancaires n'a pas encore été validée par un Agent."
                     action={
                       <Button size="sm" variant="primary" onClick={switchStaffAccount}>
-                        🔐 Se connecter avec un compte AGENT
+                        <AppIcon name="security" size="xs" />
+                        <span>Se connecter avec un compte AGENT</span>
                       </Button>
                     }
                     style={{ marginBottom: '14px' }}
@@ -1130,7 +1143,8 @@ export default function AdminPage() {
                     message="L'avis technique favorable du Chef de Division est exigé avant toute décision d'approbation ou de scellement blockchain."
                     action={
                       <Button size="sm" variant="accent" onClick={switchStaffAccount}>
-                        🔐 Se connecter avec un compte CHEF_DIVISION
+                        <AppIcon name="security" size="xs" />
+                        <span>Se connecter avec un compte CHEF_DIVISION</span>
                       </Button>
                     }
                     style={{ marginBottom: '14px' }}
@@ -1187,7 +1201,8 @@ export default function AdminPage() {
                     loadingText="Validation..."
                     onClick={() => handleValidatePayment(selectedApp.referenceNumber)}
                   >
-                    💳 Valider Quittance Frais
+                    <AppIcon name="payment" size="xs" />
+                    <span>Valider Quittance Frais</span>
                   </Button>
                 )}
 
@@ -1200,7 +1215,8 @@ export default function AdminPage() {
                       setIsComplementModalOpen(true);
                     }}
                   >
-                    📩 Demander Complément
+                    <AppIcon name="complement" size="xs" />
+                    <span>Demander Complément</span>
                   </Button>
                 )}
 
@@ -1215,7 +1231,8 @@ export default function AdminPage() {
                       setIsOpinionModalOpen(true);
                     }}
                   >
-                    📝 Émettre Avis Technique Division {!selectedApp.paymentValidated && '(En attente validation quittance)'}
+                    <AppIcon name="review" size="xs" />
+                    <span>Émettre Avis Technique Division {!selectedApp.paymentValidated && '(En attente validation quittance)'}</span>
                   </Button>
                 )}
 
@@ -1228,7 +1245,8 @@ export default function AdminPage() {
                       disabledReason={!selectedApp.paymentValidated ? 'Quittance non validée' : 'Avis technique favorable de la division requis (ADM-06)'}
                       onClick={() => setSealConfirmApp(selectedApp)}
                     >
-                      {isSubmitting ? 'Scellement Polygon en cours...' : '✍️ Approuver & Sceller Blockchain'} {!selectedApp.divisionOpinion?.favorable && '(En attente avis division)'}
+                      <AppIcon name="seal" size="xs" />
+                      <span>{isSubmitting ? 'Scellement Polygon en cours...' : 'Approuver & Sceller Blockchain'} {!selectedApp.divisionOpinion?.favorable && '(En attente avis division)'}</span>
                     </Button>
                     <Button
                       variant="danger"
@@ -1238,7 +1256,8 @@ export default function AdminPage() {
                         setIsRejectModalOpen(true);
                       }}
                     >
-                      ✕ Rejeter la Demande
+                      <AppIcon name="close" size="xs" />
+                      <span>Rejeter la Demande</span>
                     </Button>
                   </>
                 )}
@@ -1253,7 +1272,8 @@ export default function AdminPage() {
                       setIsCosignModalOpen(true);
                     }}
                   >
-                    🏛️ Co-Signature Ministérielle
+                    <AppIcon name="institution" size="xs" />
+                    <span>Co-Signature Ministérielle</span>
                   </Button>
                 )}
 
@@ -1266,7 +1286,8 @@ export default function AdminPage() {
                       setIsRevokeModalOpen(true);
                     }}
                   >
-                    ⚠️ Révoquer l&apos;Attestation
+                    <AppIcon name="gppBad" size="xs" />
+                    <span>Révoquer l&apos;Attestation</span>
                   </Button>
                 )}
               </div>
@@ -1299,7 +1320,7 @@ export default function AdminPage() {
                 }
               />
             ) : (
-              <EmptyState icon="📑" title="Aucun dossier sélectionné" description="Sélectionnez un dossier à gauche pour inspecter ses pièces justificatives." />
+              <EmptyState icon="documents" title="Aucun dossier sélectionné" description="Sélectionnez un dossier à gauche pour inspecter ses pièces justificatives." />
             )}
           </Card>
 
@@ -1322,13 +1343,16 @@ export default function AdminPage() {
           actions={
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <Button size="sm" variant={adminTab === 'STAFF' ? 'primary' : 'outline'} onClick={() => setAdminTab('STAFF')}>
-                👤 Agents ({staffList.length})
+                <AppIcon name="users" size="xs" />
+                <span>Agents ({staffList.length})</span>
               </Button>
               <Button size="sm" variant={adminTab === 'APPLICANTS' ? 'primary' : 'outline'} onClick={() => setAdminTab('APPLICANTS')}>
-                🏢 Requérants ONG ({applicantsList.length})
+                <AppIcon name="business" size="xs" />
+                <span>Requérants ONG ({applicantsList.length})</span>
               </Button>
               <Button size="sm" variant={adminTab === 'AUDIT' ? 'primary' : 'outline'} onClick={() => setAdminTab('AUDIT')}>
-                📜 Journal d&apos;Audit ({auditLogs.length})
+                <AppIcon name="audit" size="xs" />
+                <span>Journal d&apos;Audit ({auditLogs.length})</span>
               </Button>
             </div>
           }
@@ -1337,7 +1361,8 @@ export default function AdminPage() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                 <Button variant="brand" size="sm" onClick={() => { setModalError(''); setIsStaffModalOpen(true); }}>
-                  ➕ Créer un Compte Agent / Instructeur
+                  <AppIcon name="userAdd" size="xs" />
+                  <span>Créer un Compte Agent / Instructeur</span>
                 </Button>
               </div>
               <div className="table-responsive">
@@ -1380,7 +1405,7 @@ export default function AdminPage() {
                 />
               </div>
               {filteredApplicants.length === 0 ? (
-                <EmptyState icon="🏢" title="Aucun compte requérant trouvé" />
+                <EmptyState icon="business" title="Aucun compte requérant trouvé" />
               ) : (
                 <div className="table-responsive">
                   <table>
@@ -1446,11 +1471,12 @@ export default function AdminPage() {
                     }
                   }}
                 >
-                  📥 Exporter Audit CSV (ADM-07)
+                  <AppIcon name="download" size="xs" />
+                  <span>Exporter Audit CSV (ADM-07)</span>
                 </Button>
               </div>
               {filteredAuditLogs.length === 0 ? (
-                <EmptyState icon="📜" title="Aucune trace d'audit correspondante" />
+                <EmptyState icon="audit" title="Aucune trace d'audit correspondante" />
               ) : (
                 <div className="table-responsive" style={{ maxHeight: '340px', overflowY: 'auto' }}>
                   <table>
@@ -1492,11 +1518,11 @@ export default function AdminPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div><strong>Organisation :</strong> {sealConfirmApp.organizationName}</div>
               <div><strong>Service :</strong> {sealConfirmApp.serviceCode} &bull; <strong>Projet :</strong> {sealConfirmApp.projectTitle}</div>
-              <div><strong>Préalables :</strong> ✓ Quittance validée &bull; ✓ Avis division favorable</div>
+              <div><strong>Préalables :</strong> Quittance validée &bull; Avis division favorable</div>
             </div>
           )
         }
-        confirmLabel="✍️ Approuver & Sceller sur Polygon"
+        confirmLabel="Approuver & Sceller sur Polygon"
         variant="success"
         isLoading={isSubmitting}
       />

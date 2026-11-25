@@ -1,10 +1,11 @@
 import React from 'react';
+import AppIcon from './AppIcon.jsx';
 
 /**
  * État vide standardisé et explicite pour listes, files et tables.
  */
 export default function EmptyState({
-  icon = '📂',
+  icon = 'folder',
   title = 'Aucun élément à afficher',
   description = '',
   action = null
@@ -19,7 +20,9 @@ export default function EmptyState({
         border: '1px dashed var(--border)'
       }}
     >
-      <div aria-hidden="true" style={{ fontSize: '34px', marginBottom: '10px' }}>{icon}</div>
+      <div className="empty-state-icon-wrap" aria-hidden="true">
+        {typeof icon === 'string' ? <AppIcon name={icon} size="xl" /> : icon}
+      </div>
       <h4 style={{ fontSize: '15px', color: 'var(--fnpss-navy)', marginBottom: '6px' }}>{title}</h4>
       {description && (
         <p className="text-muted" style={{ fontSize: '13px', maxWidth: '420px', margin: '0 auto 14px' }}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import Card from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
+import AppIcon from '../components/ui/AppIcon.jsx';
 
 export default function HomePage() {
   const services = [
@@ -235,8 +236,14 @@ export default function HomePage() {
                     flexWrap: 'wrap'
                   }}
                 >
-                  <span>⏱ <strong>Délai :</strong> {svc.sla}</span>
-                  <span>💳 <strong>Frais :</strong> {svc.frais}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <AppIcon name="clock" size="xs" />
+                    <span><strong>Délai :</strong> {svc.sla}</span>
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <AppIcon name="payment" size="xs" />
+                    <span><strong>Frais :</strong> {svc.frais}</span>
+                  </span>
                 </div>
                 <a href={`/applications/new?service=${svc.code}`} className="btn btn-primary btn-sm" style={{ width: '100%', textDecoration: 'none' }}>
                   Initier la démarche &rarr;

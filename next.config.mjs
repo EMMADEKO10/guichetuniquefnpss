@@ -7,6 +7,9 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   compress: true,
+  experimental: {
+    optimizePackageImports: ['@mui/icons-material']
+  },
   env: {
     APP_NAME: 'Guichet Unique Dématérialisé FNPSS',
     APP_VERSION: '0.2.0',

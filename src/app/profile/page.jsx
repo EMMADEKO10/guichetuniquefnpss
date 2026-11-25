@@ -5,6 +5,7 @@ import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
+import AppIcon from '../../components/ui/AppIcon.jsx';
 import { SkeletonCard } from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken, clearClientSession, saveClientSession } from '../../lib/client-auth.js';
@@ -202,7 +203,7 @@ export default function ProfilePage() {
         <div className="flex justify-between items-start" style={{ flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <div className="flex items-center" style={{ gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '18px' }}>🔐</span>
+              <AppIcon name="security" size="md" style={{ color: '#fdba74' }} />
               <h3 style={{ margin: 0, fontSize: '16px', color: '#fff' }}>
                 Portefeuille Numérique FNPSS (Web3Auth MPC)
               </h3>
@@ -218,7 +219,12 @@ export default function ProfilePage() {
             onClick={handleCopyWallet}
             style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.1)', fontSize: '12px' }}
           >
-            {copiedWallet ? '✓ Adresse Copiée !' : 'Copier l\'adresse'}
+            {copiedWallet ? (
+              <>
+                <AppIcon name="check" size="xs" />
+                <span>Adresse Copiée</span>
+              </>
+            ) : 'Copier l\'adresse'}
           </Button>
         </div>
 

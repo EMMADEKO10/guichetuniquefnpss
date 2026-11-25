@@ -1,4 +1,5 @@
 import React from 'react';
+import AppIcon from './AppIcon.jsx';
 
 /**
  * Signal visuel permanent d'état d'ancrage sur la Blockchain Polygon Amoy.
@@ -10,7 +11,8 @@ export default function BlockchainSignal({ application, showLink = false }) {
   if (!cert) {
     return (
       <span className="chain-pill" style={{ background: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}>
-        ⛓️ Non encore ancré
+        <AppIcon name="chain" size="xs" />
+        <span>Non encore ancré</span>
       </span>
     );
   }
@@ -21,15 +23,18 @@ export default function BlockchainSignal({ application, showLink = false }) {
 
   const pill = isRevoked ? (
     <span className="chain-pill" style={{ background: '#fef2f2', color: '#991b1b', borderColor: '#fecaca' }}>
-      ⛓️ Révoqué on-chain{blockText}
+      <AppIcon name="gppBad" size="xs" />
+      <span>Révoqué on-chain{blockText}</span>
     </span>
   ) : application.ministryCoSigned ? (
     <span className="chain-pill" style={{ background: '#e6f4ea', color: '#137333', borderColor: '#bbf7d0' }}>
-      ⛓️ Scellé &amp; Co-signé{blockText}
+      <AppIcon name="verified" size="xs" />
+      <span>Scellé &amp; Co-signé{blockText}</span>
     </span>
   ) : (
     <span className="chain-pill" style={{ background: '#eef6fc', color: '#065a82', borderColor: '#bfdbfe' }}>
-      ⛓️ Confirmé Polygon{blockText}
+      <AppIcon name="chain" size="xs" />
+      <span>Confirmé Polygon{blockText}</span>
     </span>
   );
 
@@ -42,9 +47,10 @@ export default function BlockchainSignal({ application, showLink = false }) {
         href={txUrl}
         target="_blank"
         rel="noreferrer"
-        style={{ fontSize: '11px', fontWeight: 700, color: 'var(--fnpss-blue)', textDecoration: 'underline' }}
+        style={{ fontSize: '11px', fontWeight: 700, color: 'var(--fnpss-blue)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
       >
-        PolygonScan ↗
+        <span>PolygonScan</span>
+        <AppIcon name="external" size={12} />
       </a>
     </span>
   );

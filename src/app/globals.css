@@ -591,6 +591,56 @@ tr:hover td {
   border: 1px solid transparent;
 }
 
+/* Iconographie vectorielle MUI & micro-pastilles statut */
+.fnpss-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot-green { background-color: var(--fnpss-green); }
+.status-dot-orange { background-color: var(--fnpss-orange-accessible); }
+.status-dot-red { background-color: var(--fnpss-red); }
+
+.empty-state-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #eef6fc;
+  color: var(--fnpss-blue);
+  margin: 0 auto 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.verdict-seal-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-link-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Skeleton loading */
 @keyframes fnpss-pulse {
   0%, 100% { opacity: 1; }

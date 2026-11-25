@@ -5,6 +5,7 @@ import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import AlertBanner from '../../../components/ui/AlertBanner.jsx';
+import AppIcon from '../../../components/ui/AppIcon.jsx';
 import { useToast } from '../../../components/ui/ToastProvider.jsx';
 
 export default function ForgotPasswordPage() {
@@ -103,7 +104,8 @@ export default function ForgotPasswordPage() {
                       }
                     }}
                   >
-                    ➡️ Ouvrir la page de réinitialisation
+                    <AppIcon name="arrowForward" size="xs" />
+                    <span>Ouvrir la page de réinitialisation</span>
                   </Button>
                 </div>
               </div>

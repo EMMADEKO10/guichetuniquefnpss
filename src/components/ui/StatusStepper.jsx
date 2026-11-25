@@ -1,4 +1,5 @@
 import React from 'react';
+import AppIcon from './AppIcon.jsx';
 
 /**
  * Frise de progression permanente du dossier (6 étapes).
@@ -22,37 +23,42 @@ export default function StatusStepper({ application, compact = false }) {
       key: 'depot',
       label: 'Dépôt',
       state: 'done',
-      icon: '✓'
+      iconName: 'check'
     },
     {
       key: 'quittance',
       label: 'Quittance',
       state: hasPayment ? 'done' : isRejected ? 'error' : isComplement ? 'paused' : 'current',
-      icon: hasPayment ? '✓' : isRejected ? '✕' : isComplement ? '⏸' : '2'
+      iconName: hasPayment ? 'check' : isRejected ? 'close' : isComplement ? 'pause' : null,
+      stepNum: '2'
     },
     {
       key: 'division',
       label: 'Avis Division',
       state: hasOpinion ? 'done' : isRejected && hasPayment ? 'error' : isComplement && hasPayment ? 'paused' : hasPayment ? 'current' : 'pending',
-      icon: hasOpinion ? '✓' : isRejected && hasPayment ? '✕' : isComplement && hasPayment ? '⏸' : '3'
+      iconName: hasOpinion ? 'check' : isRejected && hasPayment ? 'close' : isComplement && hasPayment ? 'pause' : null,
+      stepNum: '3'
     },
     {
       key: 'dg',
       label: isRejected ? 'Rejeté DG' : 'Décision DG',
       state: isRejected ? 'error' : (isDelivered || isRevoked) ? 'done' : hasOpinion ? 'current' : 'pending',
-      icon: isRejected ? '✕' : (isDelivered || isRevoked) ? '✓' : '4'
+      iconName: isRejected ? 'close' : (isDelivered || isRevoked) ? 'check' : null,
+      stepNum: '4'
     },
     {
       key: 'seal',
       label: isRevoked ? 'Révoqué' : 'Scellement',
       state: isRevoked ? 'error' : hasCert ? 'done' : 'pending',
-      icon: isRevoked ? '!' : hasCert ? '⛓' : '5'
+      iconName: isRevoked ? 'warning' : hasCert ? 'chain' : null,
+      stepNum: '5'
     },
     {
       key: 'cosign',
       label: 'Co-signature',
       state: hasCosign ? 'done' : hasCert && !isRevoked ? 'current' : 'pending',
-      icon: hasCosign ? '✓' : '6'
+      iconName: hasCosign ? 'check' : null,
+      stepNum: '6'
     }
   ];
 
@@ -83,7 +89,7 @@ export default function StatusStepper({ application, compact = false }) {
             style={compact ? { minWidth: '58px' } : undefined}
           >
             <div className="stepper-dot" aria-hidden="true" style={compact ? { width: '20px', height: '20px', fontSize: '10px' } : undefined}>
-              {s.icon}
+              {s.iconName ? <AppIcon name={s.iconName} size={compact ? 12 : 14} /> : s.stepNum}
             </div>
             <span className="stepper-label" style={compact ? { fontSize: '10px' } : undefined}>
               {s.label}

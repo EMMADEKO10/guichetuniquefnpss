@@ -8,6 +8,7 @@ import AlertBanner from '../../../components/ui/AlertBanner.jsx';
 import { useToast } from '../../../components/ui/ToastProvider.jsx';
 import { getClientToken, getClientUser } from '../../../lib/client-auth.js';
 import { downloadAuthenticatedFile } from '../../../lib/secure-download.js';
+import AppIcon from '../../../components/ui/AppIcon.jsx';
 
 const DRAFT_STORAGE_KEY = 'fnpss_new_app_draft_v1';
 const OFFLINE_QUEUE_KEY = 'fnpss_offline_queue_v1';
@@ -290,7 +291,10 @@ export default function NewApplicationPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <Badge status="info">💾 Brouillon auto</Badge>
+          <Badge status="info">
+            <AppIcon name="save" size="xs" />
+            <span>Brouillon auto</span>
+          </Badge>
           {draftRestored && (
             <Button variant="outline" size="sm" onClick={clearDraft}>
               Effacer brouillon
@@ -317,10 +321,15 @@ export default function NewApplicationPage() {
               fontSize: '12px',
               border: step === s.num ? '2px solid var(--fnpss-orange)' : '1px solid var(--border)',
               background: step === s.num ? 'var(--fnpss-navy)' : step > s.num ? '#e6f4ea' : '#f1f5f9',
-              color: step === s.num ? '#ffffff' : step > s.num ? 'var(--fnpss-green)' : 'var(--text-muted)'
+              color: step === s.num ? '#ffffff' : step > s.num ? 'var(--fnpss-green)' : 'var(--text-muted)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px'
             }}
           >
-            {step > s.num ? `✓ ${s.title}` : s.title}
+            {step > s.num && <AppIcon name="check" size="xs" />}
+            <span>{s.title}</span>
           </div>
         ))}
       </div>
@@ -350,7 +359,8 @@ export default function NewApplicationPage() {
                     }
                   }}
                 >
-                  🧾 Télécharger l&apos;Accusé PDF
+                  <AppIcon name="receipt" size="xs" />
+                  <span>Télécharger l&apos;Accusé PDF</span>
                 </Button>
               )}
               <a href="/dashboard" className="btn btn-sm btn-success" style={{ textDecoration: 'none' }}>
@@ -522,16 +532,24 @@ export default function NewApplicationPage() {
                           {doc.code} &bull; {doc.name}
                         </div>
                         {isExempted ? (
-                          <div style={{ color: 'var(--fnpss-green)', fontSize: '11.5px', fontWeight: 600 }}>
-                            ✓ Dispensé (Once-Only validé antérieurement)
+                          <div style={{ color: 'var(--fnpss-green)', fontSize: '11.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <AppIcon name="check" size="xs" />
+                            <span>Dispensé (Once-Only validé antérieurement)</span>
                           </div>
                         ) : isDocUploading ? (
-                          <div style={{ color: 'var(--fnpss-blue)', fontSize: '11.5px', fontWeight: 600 }}>
-                            ⏳ Calcul de l&apos;empreinte SHA-256 et chiffrement en cours...
+                          <div style={{ color: 'var(--fnpss-blue)', fontSize: '11.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <AppIcon name="hourglass" size="xs" />
+                            <span>Calcul de l&apos;empreinte SHA-256 et chiffrement en cours...</span>
                           </div>
                         ) : uploaded ? (
-                          <div className="mono text-muted" style={{ fontSize: '11px', wordBreak: 'break-word' }}>
-                            📄 {uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}... {uploaded.cloudinaryUrl ? '• 🔒 AES-256' : ''}
+                          <div className="mono text-muted" style={{ fontSize: '11px', wordBreak: 'break-word', display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                            <AppIcon name="pdf" size="xs" />
+                            <span>{uploaded.fileName} &bull; SHA-256: {uploaded.sha256Hash.substring(0, 14)}...</span>
+                            {uploaded.cloudinaryUrl && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--fnpss-green)' }}>
+                                &bull; <AppIcon name="lock" size="xs" /> AES-256
+                              </span>
+                            )}
                           </div>
                         ) : (
                           <div className="text-muted" style={{ fontSize: '11px' }}>
@@ -555,15 +573,17 @@ export default function NewApplicationPage() {
                             className="btn btn-sm btn-outline full-width-xs"
                             style={{ cursor: isDocUploading ? 'wait' : 'pointer', margin: 0, opacity: isDocUploading ? 0.6 : 1 }}
                           >
-                            {isDocUploading ? '⏳ Téléversement...' : uploaded ? '🔄 Remplacer' : '📤 Téléverser PDF'}
+                            <AppIcon name={isDocUploading ? 'hourglass' : uploaded ? 'refresh' : 'upload'} size="xs" />
+                            <span>{isDocUploading ? 'Téléversement...' : uploaded ? 'Remplacer' : 'Téléverser PDF'}</span>
                           </label>
                         </div>
                       )}
                     </div>
 
                     {docError && (
-                      <div style={{ color: '#b91c1c', fontSize: '11.5px', fontWeight: 600, background: '#fee2e2', padding: '6px 10px', borderRadius: '4px' }}>
-                        ⚠️ {docError}
+                      <div style={{ color: '#b91c1c', fontSize: '11.5px', fontWeight: 600, background: '#fee2e2', padding: '6px 10px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <AppIcon name="warning" size="xs" />
+                        <span>{docError}</span>
                       </div>
                     )}
                   </div>
@@ -627,7 +647,8 @@ export default function NewApplicationPage() {
                 &larr; Retour aux Pièces
               </Button>
               <Button variant="success" isLoading={isLoading} loadingText="Soumission en cours..." onClick={handleSubmit}>
-                ✅ Soumettre la Demande au FNPSS
+                <AppIcon name="success" size="sm" />
+                <span>Soumettre la Demande au FNPSS</span>
               </Button>
             </div>
           </div>

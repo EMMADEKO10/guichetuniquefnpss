@@ -10,6 +10,7 @@ import StatusStepper from '../../components/ui/StatusStepper.jsx';
 import SlaIndicator from '../../components/ui/SlaIndicator.jsx';
 import BlockchainSignal from '../../components/ui/BlockchainSignal.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
+import AppIcon, { APP_ICON_NAMES } from '../../components/ui/AppIcon.jsx';
 import { SkeletonCard, SkeletonKpiGrid, SkeletonRow } from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { buildWorkflowEmail } from '../../notifications/email-templates.mjs';
@@ -190,7 +191,7 @@ export default function DesignSystemPage() {
             </div>
           </div>
           <EmptyState
-            icon="📂"
+            icon="folder"
             title="Aucun dossier en attente"
             description="Tous les dossiers prioritaires ont été traités dans les délais SLA."
             action={<Button size="sm" variant="brand">Créer un dossier</Button>}
@@ -240,6 +241,33 @@ export default function DesignSystemPage() {
           </Card>
         );
       })()}
+
+      <Card title="7. Bibliothèque d'Icônes Officielles FNPSS (MUI Outlined)">
+        <p className="text-muted" style={{ fontSize: '12.5px', marginBottom: '12px' }}>
+          Toutes les icônes de l&apos;interface proviennent du registre vectoriel centralisé <code>AppIcon</code> (SVG inline 100 % compatible mode hors-ligne PWA 3G et WCAG AA).
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '8px' }}>
+          {APP_ICON_NAMES.map((iconName) => (
+            <div
+              key={iconName}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--surface-subtle)',
+                fontSize: '11.5px',
+                color: 'var(--fnpss-navy)'
+              }}
+            >
+              <AppIcon name={iconName} size="md" />
+              <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{iconName}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <ConfirmDialog
         open={confirmOpen}

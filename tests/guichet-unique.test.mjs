@@ -3738,6 +3738,39 @@ test('Test 37 - Audit Responsive multi-ecrans (R0-R7 : menu mobile, modale scrol
   assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
 });
 
+test('Test 38 - Iconographie MUI Icons (AppIcon.jsx, zero emoji pictographique dans src/app & src/components, WCAG AA)', async () => {
+  const { auditNextAppAccessibility } = await import('../src/ops/g1-gate-reviewer.mjs');
+
+  assert.ok(fs.existsSync('src/components/ui/AppIcon.jsx'), 'Le composant central AppIcon.jsx doit exister');
+  const appIconSrc = fs.readFileSync('src/components/ui/AppIcon.jsx', 'utf8');
+  assert.ok(appIconSrc.includes("'use client';"), 'AppIcon.jsx doit etre marque client pour compatibilite Server Components');
+  assert.ok(appIconSrc.includes('@mui/icons-material/'), 'AppIcon.jsx doit importer les icones MUI');
+
+  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  assert.ok(pkg.dependencies['@mui/icons-material'], '@mui/icons-material doit figurer dans package.json');
+
+  const walk = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = `${dir}/${entry.name}`;
+      return entry.isDirectory() ? walk(full) : full;
+    });
+
+  const emojiRegex = /\p{Extended_Pictographic}|\u26A0|\u2705|\u2713|\u2715|\u23F1|\u23F3|\u26D3|\u2139|\u23F9|\u270F|\u2B07|\u27A1|\u2795/gu;
+  const offending = [];
+  for (const root of ['src/app', 'src/components']) {
+    for (const file of walk(root).filter((f) => /\.(jsx|js)$/.test(f))) {
+      const content = fs.readFileSync(file, 'utf8');
+      const matches = content.match(emojiRegex);
+      if (matches && matches.length > 0) {
+        offending.push(`${file}: ${[...new Set(matches)].join(' ')}`);
+      }
+    }
+  }
+  assert.deepEqual(offending, [], `Aucun emoji IA ne doit subsister dans src/app ou src/components : ${offending.join('; ')}`);
+
+  assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
+});
+
 
 
 

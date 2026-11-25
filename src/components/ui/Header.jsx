@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { getClientToken, getClientUser, clearClientSession } from '../../lib/client-auth.js';
 import NotificationBell from './NotificationBell.jsx';
+import AppIcon from './AppIcon.jsx';
 
 /**
  * En-tête officiel souverain FNPSS (UX-05, WCAG AA)
@@ -157,7 +158,7 @@ export default function Header({
               aria-controls="main-nav-menu"
               onClick={() => setMobileMenuOpen((v) => !v)}
             >
-              {mobileMenuOpen ? '✕' : '☰'}
+              <AppIcon name={mobileMenuOpen ? 'close' : 'menu'} size="md" />
             </button>
           </div>
         </div>
@@ -173,17 +174,21 @@ export default function Header({
               <a
                 href={isStaffUser ? '/admin' : '/dashboard'}
                 onClick={() => setMobileMenuOpen(false)}
+                className="nav-link-icon"
                 style={{ color: '#f7d618', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none' }}
               >
-                {isStaffUser ? '🏛️ Console Back-Office' : '📋 Mon Tableau de Bord'}
+                <AppIcon name={isStaffUser ? 'institution' : 'dashboard'} size="sm" />
+                <span>{isStaffUser ? 'Console Back-Office' : 'Mon Tableau de Bord'}</span>
               </a>
               {!isStaffUser && (
                 <a
                   href="/applications/new"
                   onClick={() => setMobileMenuOpen(false)}
+                  className="nav-link-icon"
                   style={{ color: '#fed7aa', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none' }}
                 >
-                  ➕ Déposer un dossier
+                  <AppIcon name="add" size="sm" />
+                  <span>Déposer un dossier</span>
                 </a>
               )}
             </>
@@ -191,19 +196,23 @@ export default function Header({
           <a
             href="/guide"
             onClick={() => setMobileMenuOpen(false)}
+            className="nav-link-icon"
             style={{ color: '#e2e8f0', fontSize: '12.5px', fontWeight: 600, textDecoration: 'none' }}
           >
-            📘 Guide ONG
+            <AppIcon name="guide" size="sm" />
+            <span>Guide ONG</span>
           </a>
           <a
             href="/verifier"
             onClick={() => setMobileMenuOpen(false)}
+            className="nav-link-icon"
             style={{ color: '#e2e8f0', fontSize: '12.5px', fontWeight: 600, textDecoration: 'none' }}
           >
-            🔍 Contrôle Douane DGDA
+            <AppIcon name="verify" size="sm" />
+            <span>Contrôle Douane DGDA</span>
           </a>
           <span
-            className="net-pill"
+            className="net-pill nav-link-icon"
             role="status"
             style={{
               padding: '4px 10px',
@@ -215,7 +224,8 @@ export default function Header({
               color: isOnline ? '#137333' : '#92400e'
             }}
           >
-            {isOnline ? '🟢 En ligne' : '🟠 Hors-ligne (PWA)'}
+            <span className={`status-dot ${isOnline ? 'status-dot-green' : 'status-dot-orange'}`} aria-hidden="true" />
+            <span>{isOnline ? 'En ligne' : 'Hors-ligne (PWA)'}</span>
           </span>
 
           <span className="header-desktop-bell">
@@ -227,10 +237,12 @@ export default function Header({
               <a
                 href={isStaffUser ? '/admin' : '/profile'}
                 onClick={() => setMobileMenuOpen(false)}
+                className="nav-link-icon"
                 style={{ fontSize: '12px', color: '#e2e8f0', textDecoration: 'none', wordBreak: 'break-word' }}
                 title="Accéder à mon profil"
               >
-                👤 <strong>{displayName}</strong> <span style={{ color: '#94a3b8' }}>({activeUser.role})</span>
+                <AppIcon name="user" size="sm" />
+                <span><strong>{displayName}</strong> <span style={{ color: '#94a3b8' }}>({activeUser.role})</span></span>
               </a>
               <button
                 type="button"

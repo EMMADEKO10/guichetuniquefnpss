@@ -1,13 +1,14 @@
 'use client';
 
 import React from 'react';
+import AppIcon from './AppIcon.jsx';
 
-const ICONS = {
-  error: '🛑',
-  danger: '🛑',
-  warning: '⚠️',
-  success: '✅',
-  info: 'ℹ️'
+const ICON_NAMES = {
+  error: 'error',
+  danger: 'error',
+  warning: 'warning',
+  success: 'success',
+  info: 'info'
 };
 
 /**
@@ -24,7 +25,7 @@ export default function AlertBanner({
   className = ''
 }) {
   const normalizedVariant = variant === 'danger' ? 'error' : variant;
-  const icon = ICONS[normalizedVariant] || 'ℹ️';
+  const iconName = ICON_NAMES[normalizedVariant] || 'info';
 
   return (
     <div
@@ -32,7 +33,9 @@ export default function AlertBanner({
       className={`alert alert-${normalizedVariant} ${className}`}
       style={{ ...style }}
     >
-      <span className="alert-icon" aria-hidden="true">{icon}</span>
+      <span className="alert-icon" aria-hidden="true">
+        <AppIcon name={iconName} size="md" />
+      </span>
       <div className="alert-body">
         {title && <div className="alert-title">{title}</div>}
         <div>{children || message}</div>
@@ -50,7 +53,7 @@ export default function AlertBanner({
           aria-label="Fermer l'alerte"
           title="Fermer"
         >
-          ✕
+          <AppIcon name="close" size="sm" />
         </button>
       )}
     </div>

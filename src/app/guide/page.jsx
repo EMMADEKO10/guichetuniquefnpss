@@ -5,6 +5,7 @@ import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
+import AppIcon from '../../components/ui/AppIcon.jsx';
 
 const DEFAULT_GUIDE_MODULES = [
   {
@@ -136,17 +137,20 @@ export default function GuidePage() {
             size="sm"
             onClick={() => setActiveTab('ONG')}
           >
-            📘 Guide ONG / ASBL
+            <AppIcon name="guide" size="sm" />
+            <span>Guide ONG / ASBL</span>
           </Button>
           <Button
             variant={activeTab === 'STAFF' ? 'brand' : 'outline'}
             size="sm"
             onClick={() => setActiveTab('STAFF')}
           >
-            🎓 Formations FNPSS / DGDA
+            <AppIcon name="training" size="sm" />
+            <span>Formations FNPSS / DGDA</span>
           </Button>
           <a href="/design-system" className="btn btn-outline btn-sm" style={{ textDecoration: 'none' }}>
-            🎨 Charte &amp; Signaux
+            <AppIcon name="palette" size="sm" />
+            <span>Charte &amp; Signaux</span>
           </a>
         </div>
       </div>
@@ -157,7 +161,8 @@ export default function GuidePage() {
         subtitle="Parcours rapide pour les inspecteurs DGDA, DGI et DGRAD aux postes frontaliers"
         actions={
           <a href="/verifier" className="btn btn-brand btn-sm" style={{ textDecoration: 'none' }}>
-            🔍 Ouvrir le Vérificateur
+            <AppIcon name="verify" size="sm" />
+            <span>Ouvrir le Vérificateur</span>
           </a>
         }
       >
@@ -195,7 +200,7 @@ export default function GuidePage() {
 
           {filteredModules.length === 0 ? (
             <EmptyState
-              icon="🔎"
+              icon="search"
               title="Aucun module correspondant"
               description="Modifiez votre mot-clé pour afficher l'ensemble des étapes du guichet."
               action={
@@ -223,10 +228,12 @@ export default function GuidePage() {
 
           <div className="flex gap-3" style={{ flexWrap: 'wrap', marginTop: '14px' }}>
             <a href="/applications/new" className="btn btn-brand btn-sm" style={{ textDecoration: 'none' }}>
-              🚀 Déposer une nouvelle demande
+              <AppIcon name="launch" size="sm" />
+              <span>Déposer une nouvelle demande</span>
             </a>
             <a href="/dashboard" className="btn btn-outline btn-sm" style={{ textDecoration: 'none' }}>
-              📋 Suivre mes dossiers
+              <AppIcon name="dashboard" size="sm" />
+              <span>Suivre mes dossiers</span>
             </a>
           </div>
         </div>

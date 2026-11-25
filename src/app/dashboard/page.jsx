@@ -17,6 +17,7 @@ import { useToast } from '../../components/ui/ToastProvider.jsx';
 import { getClientToken } from '../../lib/client-auth.js';
 import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
 import QrCodeDisplay from '../../components/ui/QrCodeDisplay.jsx';
+import AppIcon from '../../components/ui/AppIcon.jsx';
 
 const COMPLEMENT_DOC_OPTIONS = [
   { code: 'P1_REQUETE', label: 'P1 — Requête motivée' },
@@ -329,13 +330,13 @@ export default function DashboardPage() {
       }
     >
       {app.status === 'VALIDE_DELIVRE'
-        ? '✓ Délivré'
+        ? 'Délivré'
         : app.status === 'REVOQUE'
-        ? '✕ Révoqué'
+        ? 'Révoqué'
         : app.status === 'REJETE'
-        ? '✕ Rejeté'
+        ? 'Rejeté'
         : app.status === 'COMPLEMENT_REQUIS'
-        ? '⚠️ Complément requis'
+        ? 'Complément requis'
         : app.status === 'SOUMIS'
         ? 'En attente'
         : 'En instruction'}
@@ -353,10 +354,12 @@ export default function DashboardPage() {
         </div>
         <div className="filter-controls-row">
           <a href="/profile" className="btn btn-outline full-width-xs" style={{ textDecoration: 'none' }}>
-            👤 Mon Profil ONG
+            <AppIcon name="user" size="sm" />
+            <span>Mon Profil ONG</span>
           </a>
           <a href="/applications/new" className="btn btn-brand full-width-xs" style={{ textDecoration: 'none' }}>
-            ➕ Déposer une Nouvelle Demande
+            <AppIcon name="add" size="sm" />
+            <span>Déposer une Nouvelle Demande</span>
           </a>
         </div>
       </div>
@@ -380,7 +383,12 @@ export default function DashboardPage() {
               ? 'Votre session a expiré par mesure de sécurité. Veuillez vous reconnecter pour accéder à vos dossiers.'
               : 'Vous consultez actuellement l\'interface sans session active. Connectez-vous avec votre compte ONG pour suivre vos dossiers.'
           }
-          action={<a href="/auth/login" className="btn btn-sm btn-brand" style={{ textDecoration: 'none' }}>🔐 Se connecter</a>}
+          action={
+            <a href="/auth/login" className="btn btn-sm btn-brand" style={{ textDecoration: 'none' }}>
+              <AppIcon name="security" size="sm" />
+              <span>Se connecter</span>
+            </a>
+          }
           style={{ marginBottom: '18px' }}
         />
       )}
@@ -400,7 +408,8 @@ export default function DashboardPage() {
                 setComplementFile(null);
               }}
             >
-              📤 Fournir le complément maintenant
+              <AppIcon name="upload" size="sm" />
+              <span>Fournir le complément maintenant</span>
             </Button>
           }
           style={{ marginBottom: '18px' }}
@@ -450,11 +459,15 @@ export default function DashboardPage() {
                   fontWeight: 700,
                   border: 'none',
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
                   background: viewMode === 'cards' ? 'var(--fnpss-navy)' : '#ffffff',
                   color: viewMode === 'cards' ? '#ffffff' : 'var(--text-main)'
                 }}
               >
-                🗂️ Cartes
+                <AppIcon name="cards" size="xs" />
+                <span>Cartes</span>
               </button>
               <button
                 type="button"
@@ -465,11 +478,15 @@ export default function DashboardPage() {
                   fontWeight: 700,
                   border: 'none',
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
                   background: viewMode === 'table' ? 'var(--fnpss-navy)' : '#ffffff',
                   color: viewMode === 'table' ? '#ffffff' : 'var(--text-main)'
                 }}
               >
-                📋 Tableau
+                <AppIcon name="table" size="xs" />
+                <span>Tableau</span>
               </button>
             </div>
             <select
@@ -509,12 +526,13 @@ export default function DashboardPage() {
           <SkeletonCard rows={4} />
         ) : filteredApps.length === 0 ? (
           <EmptyState
-            icon="📂"
+            icon="folder"
             title="Aucun dossier trouvé pour ces critères"
             description="Commencez par initier une démarche dématérialisée auprès du Guichet Unique FNPSS."
             action={
               <a href="/applications/new" className="btn btn-brand btn-sm" style={{ textDecoration: 'none' }}>
-                ➕ Initier une demande
+                <AppIcon name="add" size="sm" />
+                <span>Initier une demande</span>
               </a>
             }
           />
@@ -565,8 +583,9 @@ export default function DashboardPage() {
                     <strong>Prochaine étape :</strong> {getNextStepText(app)}
                   </div>
                   {app.status === 'COMPLEMENT_REQUIS' && app.complementReason && (
-                    <div style={{ color: '#b91c1c', fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
-                      📩 Motif instructeur : {app.complementReason}
+                    <div style={{ color: '#b91c1c', fontSize: '12px', fontWeight: 700, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <AppIcon name="complement" size="xs" />
+                      <span>Motif instructeur : {app.complementReason}</span>
                     </div>
                   )}
                 </div>
@@ -579,10 +598,12 @@ export default function DashboardPage() {
                     {app.status === 'SOUMIS' && (
                       <>
                         <button type="button" onClick={() => handleOpenEdit(app)} className="btn btn-sm btn-outline">
-                          ✏️ Éditer
+                          <AppIcon name="edit" size="xs" />
+                          <span>Éditer</span>
                         </button>
                         <button type="button" onClick={() => handleWithdraw(app)} className="btn btn-sm btn-danger">
-                          🗑️ Retirer
+                          <AppIcon name="delete" size="xs" />
+                          <span>Retirer</span>
                         </button>
                       </>
                     )}
@@ -596,11 +617,13 @@ export default function DashboardPage() {
                         }}
                         className="btn btn-sm btn-brand"
                       >
-                        📤 Fournir Complément
+                        <AppIcon name="upload" size="xs" />
+                        <span>Fournir Complément</span>
                       </button>
                     )}
                     <button type="button" onClick={() => setThreadApp(app)} className="btn btn-sm btn-outline">
-                      💬 Échanges
+                      <AppIcon name="chat" size="xs" />
+                      <span>Échanges</span>
                     </button>
                     <Button
                       type="button"
@@ -619,7 +642,8 @@ export default function DashboardPage() {
                         }
                       }}
                     >
-                      🧾 Accusé PDF
+                      <AppIcon name="receipt" size="xs" />
+                      <span>Accusé PDF</span>
                     </Button>
                     {app.certificate && (
                       <>
@@ -640,7 +664,8 @@ export default function DashboardPage() {
                             }
                           }}
                         >
-                          📥 PDF Scellé
+                          <AppIcon name="pdfFile" size="xs" />
+                          <span>PDF Scellé</span>
                         </Button>
                         <Button
                           type="button"
@@ -648,7 +673,8 @@ export default function DashboardPage() {
                           variant="outline"
                           onClick={() => setQrModalApp(app)}
                         >
-                          📱 QR Code
+                          <AppIcon name="qr" size="xs" />
+                          <span>QR Code</span>
                         </Button>
                       </>
                     )}
@@ -683,8 +709,9 @@ export default function DashboardPage() {
                       <div style={{ fontWeight: 600, fontSize: '13px' }}>{app.projectTitle || 'Non renseigné'}</div>
                       <div className="text-muted" style={{ fontSize: '11px' }}>{app.goodsSummary || ''}</div>
                       {app.status === 'COMPLEMENT_REQUIS' && app.complementReason && (
-                        <div style={{ color: '#b91c1c', fontSize: '11.5px', fontWeight: 600, marginTop: '4px' }}>
-                          📩 Motif instructeur : {app.complementReason}
+                        <div style={{ color: '#b91c1c', fontSize: '11.5px', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AppIcon name="complement" size="xs" />
+                          <span>Motif instructeur : {app.complementReason}</span>
                         </div>
                       )}
                     </td>
@@ -705,7 +732,8 @@ export default function DashboardPage() {
                               className="btn btn-sm btn-outline"
                               title="Modifier avant instruction (REQ-08)"
                             >
-                              ✏️ Éditer
+                              <AppIcon name="edit" size="xs" />
+                              <span>Éditer</span>
                             </button>
                             <button
                               type="button"
@@ -713,7 +741,8 @@ export default function DashboardPage() {
                               className="btn btn-sm btn-danger"
                               title="Retirer la demande (REQ-08)"
                             >
-                              🗑️ Retirer
+                              <AppIcon name="delete" size="xs" />
+                              <span>Retirer</span>
                             </button>
                           </>
                         )}
@@ -728,7 +757,8 @@ export default function DashboardPage() {
                             className="btn btn-sm btn-brand"
                             title="Joindre la pièce complémentaire demandée (SC-02)"
                           >
-                            📤 Fournir Complément
+                            <AppIcon name="upload" size="xs" />
+                            <span>Fournir Complément</span>
                           </button>
                         )}
                         <button
@@ -737,7 +767,8 @@ export default function DashboardPage() {
                           className="btn btn-sm btn-outline"
                           title="Fil de discussion instructeur / requérant (NOT-04)"
                         >
-                          💬 Échanges
+                          <AppIcon name="chat" size="xs" />
+                          <span>Échanges</span>
                         </button>
                         <Button
                           type="button"
@@ -757,7 +788,8 @@ export default function DashboardPage() {
                             }
                           }}
                         >
-                          🧾 Accusé PDF
+                          <AppIcon name="receipt" size="xs" />
+                          <span>Accusé PDF</span>
                         </Button>
                         {app.certificate && (
                           <>
@@ -778,7 +810,8 @@ export default function DashboardPage() {
                                 }
                               }}
                             >
-                              📥 PDF Scellé
+                              <AppIcon name="pdfFile" size="xs" />
+                              <span>PDF Scellé</span>
                             </Button>
                             <Button
                               type="button"
@@ -786,7 +819,8 @@ export default function DashboardPage() {
                               variant="outline"
                               onClick={() => setQrModalApp(app)}
                             >
-                              📱 QR Code
+                              <AppIcon name="qr" size="xs" />
+                              <span>QR Code</span>
                             </Button>
                           </>
                         )}
@@ -807,7 +841,8 @@ export default function DashboardPage() {
         actions={
           unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
-              ✓ Tout marquer comme lu
+              <AppIcon name="check" size="xs" />
+              <span>Tout marquer comme lu</span>
             </Button>
           )
         }
@@ -921,7 +956,8 @@ export default function DashboardPage() {
               Annuler
             </Button>
             <Button variant="brand" onClick={handleProvideComplement} isLoading={complementBusy} loadingText="Chiffrement & Envoi...">
-              📤 Déposer le Complément
+              <AppIcon name="upload" size="sm" />
+              <span>Déposer le Complément</span>
             </Button>
           </>
         }

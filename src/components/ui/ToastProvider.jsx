@@ -1,14 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import AppIcon from './AppIcon.jsx';
 
 const ToastContext = createContext(null);
 
-const TOAST_ICONS = {
-  success: '✅',
-  error: '🛑',
-  warning: '⚠️',
-  info: 'ℹ️'
+const TOAST_ICON_CONFIG = {
+  success: { name: 'success', color: '#16a34a' },
+  error: { name: 'error', color: '#dc2626' },
+  warning: { name: 'warning', color: '#d97706' },
+  info: { name: 'info', color: '#2563eb' }
 };
 
 export function ToastProvider({ children }) {
@@ -41,32 +42,36 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={api}>
       {children}
       <div className="toast-container" role="region" aria-label="Notifications système" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast-item toast-${t.type}`} role="status">
-            <span aria-hidden="true" style={{ fontSize: '16px', flexShrink: 0 }}>
-              {TOAST_ICONS[t.type] || 'ℹ️'}
-            </span>
-            <div style={{ flex: 1 }}>
-              {t.title && <div style={{ fontWeight: 700, color: 'var(--fnpss-navy)', marginBottom: '2px' }}>{t.title}</div>}
-              <div style={{ color: 'var(--text-main)' }}>{t.message}</div>
+        {toasts.map((t) => {
+          const iconCfg = TOAST_ICON_CONFIG[t.type] || TOAST_ICON_CONFIG.info;
+          return (
+            <div key={t.id} className={`toast-item toast-${t.type}`} role="status">
+              <span aria-hidden="true" style={{ color: iconCfg.color, flexShrink: 0, marginTop: '1px' }}>
+                <AppIcon name={iconCfg.name} size="md" />
+              </span>
+              <div style={{ flex: 1 }}>
+                {t.title && <div style={{ fontWeight: 700, color: 'var(--fnpss-navy)', marginBottom: '2px' }}>{t.title}</div>}
+                <div style={{ color: 'var(--text-main)' }}>{t.message}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => dismiss(t.id)}
+                aria-label="Fermer la notification"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: '2px',
+                  display: 'inline-flex',
+                  alignItems: 'center'
+                }}
+              >
+                <AppIcon name="close" size="xs" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => dismiss(t.id)}
-              aria-label="Fermer la notification"
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-                fontSize: '14px',
-                padding: '0 2px'
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

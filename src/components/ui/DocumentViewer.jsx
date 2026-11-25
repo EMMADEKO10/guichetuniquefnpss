@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Badge from './Badge.jsx';
 import Button from './Button.jsx';
+import AppIcon from './AppIcon.jsx';
 import { downloadAuthenticatedFile } from '../../lib/secure-download.js';
 
 /**
@@ -58,8 +59,9 @@ export default function DocumentViewer({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)' }}>
-            📑 Pièces Justificatives ({documents.length})
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--fnpss-navy)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <AppIcon name="documents" size="sm" />
+            <span>Pièces Justificatives ({documents.length})</span>
           </span>
           {documents.length > 0 && (
             <Badge status={checkedCount === documents.length ? 'valide' : 'info'}>
@@ -73,7 +75,12 @@ export default function DocumentViewer({
               SHA-256: {activeDoc.sha256 ? `${activeDoc.sha256.substring(0, 16)}...` : 'Non calculé'}
             </span>
             <Badge status={activeDoc.sha256 ? 'valide' : 'instruction'}>
-              {activeDoc.sha256 ? '✓ Intègre' : 'En attente'}
+              {activeDoc.sha256 ? (
+                <>
+                  <AppIcon name="check" size="xs" />
+                  <span>Intègre</span>
+                </>
+              ) : 'En attente'}
             </Badge>
           </div>
         )}
@@ -107,12 +114,12 @@ export default function DocumentViewer({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{doc.docCode}</span>
-                  <span>
-                    {doc.stored && <span title="Stocké et chiffré AES-256-GCM sur Cloudinary" style={{ marginRight: '4px' }}>🔒</span>}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {doc.stored && <AppIcon name="lock" size="xs" title="Stocké et chiffré AES-256-GCM sur Cloudinary" />}
                     {isVerified ? (
-                      <span title="Marquée vérifiée" style={{ color: 'var(--fnpss-green)', fontWeight: 800 }}>☑</span>
+                      <AppIcon name="checkbox" size="xs" title="Marquée vérifiée" style={{ color: 'var(--fnpss-green)' }} />
                     ) : doc.sha256 ? (
-                      <span style={{ color: 'var(--fnpss-green)' }}>✓</span>
+                      <AppIcon name="check" size="xs" style={{ color: 'var(--fnpss-green)' }} />
                     ) : null}
                   </span>
                 </div>
@@ -128,7 +135,9 @@ export default function DocumentViewer({
         <div style={{ padding: '16px', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 0 }}>
           {activeDoc ? (
             <div style={{ width: '100%', maxWidth: '480px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '18px 14px' }}>
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>📄</div>
+              <div style={{ color: 'var(--fnpss-blue)', marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
+                <AppIcon name="pdf" size="xl" />
+              </div>
               <h4 style={{ fontSize: '14px', marginBottom: '6px', wordBreak: 'break-word' }}>{activeDoc.name}</h4>
               <p className="text-muted" style={{ fontSize: '12px', marginBottom: '12px', wordBreak: 'break-word' }}>
                 Fichier : <strong>{activeDoc.fileName || `${activeDoc.docCode}.pdf`}</strong>
@@ -143,7 +152,10 @@ export default function DocumentViewer({
                 </div>
               )}
               <div className="flex gap-2 justify-between" style={{ flexWrap: 'wrap', marginBottom: '12px' }}>
-                <span className="badge badge-valide">✓ Format PDF/A Conforme</span>
+                <span className="badge badge-valide">
+                  <AppIcon name="check" size="xs" />
+                  <span>Format PDF/A Conforme</span>
+                </span>
                 <span className="badge badge-soumis">Anti-malware vérifié</span>
               </div>
 
@@ -185,7 +197,8 @@ export default function DocumentViewer({
                       }
                     }}
                   >
-                    🔓 Ouvrir &amp; Déchiffrer le PDF (Cloudinary AES-256-GCM)
+                    <AppIcon name="unlock" size="sm" />
+                    <span>Ouvrir &amp; Déchiffrer le PDF (Cloudinary AES-256-GCM)</span>
                   </Button>
                   {docError && (
                     <div role="alert" style={{ marginTop: '8px', fontSize: '12px', color: '#991b1b', fontWeight: 600 }}>
@@ -194,8 +207,9 @@ export default function DocumentViewer({
                   )}
                 </div>
               ) : (
-                <div className="text-muted" style={{ fontSize: '11px' }}>
-                  ℹ️ Empreinte SHA-256 enregistrée (binaire non archivé sur Cloudinary pour cet ancien dépôt).
+                <div className="text-muted" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <AppIcon name="info" size="xs" />
+                  <span>Empreinte SHA-256 enregistrée (binaire non archivé sur Cloudinary pour cet ancien dépôt).</span>
                 </div>
               )}
             </div>

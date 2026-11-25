@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import AlertBanner from './AlertBanner.jsx';
 import Button from './Button.jsx';
+import AppIcon from './AppIcon.jsx';
 import { useToast } from './ToastProvider.jsx';
 import { getClientToken } from '../../lib/client-auth.js';
 
@@ -142,7 +143,8 @@ export default function PwaManager() {
           message="Votre connexion est revenue. Synchronisez vos soumissions enregistrées hors-ligne sans risque de doublon."
           action={
             <Button size="sm" variant="brand" isLoading={isSyncing} loadingText="Synchronisation..." onClick={handleSyncNow}>
-              🔄 Synchroniser {pendingQueue.length} dossier(s)
+              <AppIcon name="sync" size="sm" />
+              <span>Synchroniser {pendingQueue.length} dossier(s)</span>
             </Button>
           }
         />

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import Button from './Button.jsx';
+import AppIcon from './AppIcon.jsx';
 import { useToast } from './ToastProvider.jsx';
 
 /**
@@ -128,10 +129,12 @@ export default function QrCodeDisplay({
 
       <div className="flex gap-2" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
         <Button type="button" size="sm" variant="primary" disabled={!dataUrl} onClick={handleDownloadPng}>
-          ⬇️ Télécharger PNG
+          <AppIcon name="download" size="sm" />
+          <span>Télécharger PNG</span>
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={handleCopyUrl}>
-          📋 Copier le lien
+          <AppIcon name="copy" size="sm" />
+          <span>Copier le lien</span>
         </Button>
         <a
           href={value}
@@ -140,7 +143,8 @@ export default function QrCodeDisplay({
           className="btn btn-sm btn-outline"
           style={{ textDecoration: 'none' }}
         >
-          🔍 Ouvrir /verifier
+          <AppIcon name="verify" size="sm" />
+          <span>Ouvrir /verifier</span>
         </a>
       </div>
     </div>

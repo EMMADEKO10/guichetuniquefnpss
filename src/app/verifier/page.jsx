@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import AlertBanner from '../../components/ui/AlertBanner.jsx';
 import QrCodeDisplay from '../../components/ui/QrCodeDisplay.jsx';
+import AppIcon from '../../components/ui/AppIcon.jsx';
 import { useToast } from '../../components/ui/ToastProvider.jsx';
 
 const HISTORY_STORAGE_KEY = 'fnpss_verify_history_v1';
@@ -429,15 +430,17 @@ export default function VerifierPage() {
         )}
       </Card>
 
-      <Card title="📷 Scanner un QR Code (Caméra Mobile ou Image — Inspection Douanière)">
+      <Card title="Scanner un QR Code (Caméra Mobile ou Image — Inspection Douanière)">
         <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap', marginBottom: cameraActive || cameraInfo ? '12px' : 0 }}>
           {!cameraActive ? (
             <Button type="button" variant="primary" size="sm" onClick={startCameraScan}>
-              📷 Activer la caméra QR Code
+              <AppIcon name="camera" size="sm" />
+              <span>Activer la caméra QR Code</span>
             </Button>
           ) : (
             <Button type="button" variant="outline" size="sm" onClick={stopCameraScan}>
-              ⏹ Arrêter le scanner caméra
+              <AppIcon name="stop" size="sm" />
+              <span>Arrêter le scanner caméra</span>
             </Button>
           )}
           <Button
@@ -446,7 +449,8 @@ export default function VerifierPage() {
             size="sm"
             onClick={() => qrImageInputRef.current?.click()}
           >
-            🖼️ Importer une image QR Code
+            <AppIcon name="image" size="sm" />
+            <span>Importer une image QR Code</span>
           </Button>
           <input
             ref={qrImageInputRef}
@@ -519,8 +523,16 @@ export default function VerifierPage() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '34px' }} aria-hidden="true">
-                  {isGreen ? '🟢' : isExpired ? '⚪' : '🔴'}
+                <span
+                  className="verdict-seal-icon"
+                  aria-hidden="true"
+                  style={{
+                    background: isGreen ? '#dcfce7' : isExpired ? '#e2e8f0' : '#fee2e2',
+                    color: isGreen ? '#166534' : isExpired ? '#334155' : '#991b1b',
+                    border: `2px solid ${isGreen ? 'var(--fnpss-green)' : isExpired ? '#64748b' : 'var(--fnpss-red)'}`
+                  }}
+                >
+                  <AppIcon name={isGreen ? 'verified' : isExpired ? 'expired' : 'gppBad'} size="xl" />
                 </span>
                 <div>
                   <h3 style={{ margin: 0, color: isGreen ? '#166534' : isExpired ? '#334155' : '#991b1b' }}>
@@ -540,10 +552,14 @@ export default function VerifierPage() {
 
               <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                 <Badge status={result.onChainVerified ? 'valide' : 'neutral'}>
-                  {result.onChainVerified ? '⛓️ Preuve Polygon Confirmée' : 'Registre FNPSS Local'}
+                  <AppIcon name="chain" size="xs" />
+                  <span>{result.onChainVerified ? 'Preuve Polygon Confirmée' : 'Registre FNPSS Local'}</span>
                 </Badge>
                 {result.ministryCoSigned && (
-                  <Badge status="info">🏛️ Co-signé Ministère</Badge>
+                  <Badge status="info">
+                    <AppIcon name="institution" size="xs" />
+                    <span>Co-signé Ministère</span>
+                  </Badge>
                 )}
               </div>
             </div>

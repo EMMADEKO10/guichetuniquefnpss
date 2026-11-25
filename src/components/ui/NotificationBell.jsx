@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getClientToken, getClientUser } from '../../lib/client-auth.js';
+import AppIcon from './AppIcon.jsx';
 
 const STAFF_ROLES = ['AGENT', 'CHEF_DIVISION', 'DG', 'MINISTERE', 'ADMIN'];
 
@@ -134,7 +135,7 @@ export default function NotificationBell() {
         aria-expanded={isOpen}
         title="Centre de notifications"
       >
-        <span aria-hidden="true">🔔</span>
+        <AppIcon name="bell" size="md" />
         {unreadCount > 0 && (
           <span className="notif-count-pill">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -160,8 +161,9 @@ export default function NotificationBell() {
                 Notifications ({unreadCount} non lue{unreadCount > 1 ? 's' : ''})
               </strong>
               {emailRetryQueued > 0 && (
-                <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 600 }}>
-                  ⚠️ {emailRetryQueued} email(s) en file de reprise SMTP
+                <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <AppIcon name="warning" size="xs" />
+                  <span>{emailRetryQueued} email(s) en file de reprise SMTP</span>
                 </div>
               )}
             </div>
@@ -182,8 +184,9 @@ export default function NotificationBell() {
                 className="btn btn-sm btn-outline"
                 style={{ fontSize: '11px', padding: '3px 8px' }}
                 title="Actualiser"
+                aria-label="Actualiser les notifications"
               >
-                ↻
+                <AppIcon name="refresh" size="xs" />
               </button>
             </div>
           </div>
