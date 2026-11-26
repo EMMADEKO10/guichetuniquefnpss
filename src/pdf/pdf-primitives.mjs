@@ -4,6 +4,11 @@
  */
 
 import QRCode from 'qrcode';
+import {
+  FNPSS_LOGO_JPEG_WIDTH,
+  FNPSS_LOGO_JPEG_HEIGHT,
+  FNPSS_LOGO_JPEG_BUFFER
+} from './fnpss-logo-embed.mjs';
 
 export function escapePdfText(input) {
   return String(input || '')
@@ -68,17 +73,13 @@ export function drawSovereignHeaderAndFrame(ops, { subtitle = 'Guichet Unique De
   ops.push('0.039 0.145 0.251 rg 22 728 551 87 re f');
   ops.push('0.875 0.325 0.067 rg 22 725 551 3 re f');
 
-  // Medaillon vectoriel officiel FNPSS
-  ops.push('1 1 1 rg 0.875 0.325 0.067 RG 1.6 w');
-  pushCirclePath(ops, 62, 771, 25);
-  ops.push('B');
-  ops.push('0.039 0.145 0.251 RG 0.8 w');
-  pushCirclePath(ops, 62, 771, 20.5);
-  ops.push('S');
-  // Losange or RDC + monogramme FNPSS
-  ops.push('0.969 0.839 0.094 rg 62 786 m 67 781 l 62 776 l 57 781 l h f');
-  pushPdfText(ops, { font: '/F2', size: 9, x: 46, y: 765, text: 'FNPSS', rgb: '0.039 0.145 0.251' });
-  pushPdfText(ops, { font: '/F2', size: 6.5, x: 54, y: 756, text: 'RDC', rgb: '0.875 0.325 0.067' });
+  // Cartouche blanc + vrai logo officiel FNPSS (/ImLogo JPEG)
+  ops.push('1 1 1 rg 34 739 56 64 re f');
+  ops.push('0.875 0.325 0.067 RG 1.1 w 34 739 56 64 re S');
+  ops.push('q');
+  ops.push('48 0 0 51 38 745.5 cm');
+  ops.push('/ImLogo Do');
+  ops.push('Q');
 
   // Textes institutionnels blancs dans l'en-tete
   pushPdfText(ops, { font: '/F2', size: 11, x: 102, y: 793, text: 'REPUBLIQUE DEMOCRATIQUE DU CONGO', rgb: '1 1 1' });
@@ -178,30 +179,46 @@ export function compileMultiFontPdfBuffer(streamOps) {
   const streamContent = streamOps.join('\n') + '\n';
   const streamByteLength = Buffer.byteLength(streamContent, 'ascii');
 
-  const objects = [
-    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
-    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
-    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 6 0 R /F3 7 0 R >> >> /Contents 5 0 R >>\nendobj\n',
-    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
-    `5 0 obj\n<< /Length ${streamByteLength} >>\nstream\n${streamContent}endstream\nendobj\n`,
-    '6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n',
-    '7 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n'
+  const imageHeader =
+    `8 0 obj\n<< /Type /XObject /Subtype /Image /Width ${FNPSS_LOGO_JPEG_WIDTH} /Height ${FNPSS_LOGO_JPEG_HEIGHT} ` +
+    `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${FNPSS_LOGO_JPEG_BUFFER.length} >>\nstream\n`;
+  const imageObjBuf = Buffer.concat([
+    Buffer.from(imageHeader, 'ascii'),
+    FNPSS_LOGO_JPEG_BUFFER,
+    Buffer.from('\nendstream\nendobj\n', 'ascii')
+  ]);
+
+  const objectBuffers = [
+    Buffer.from('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n', 'ascii'),
+    Buffer.from('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n', 'ascii'),
+    Buffer.from(
+      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 6 0 R /F3 7 0 R >> /XObject << /ImLogo 8 0 R >> >> /Contents 5 0 R >>\nendobj\n',
+      'ascii'
+    ),
+    Buffer.from('4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n', 'ascii'),
+    Buffer.from(`5 0 obj\n<< /Length ${streamByteLength} >>\nstream\n${streamContent}endstream\nendobj\n`, 'ascii'),
+    Buffer.from('6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n', 'ascii'),
+    Buffer.from('7 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n', 'ascii'),
+    imageObjBuf
   ];
 
-  let pdf = '%PDF-1.4\n';
+  const chunks = [Buffer.from('%PDF-1.4\n', 'ascii')];
+  let currentOffset = chunks[0].length;
   const offsets = [0];
-  for (const obj of objects) {
-    offsets.push(Buffer.byteLength(pdf, 'ascii'));
-    pdf += obj;
+  for (const objBuf of objectBuffers) {
+    offsets.push(currentOffset);
+    chunks.push(objBuf);
+    currentOffset += objBuf.length;
   }
 
-  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
-  pdf += `xref\n0 ${objects.length + 1}\n`;
-  pdf += '0000000000 65535 f \n';
-  for (let i = 1; i <= objects.length; i++) {
-    pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+  const xrefOffset = currentOffset;
+  let xref = `xref\n0 ${objectBuffers.length + 1}\n`;
+  xref += '0000000000 65535 f \n';
+  for (let i = 1; i <= objectBuffers.length; i++) {
+    xref += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
   }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  xref += `trailer\n<< /Size ${objectBuffers.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  chunks.push(Buffer.from(xref, 'ascii'));
 
-  return Buffer.from(pdf, 'ascii');
+  return Buffer.concat(chunks);
 }

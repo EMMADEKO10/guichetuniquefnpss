@@ -4054,6 +4054,67 @@ test('Test 42 - Suppression notifications (unitaire, selection multiple, suppres
   assert.equal(auditNextAppAccessibility(process.cwd()).passed, true);
 });
 
+test('Test 43 - Integration du vrai logo officiel FNPSS (/ImLogo JPEG) dans les PDF scelles et accusses', async () => {
+  const { generateReceiptPdfBuffer } = await import('../src/pdf/receipt-pdf-generator.mjs');
+  const { FNPSS_LOGO_JPEG_WIDTH, FNPSS_LOGO_JPEG_HEIGHT } = await import('../src/pdf/fnpss-logo-embed.mjs');
+
+  const certPdf = generateOfficialPdfBuffer({
+    certificateNumber: 'FNPSS/CEX/2026/00043',
+    serviceCode: 'S4',
+    organizationName: 'ONG Espoir du Nord-Kivu',
+    projectTitle: 'Couveuses et Ambulances Rurales',
+    goodsSummary: '50 couveuses pediatriques (SH 9018.90)',
+    issuedAtIso: '2026-11-25T16:00:00Z',
+    expiresAtIso: '2027-11-25T16:00:00Z',
+    docHash: '0x' + 'ab'.repeat(32),
+    txHash: '0x' + 'cd'.repeat(32),
+    qrVerificationUrl: 'https://guichetuniquefnpss.vercel.app/verifier?cert=FNPSS%2FCEX%2F2026%2F00043'
+  });
+
+  const receiptPdf = generateReceiptPdfBuffer({
+    referenceNumber: 'FNPSS/DEM/2026/00043',
+    serviceCode: 'S4',
+    organizationName: 'ONG Espoir du Nord-Kivu',
+    projectTitle: 'Couveuses et Ambulances Rurales',
+    paymentReference: 'RAWBANK-TRX-2026-9874',
+    status: 'SOUMIS',
+    attachedDocuments: [{ docCode: 'P1_REQUETE', fileName: 'P1.pdf', sha256Hash: '0x' + '11'.repeat(32) }]
+  });
+
+  for (const [label, buf] of [['certificat.pdf', certPdf], ['accuse.pdf', receiptPdf]]) {
+    const latin = buf.toString('latin1');
+    assert.ok(latin.startsWith('%PDF-1.4\n'), `${label} doit demarrer par %PDF-1.4`);
+    assert.ok(latin.trimEnd().endsWith('%%EOF'), `${label} doit finir par %%EOF`);
+    assert.ok(latin.includes('/ImLogo Do'), `${label} doit dessiner le vrai logo /ImLogo`);
+    assert.ok(latin.includes('/Subtype /Image'), `${label} doit embarquer un XObject Image`);
+    assert.ok(latin.includes('/Filter /DCTDecode'), `${label} doit utiliser /DCTDecode JPEG`);
+    assert.ok(latin.includes(`/Width ${FNPSS_LOGO_JPEG_WIDTH}`) && latin.includes(`/Height ${FNPSS_LOGO_JPEG_HEIGHT}`), `${label} doit declarer 256x272`);
+    assert.equal(latin.includes('(RDC) Tj'), false, `${label} ne doit plus contenir l'ancien monogramme synthetique RDC`);
+    assert.ok(buf.length < 100 * 1024, `${label} doit rester sous 100 Ko`);
+
+    const check = validateAndInspectPdfUpload(buf, { fileName: label });
+    assert.equal(check.isSafePdf, true, `${label} doit passer validateAndInspectPdfUpload`);
+
+    // Verifier exactitude binaire de la table xref pour objets 1..8
+    const startXrefMatch = latin.match(/startxref\n(\d+)\n%%EOF/);
+    assert.ok(startXrefMatch, `${label} doit contenir startxref`);
+    const xrefPos = Number(startXrefMatch[1]);
+    assert.equal(buf.subarray(xrefPos, xrefPos + 4).toString('ascii'), 'xref', `${label} startxref doit pointer sur xref`);
+    const xrefText = latin.slice(xrefPos);
+    const entryLines = xrefText.match(/\d{10} 00000 n /g) || [];
+    assert.equal(entryLines.length, 8, `${label} doit referencer exactement 8 objets dans xref`);
+    entryLines.forEach((line, idx) => {
+      const objOffset = Number(line.slice(0, 10));
+      const expectedPrefix = `${idx + 1} 0 obj`;
+      assert.equal(
+        buf.subarray(objOffset, objOffset + expectedPrefix.length).toString('ascii'),
+        expectedPrefix,
+        `${label} offset xref invalide pour objet ${idx + 1}`
+      );
+    });
+  }
+});
+
 
 
 
