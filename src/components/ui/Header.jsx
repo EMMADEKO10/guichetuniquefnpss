@@ -144,11 +144,11 @@ export default function Header({
               />
             </div>
             <div style={{ minWidth: 0 }}>
-              <h1 style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
+              <h1 style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em', color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
                 Guichet Unique Dématérialisé
               </h1>
               <p style={{ fontSize: '11.5px', color: '#cbd5e1', margin: 0, lineHeight: 1.2 }}>
-                FNPSS &bull; <span style={{ color: '#f7d618', fontWeight: 600 }}>Le social dans la solidarité</span> &bull; RDC
+                FNPSS &bull; <span style={{ color: '#f7d618', fontWeight: 500 }}>Le social dans la solidarité</span> &bull; RDC
               </p>
             </div>
           </a>
